@@ -4,11 +4,14 @@ package httpx
 
 import (
 	"io/fs"
+	"log/slog"
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/jackc/pgx/v5/pgxpool"
+
+	db "bealhouse/internal/db/gen"
 )
 
 // Deps are the collaborators the HTTP layer needs. Pool may be nil when the
@@ -28,8 +31,15 @@ func NewRouter(d Deps) http.Handler {
 	r.Route("/api", func(api chi.Router) {
 		api.Get("/health", health(d.Pool))
 
-		// Domain routes land here in build-order step 2 onward:
-		// availability, rooms, bookings, admin.
+		if d.Pool != nil {
+			q := db.New(d.Pool)
+			api.Get("/availability", searchAvailability(q))
+		} else {
+			// Better an honest 503 than a route that silently does not exist.
+			api.Get("/availability", databaseRequired)
+		}
+
+		// Remaining domain routes land here: rooms, bookings, admin.
 		api.NotFound(func(w http.ResponseWriter, r *http.Request) {
 			writeJSON(w, http.StatusNotFound, map[string]string{
 				"error": "no such endpoint",
@@ -41,4 +51,26 @@ func NewRouter(d Deps) http.Handler {
 	r.NotFound(serveSPA(d.SPA))
 
 	return r
+}
+
+func badRequest(w http.ResponseWriter, reason string) {
+	writeJSON(w, http.StatusBadRequest, map[string]string{"error": reason})
+}
+
+// serverError logs the cause and tells the client nothing about it.
+func serverError(w http.ResponseWriter, r *http.Request, err error) {
+	slog.Error("request failed",
+		"err", err,
+		"path", r.URL.Path,
+		"request_id", middleware.GetReqID(r.Context()),
+	)
+	writeJSON(w, http.StatusInternalServerError, map[string]string{
+		"error": "something went wrong",
+	})
+}
+
+func databaseRequired(w http.ResponseWriter, r *http.Request) {
+	writeJSON(w, http.StatusServiceUnavailable, map[string]string{
+		"error": "this endpoint needs a database; DATABASE_URL is not configured",
+	})
 }

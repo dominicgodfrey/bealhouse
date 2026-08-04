@@ -7,6 +7,8 @@ package db
 
 import (
 	"context"
+
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 const getRoomIDBySlug = `-- name: GetRoomIDBySlug :one
@@ -21,20 +23,36 @@ func (q *Queries) GetRoomIDBySlug(ctx context.Context, slug string) (int64, erro
 }
 
 const getSettings = `-- name: GetSettings :one
-SELECT id, default_min_stay, tax_rate, hold_ttl_minutes, checkin_time, checkout_time, updated_at, accessibility_notice FROM settings WHERE id
+SELECT
+  default_min_stay,
+  (tax_rate * 100000)::bigint AS tax_rate_scaled,
+  hold_ttl_minutes,
+  checkin_time,
+  checkout_time,
+  accessibility_notice
+FROM settings WHERE id
 `
 
-func (q *Queries) GetSettings(ctx context.Context) (Setting, error) {
+type GetSettingsRow struct {
+	DefaultMinStay      int32
+	TaxRateScaled       int64
+	HoldTtlMinutes      int32
+	CheckinTime         pgtype.Time
+	CheckoutTime        pgtype.Time
+	AccessibilityNotice string
+}
+
+// The tax rate is scaled to hundred-thousandths in SQL so Go never decodes a
+// numeric into a float. pricing.Rate expects exactly this scale.
+func (q *Queries) GetSettings(ctx context.Context) (GetSettingsRow, error) {
 	row := q.db.QueryRow(ctx, getSettings)
-	var i Setting
+	var i GetSettingsRow
 	err := row.Scan(
-		&i.ID,
 		&i.DefaultMinStay,
-		&i.TaxRate,
+		&i.TaxRateScaled,
 		&i.HoldTtlMinutes,
 		&i.CheckinTime,
 		&i.CheckoutTime,
-		&i.UpdatedAt,
 		&i.AccessibilityNotice,
 	)
 	return i, err
