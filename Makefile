@@ -55,9 +55,10 @@ migrate-status:
 migration:
 	go tool goose -dir $(MIGRATIONS) -s create $(name) sql
 
-## seed: load the seven real rooms (re-runnable)
+## seed: load the seven rooms and the placeholder rate season (re-runnable)
 seed:
 	docker compose exec -T postgres psql -U bealhouse -d bealhouse -v ON_ERROR_STOP=1 -f - < internal/db/seed/rooms.sql
+	docker compose exec -T postgres psql -U bealhouse -d bealhouse -v ON_ERROR_STOP=1 -f - < internal/db/seed/rates.sql
 
 ## gen: regenerate type-safe query code from SQL
 gen:

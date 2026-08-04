@@ -11,6 +11,7 @@ import (
 	"os"
 	"testing"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -38,6 +39,26 @@ func Connect(t *testing.T) *pgxpool.Pool {
 
 	t.Cleanup(pool.Close)
 	return pool
+}
+
+// Tx starts a transaction that is always rolled back when the test ends.
+//
+// Tests that need to rewrite reference data — replacing every rate season, say —
+// use this so they can do so freely without leaving the developer's database in
+// a state that later confuses the running application.
+func Tx(t *testing.T, pool *pgxpool.Pool) pgx.Tx {
+	t.Helper()
+
+	tx, err := pool.Begin(context.Background())
+	if err != nil {
+		t.Fatalf("beginning test transaction: %v", err)
+	}
+	t.Cleanup(func() {
+		// Rollback on an already-finished transaction is a no-op error we do
+		// not care about.
+		_ = tx.Rollback(context.Background())
+	})
+	return tx
 }
 
 // ResetOccupancy empties room_occupancy so a test starts from a known state.

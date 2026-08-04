@@ -10,6 +10,30 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+type RateCalendar struct {
+	RoomID     int64
+	Date       pgtype.Date
+	PriceCents int32
+	MinStay    int32
+}
+
+type RateSeason struct {
+	ID        int64
+	Name      string
+	StartsOn  pgtype.Date
+	EndsOn    pgtype.Date
+	MinStay   *int32
+	Priority  int32
+	CreatedAt time.Time
+	UpdatedAt time.Time
+}
+
+type RateSeasonPrice struct {
+	SeasonID   int64
+	RoomID     int64
+	PriceCents int32
+}
+
 type Room struct {
 	ID                    int64
 	Slug                  string
