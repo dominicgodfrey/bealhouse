@@ -55,6 +55,10 @@ migrate-status:
 migration:
 	go tool goose -dir $(MIGRATIONS) -s create $(name) sql
 
+## seed: load the seven real rooms (re-runnable)
+seed:
+	docker compose exec -T postgres psql -U bealhouse -d bealhouse -v ON_ERROR_STOP=1 -f - < internal/db/seed/rooms.sql
+
 ## gen: regenerate type-safe query code from SQL
 gen:
 	go tool sqlc generate
@@ -63,4 +67,4 @@ gen:
 tidy:
 	go mod tidy
 
-.PHONY: help dev web build run test db-up db-down db-reset migrate migrate-down migrate-status migration gen tidy
+.PHONY: help dev web build run test db-up db-down db-reset migrate migrate-down migrate-status migration seed gen tidy
