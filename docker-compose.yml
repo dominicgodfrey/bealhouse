@@ -1,0 +1,22 @@
+# Local Postgres only. The application itself is not containerised: it ships as
+# a single Go binary to the VPS (architecture decision #3).
+services:
+  postgres:
+    image: postgres:17-alpine
+    container_name: bealhouse-postgres
+    environment:
+      POSTGRES_USER: bealhouse
+      POSTGRES_PASSWORD: bealhouse
+      POSTGRES_DB: bealhouse
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U bealhouse -d bealhouse"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  postgres-data:

@@ -1,0 +1,13 @@
+# Build output
+/bin/
+web/dist/*
+!web/dist/.gitkeep
+
+# Dependencies
+web/node_modules/
+
+# Local config and secrets
+.env
+
+# Uploaded media (served from disk in production)
+/media/

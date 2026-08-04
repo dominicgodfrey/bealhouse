@@ -1,0 +1,18 @@
+# The repository stores LF. Development happens on Windows but the binary is
+# built for and deployed to a Linux VPS, so anything the build or the server
+# reads must not acquire CRLF on checkout.
+* text=auto eol=lf
+
+# Binary assets: never touch.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.webp binary
+*.avif binary
+*.pdf binary
+*.woff binary
+*.woff2 binary
+
+# Generated; keep diffs collapsed in review.
+web/package-lock.json linguist-generated=true
+internal/db/gen/** linguist-generated=true
