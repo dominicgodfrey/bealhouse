@@ -311,16 +311,15 @@ func TestSweptHoldFreesTheRoomAndExpiresTheBooking(t *testing.T) {
 		t.Fatalf("ageing the hold: %v", err)
 	}
 
-	swept, err := q.SweepExpiredHolds(ctx)
+	holds, expired, err := Sweep(ctx, q)
 	if err != nil {
 		t.Fatalf("sweeping: %v", err)
 	}
-	if swept == 0 {
-		t.Fatal("the sweeper found nothing to reclaim")
+	if holds == 0 {
+		t.Fatal("the sweeper found no hold to reclaim")
 	}
-
-	if _, err := q.ExpireAbandonedBookings(ctx); err != nil {
-		t.Fatalf("expiring abandoned bookings: %v", err)
+	if expired == 0 {
+		t.Fatal("the hold went but the booking behind it stayed pending")
 	}
 
 	read, err := Get(ctx, q, made.Code)

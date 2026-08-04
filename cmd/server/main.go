@@ -14,7 +14,9 @@ import (
 
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"bealhouse/internal/booking"
 	"bealhouse/internal/config"
+	db "bealhouse/internal/db/gen"
 	"bealhouse/internal/httpx"
 	"bealhouse/web"
 )
@@ -43,6 +45,13 @@ func run() error {
 
 	if !web.Built() {
 		slog.Warn("SPA bundle is empty; non-API routes will 503 until `make web` runs")
+	}
+
+	// Without this an abandoned checkout holds its room forever, which is
+	// worse than the double-booking the hold exists to prevent. Step 4's
+	// durable job runner takes this over along with the T-7 charges.
+	if pool != nil {
+		go booking.RunSweeper(ctx, db.New(pool))
 	}
 
 	srv := &http.Server{
