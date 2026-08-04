@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 800" role="img" aria-label="Placeholder image for Mrs. Beal&apos;s Suite">
+  <rect width="1200" height="800" fill="#e8e3db"/>
+  <rect x="24" y="24" width="1152" height="752" fill="none" stroke="#c9c0b3" stroke-width="2" stroke-dasharray="14 10"/>
+  <g fill="#8b8071" font-family="ui-sans-serif, system-ui, -apple-system, sans-serif" text-anchor="middle">
+    <text x="600" y="378" font-size="48" font-weight="600">Mrs. Beal&apos;s Suite</text>
+    <text x="600" y="438" font-size="26" letter-spacing="2">PHOTO PLACEHOLDER</text>
+    <text x="600" y="486" font-size="20" fill="#a2988a">Replaced when the owner uploads in admin</text>
+  </g>
+</svg>

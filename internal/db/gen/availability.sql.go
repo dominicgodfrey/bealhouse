@@ -50,6 +50,45 @@ func (q *Queries) ListBedsForRooms(ctx context.Context, roomIds []int64) ([]List
 	return items, nil
 }
 
+const listPhotosForRooms = `-- name: ListPhotosForRooms :many
+SELECT room_id, path, alt_text, sort_order
+FROM room_photos
+WHERE room_id = ANY($1::bigint[])
+ORDER BY room_id, sort_order, id
+`
+
+type ListPhotosForRoomsRow struct {
+	RoomID    int64
+	Path      string
+	AltText   string
+	SortOrder int32
+}
+
+func (q *Queries) ListPhotosForRooms(ctx context.Context, roomIds []int64) ([]ListPhotosForRoomsRow, error) {
+	rows, err := q.db.Query(ctx, listPhotosForRooms, roomIds)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListPhotosForRoomsRow{}
+	for rows.Next() {
+		var i ListPhotosForRoomsRow
+		if err := rows.Scan(
+			&i.RoomID,
+			&i.Path,
+			&i.AltText,
+			&i.SortOrder,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const searchAvailability = `-- name: SearchAvailability :many
 SELECT
   r.id,

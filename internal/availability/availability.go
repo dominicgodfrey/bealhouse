@@ -41,6 +41,21 @@ type Bed struct {
 	Location string `json:"location,omitempty"`
 }
 
+type Photo struct {
+	URL string `json:"url"`
+	Alt string `json:"alt"`
+}
+
+// PlaceholderPhoto is the bundled stand-in for a room with no uploaded photos.
+//
+// Deliberately a fallback rather than seeded rows: a placeholder that lives in
+// the database is one the owner has to find and delete later, and one that can
+// reach the live site by being forgotten. This one disappears the moment a real
+// photo exists.
+func PlaceholderPhoto(slug string) string {
+	return "/placeholders/" + slug + ".svg"
+}
+
 // Room is one sellable result, priced.
 type Room struct {
 	ID            int64    `json:"id"`
@@ -51,7 +66,12 @@ type Room struct {
 	MaxOccupancy  int      `json:"maxOccupancy"`
 	Amenities     []string `json:"amenities"`
 	Beds          []Bed    `json:"beds"`
+	Photos        []Photo  `json:"photos"`
 	IsPetFriendly bool     `json:"isPetFriendly"`
+
+	// PlaceholderPhotoURL is what to render while Photos is empty, so a room
+	// page has the right shape before the owner has uploaded anything.
+	PlaceholderPhotoURL string `json:"placeholderPhotoUrl"`
 
 	// NightlyCents is the per-night breakdown, in order, so the UI can show
 	// what a stay is actually made of rather than one opaque total.
@@ -102,7 +122,13 @@ func Search(ctx context.Context, q *db.Queries, req Request) (Result, error) {
 		return Result{}, fmt.Errorf("availability: searching: %w", err)
 	}
 
-	beds, err := bedsByRoom(ctx, q, rows)
+	ids := roomIDs(rows)
+
+	beds, err := bedsByRoom(ctx, q, ids)
+	if err != nil {
+		return Result{}, err
+	}
+	photos, err := photosByRoom(ctx, q, ids)
 	if err != nil {
 		return Result{}, err
 	}
@@ -132,16 +158,18 @@ func Search(ctx context.Context, q *db.Queries, req Request) (Result, error) {
 		}
 
 		result.Rooms = append(result.Rooms, Room{
-			ID:            row.ID,
-			Slug:          row.Slug,
-			Name:          row.Name,
-			Description:   row.Description,
-			View:          derefString(row.View),
-			MaxOccupancy:  int(row.MaxOccupancy),
-			Amenities:     row.Amenities,
-			Beds:          beds[row.ID],
-			IsPetFriendly: row.IsPetFriendly,
-			NightlyCents:  nightly,
+			ID:                  row.ID,
+			Slug:                row.Slug,
+			Name:                row.Name,
+			Description:         row.Description,
+			View:                derefString(row.View),
+			MaxOccupancy:        int(row.MaxOccupancy),
+			Amenities:           row.Amenities,
+			Beds:                beds[row.ID],
+			Photos:              photos[row.ID],
+			PlaceholderPhotoURL: PlaceholderPhoto(row.Slug),
+			IsPetFriendly:       row.IsPetFriendly,
+			NightlyCents:        nightly,
 			Quote: pricing.Compute(pricing.Input{
 				NightlyCents: nightly,
 				PetFeeCents:  petFee,
@@ -166,15 +194,38 @@ func validate(req Request) error {
 	return nil
 }
 
-func bedsByRoom(ctx context.Context, q *db.Queries, rows []db.SearchAvailabilityRow) (map[int64][]Bed, error) {
-	byRoom := make(map[int64][]Bed, len(rows))
-	if len(rows) == 0 {
-		return byRoom, nil
-	}
-
+func roomIDs(rows []db.SearchAvailabilityRow) []int64 {
 	ids := make([]int64, len(rows))
 	for i, row := range rows {
 		ids[i] = row.ID
+	}
+	return ids
+}
+
+func photosByRoom(ctx context.Context, q *db.Queries, ids []int64) (map[int64][]Photo, error) {
+	byRoom := make(map[int64][]Photo, len(ids))
+	if len(ids) == 0 {
+		return byRoom, nil
+	}
+
+	photos, err := q.ListPhotosForRooms(ctx, ids)
+	if err != nil {
+		return nil, fmt.Errorf("availability: loading photos: %w", err)
+	}
+	for _, p := range photos {
+		byRoom[p.RoomID] = append(byRoom[p.RoomID], Photo{
+			// Uploaded media is served from disk under /media.
+			URL: "/media/" + p.Path,
+			Alt: p.AltText,
+		})
+	}
+	return byRoom, nil
+}
+
+func bedsByRoom(ctx context.Context, q *db.Queries, ids []int64) (map[int64][]Bed, error) {
+	byRoom := make(map[int64][]Bed, len(ids))
+	if len(ids) == 0 {
+		return byRoom, nil
 	}
 
 	beds, err := q.ListBedsForRooms(ctx, ids)

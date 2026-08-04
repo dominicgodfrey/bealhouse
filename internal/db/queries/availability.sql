@@ -48,6 +48,12 @@ HAVING count(*) = (sqlc.arg(checkout)::date - sqlc.arg(checkin)::date)
        >= max(c.min_stay) FILTER (WHERE c.date = sqlc.arg(checkin)::date)
 ORDER BY r.sort_order;
 
+-- name: ListPhotosForRooms :many
+SELECT room_id, path, alt_text, sort_order
+FROM room_photos
+WHERE room_id = ANY(sqlc.arg(room_ids)::bigint[])
+ORDER BY room_id, sort_order, id;
+
 -- name: ListBedsForRooms :many
 SELECT room_id, bed_type, count, location
 FROM room_beds

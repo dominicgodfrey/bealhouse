@@ -263,6 +263,24 @@ func TestValidation(t *testing.T) {
 	}
 }
 
+// Until the owner uploads real photos, every room still has something to
+// render, so the layout can be judged before any content exists.
+func TestRoomsWithoutPhotosFallBackToAPlaceholder(t *testing.T) {
+	ctx, q := setup(t)
+
+	res := search(t, ctx, q, Request{Checkin: day(30), Checkout: day(32), Guests: 1})
+
+	for _, room := range res.Rooms {
+		if len(room.Photos) > 0 {
+			continue // a real upload wins; nothing to check
+		}
+		want := "/placeholders/" + room.Slug + ".svg"
+		if room.PlaceholderPhotoURL != want {
+			t.Errorf("%s placeholder is %q, want %q", room.Slug, room.PlaceholderPhotoURL, want)
+		}
+	}
+}
+
 // Beds come back with the result so a result card can describe the room.
 func TestResultsCarryBeds(t *testing.T) {
 	ctx, q := setup(t)
