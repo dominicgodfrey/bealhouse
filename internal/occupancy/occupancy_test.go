@@ -3,6 +3,7 @@ package occupancy
 import (
 	"context"
 	"errors"
+	"fmt"
 	"sync"
 	"testing"
 	"time"
@@ -96,6 +97,57 @@ func TestConcurrentBookingsRaceForTheSameRoom(t *testing.T) {
 	}
 	if lost != racers-1 {
 		t.Errorf("%d racers were cleanly rejected, want %d", lost, racers-1)
+	}
+}
+
+// Regression guard for the deadlock this suite originally exposed.
+//
+// Identical spans are the obvious race, but staggered overlapping ones are
+// worse: each insert waits on a different uncommitted neighbour, which is
+// exactly the cycle Postgres resolves by aborting somebody with 40P01. Before
+// Create retried, that surfaced as a raw driver error roughly once every
+// twenty-five runs — an error page mid-checkout that a guest could not tell
+// apart from the room being genuinely gone.
+//
+// The invariant is not "one winner" here, since some spans do not overlap each
+// other. It is that a caller never sees anything except success or a clean
+// ErrRoomTaken.
+func TestStaggeredOverlapsNeverLeakDeadlocks(t *testing.T) {
+	ctx, q, _ := setup(t)
+	room := roomID(t, ctx, q, "flume")
+
+	const racers = 24
+	errs := make([]error, racers)
+
+	start := make(chan struct{})
+	var wg sync.WaitGroup
+	for i := range racers {
+		wg.Add(1)
+		go func(i int) {
+			defer wg.Done()
+			// Spans of 2 to 4 nights starting across a 6-day window, so they
+			// overlap each other in varying combinations.
+			checkin := mustDate(t, fmt.Sprintf("2028-03-%02d", 10+i%6))
+			checkout := mustDate(t, fmt.Sprintf("2028-03-%02d", 12+i%3+i%6))
+			<-start
+			errs[i] = book(ctx, q, room, checkin, checkout)
+		}(i)
+	}
+	close(start)
+	wg.Wait()
+
+	var won int
+	for i, err := range errs {
+		switch {
+		case err == nil:
+			won++
+		case errors.Is(err, ErrRoomTaken):
+		default:
+			t.Errorf("racer %d leaked a raw database error: %v", i, err)
+		}
+	}
+	if won == 0 {
+		t.Error("every racer lost; at least one span should have been claimed")
 	}
 }
 
