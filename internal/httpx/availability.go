@@ -31,14 +31,10 @@ func searchAvailability(q *db.Queries) http.HandlerFunc {
 			return
 		}
 
-		// Guests defaults to 1 rather than erroring, so a bare date search works.
-		guests := 1
-		if raw := query.Get("guests"); raw != "" {
-			guests, err = strconv.Atoi(raw)
-			if err != nil {
-				badRequest(w, "guests must be a whole number")
-				return
-			}
+		guests, err := parseGuests(query.Get("guests"))
+		if err != nil {
+			badRequest(w, "guests must be a whole number")
+			return
 		}
 
 		result, err := availability.Search(r.Context(), q, availability.Request{
@@ -67,4 +63,14 @@ func searchAvailability(q *db.Queries) http.HandlerFunc {
 
 func parseDate(s string) (time.Time, error) {
 	return time.Parse(time.DateOnly, s)
+}
+
+// parseGuests defaults to one rather than erroring on an empty value, so a bare
+// date search works. A party size the domain will not accept is left to the
+// domain to reject, so the message the guest sees is written in one place.
+func parseGuests(s string) (int, error) {
+	if s == "" {
+		return 1, nil
+	}
+	return strconv.Atoi(s)
 }

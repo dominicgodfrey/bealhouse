@@ -34,9 +34,11 @@ func NewRouter(d Deps) http.Handler {
 		if d.Pool != nil {
 			q := db.New(d.Pool)
 			api.Get("/availability", searchAvailability(q))
+			api.Get("/calendar", calendar(q))
 		} else {
 			// Better an honest 503 than a route that silently does not exist.
 			api.Get("/availability", databaseRequired)
+			api.Get("/calendar", databaseRequired)
 		}
 
 		// Remaining domain routes land here: rooms, bookings, admin.

@@ -30,11 +30,16 @@ func dayString(offset int) string { return day(offset).Format(time.DateOnly) }
 
 // request is a booking that should succeed, which each test then breaks in
 // exactly one way.
+//
+// The dates sit far out on purpose. Most of these tests roll back, but the
+// concurrency one commits, and `go test ./...` runs packages in parallel
+// against a shared database: a committed booking in a stretch of calendar
+// another package asserts about would quietly break that package instead.
 func request() Request {
 	return Request{
 		RoomSlug: "rose-chamber",
-		Checkin:  day(30),
-		Checkout: day(32),
+		Checkin:  day(200),
+		Checkout: day(202),
 		Guests:   2,
 		Guest:    Guest{Name: "Ada Lovelace", Email: "ada@example.com", Phone: "603-555-0100"},
 	}
@@ -75,7 +80,7 @@ func TestCreateHoldsTheRoom(t *testing.T) {
 
 	// The point of the hold: the room is gone from the search that produced it.
 	res, err := availability.Search(ctx, q, availability.Request{
-		Checkin: day(30), Checkout: day(32), Guests: 2,
+		Checkin: day(200), Checkout: day(202), Guests: 2,
 	})
 	if err != nil {
 		t.Fatalf("searching: %v", err)
@@ -93,7 +98,7 @@ func TestMinimumStayCannotBeBypassed(t *testing.T) {
 	ctx, _, b := setup(t)
 
 	req := request()
-	req.Checkout = day(31) // one night, against a global minimum of two
+	req.Checkout = day(201) // one night, against a global minimum of two
 
 	if _, err := Create(ctx, b, req); !errors.Is(err, ErrRoomUnavailable) {
 		t.Errorf("a one-night payload got %v, want ErrRoomUnavailable", err)
@@ -230,9 +235,9 @@ func TestBalanceIsScheduledForSevenDaysOut(t *testing.T) {
 
 	made := create(t, ctx, b, request())
 
-	if want := dayString(23); made.BalanceChargeOn != want {
+	if want := dayString(193); made.BalanceChargeOn != want {
 		t.Errorf("balance charge on %q, want %q (T-7 for a stay starting %s)",
-			made.BalanceChargeOn, want, dayString(30))
+			made.BalanceChargeOn, want, dayString(200))
 	}
 	if made.ChargeNowCents != made.Quote.DepositCents {
 		t.Errorf("charging %d at booking, want the %d deposit",
@@ -283,11 +288,11 @@ func TestTurnoverBetweenTwoHoldsIsAllowed(t *testing.T) {
 	ctx, _, b := setup(t)
 
 	first := request()
-	first.Checkout = day(33)
+	first.Checkout = day(203)
 	create(t, ctx, b, first)
 
 	second := request()
-	second.Checkin, second.Checkout = day(33), day(35)
+	second.Checkin, second.Checkout = day(203), day(205)
 	second.Guest.Email = "grace@example.com"
 	if _, err := Create(ctx, b, second); err != nil {
 		t.Errorf("the checkout day should be bookable by the next guest, got: %v", err)
@@ -331,7 +336,7 @@ func TestSweptHoldFreesTheRoomAndExpiresTheBooking(t *testing.T) {
 
 	// ...and the room is sellable again.
 	res, err := availability.Search(ctx, q, availability.Request{
-		Checkin: day(30), Checkout: day(32), Guests: 2,
+		Checkin: day(200), Checkout: day(202), Guests: 2,
 	})
 	if err != nil {
 		t.Fatalf("searching: %v", err)

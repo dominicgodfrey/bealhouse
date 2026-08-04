@@ -48,6 +48,35 @@ HAVING count(*) = (sqlc.arg(checkout)::date - sqlc.arg(checkin)::date)
        >= max(c.min_stay) FILTER (WHERE c.date = sqlc.arg(checkin)::date)
 ORDER BY r.sort_order;
 
+-- Every night in the window that is actually sellable, per room: priced by the
+-- calendar, and not covered by a booking, a hold, or an owner's block.
+--
+-- One row per room per night, deliberately. Stitching them into runs of
+-- consecutive nights is a job for a loop over an ordered result, and doing it
+-- here in SQL would buy nothing but a window function to maintain.
+--
+-- `during @> date` is the half-open convention paying off again: for a stay of
+-- [10, 13) the nights 10, 11 and 12 are occupied and the 13th is not, because
+-- the 13th is a checkout rather than a night.
+-- name: ListSellableNights :many
+SELECT
+  c.room_id,
+  r.slug,
+  c.date,
+  c.min_stay
+FROM rate_calendar c
+JOIN rooms r ON r.id = c.room_id
+WHERE c.date >= sqlc.arg(from_date)::date
+  AND c.date <  sqlc.arg(to_date)::date
+  AND r.max_occupancy >= sqlc.arg(guests)::int
+  AND (NOT sqlc.arg(with_pet)::boolean OR r.is_pet_friendly)
+  AND NOT EXISTS (
+    SELECT 1 FROM room_occupancy o
+    WHERE o.room_id = c.room_id
+      AND o.during @> c.date
+  )
+ORDER BY r.sort_order, c.room_id, c.date;
+
 -- name: ListPhotosForRooms :many
 SELECT room_id, path, alt_text, sort_order
 FROM room_photos
