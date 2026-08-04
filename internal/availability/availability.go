@@ -204,6 +204,12 @@ func roomIDs(rows []db.SearchAvailabilityRow) []int64 {
 
 func photosByRoom(ctx context.Context, q *db.Queries, ids []int64) (map[int64][]Photo, error) {
 	byRoom := make(map[int64][]Photo, len(ids))
+	// Seeded empty so a room with nothing uploaded yet serialises as [] rather
+	// than null. Until the owner adds photos that is every room, and an API
+	// that answers null for "none" makes every caller defend against it.
+	for _, id := range ids {
+		byRoom[id] = []Photo{}
+	}
 	if len(ids) == 0 {
 		return byRoom, nil
 	}
@@ -224,6 +230,9 @@ func photosByRoom(ctx context.Context, q *db.Queries, ids []int64) (map[int64][]
 
 func bedsByRoom(ctx context.Context, q *db.Queries, ids []int64) (map[int64][]Bed, error) {
 	byRoom := make(map[int64][]Bed, len(ids))
+	for _, id := range ids {
+		byRoom[id] = []Bed{}
+	}
 	if len(ids) == 0 {
 		return byRoom, nil
 	}

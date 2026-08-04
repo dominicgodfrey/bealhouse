@@ -1,7 +1,9 @@
 package availability
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"testing"
 	"time"
@@ -299,5 +301,36 @@ func TestResultsCarryBeds(t *testing.T) {
 	}
 	if !foundDaybed {
 		t.Errorf("the sitting-room daybed is missing from %+v", mrsBeals.Beds)
+	}
+}
+
+// A room with nothing uploaded must come back as an empty list, not null.
+//
+// This is a contract, not a nicety: the results page reads photos[0] to pick a
+// hero image, and null there is a crash rather than a fallback. Every room is
+// in that state until the owner uploads anything.
+func TestEmptyListsSerialiseAsLists(t *testing.T) {
+	ctx, q := setup(t)
+
+	res := search(t, ctx, q, Request{Checkin: day(30), Checkout: day(32), Guests: 1})
+
+	for _, room := range res.Rooms {
+		if room.Photos == nil {
+			t.Errorf("%s has nil photos; the UI reads photos[0]", room.Slug)
+		}
+		if room.Beds == nil {
+			t.Errorf("%s has nil beds", room.Slug)
+		}
+		if room.Amenities == nil {
+			t.Errorf("%s has nil amenities", room.Slug)
+		}
+	}
+
+	encoded, err := json.Marshal(res)
+	if err != nil {
+		t.Fatalf("encoding the result: %v", err)
+	}
+	if bytes.Contains(encoded, []byte(`null`)) {
+		t.Errorf("a null reached the wire: %s", encoded)
 	}
 }
