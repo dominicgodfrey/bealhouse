@@ -11,10 +11,9 @@ sql:
         emit_json_tags: false
         emit_pointers_for_null_types: true
         emit_empty_slices: true
-        # Money is integer cents everywhere; never let a price become a float.
+        # Nullable columns become pointers via emit_pointers_for_null_types, so
+        # only the non-null mapping is overridden here. Declaring the nullable
+        # case as *time.Time as well yields **time.Time.
         overrides:
           - db_type: "timestamptz"
             go_type: "time.Time"
-          - db_type: "timestamptz"
-            nullable: true
-            go_type: "*time.Time"
