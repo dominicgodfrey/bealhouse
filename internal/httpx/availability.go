@@ -1,7 +1,6 @@
 package httpx
 
 import (
-	"errors"
 	"net/http"
 	"strconv"
 	"time"
@@ -44,16 +43,11 @@ func searchAvailability(q *db.Queries) http.HandlerFunc {
 			WithPet:  query.Get("pet") == "true",
 		})
 		if err != nil {
-			switch {
-			case errors.Is(err, availability.ErrCheckoutNotAfterCheckin):
-				badRequest(w, "check-out must be after check-in")
-			case errors.Is(err, availability.ErrCheckinInPast):
-				badRequest(w, "check-in cannot be in the past")
-			case errors.Is(err, availability.ErrGuestsOutOfRange):
-				badRequest(w, "at least one guest is required")
-			default:
-				serverError(w, r, err)
+			if reason, ok := searchProblem(err); ok {
+				badRequest(w, reason)
+				return
 			}
+			serverError(w, r, err)
 			return
 		}
 

@@ -63,15 +63,20 @@ type Input struct {
 
 // Quote is a fully resolved set of amounts. Every field is derived, so a
 // booking can snapshot the whole struct and never recompute.
+//
+// The tags are here rather than in a separate wire type because a quote is
+// handed to the browser verbatim by three endpoints, and a second struct that
+// existed only to rename these fields would be one more place for them to drift
+// apart.
 type Quote struct {
-	Nights            int
-	RoomSubtotalCents int64
-	PetFeeCents       int64
-	TaxableCents      int64
-	TaxCents          int64
-	TotalCents        int64
-	DepositCents      int64
-	BalanceCents      int64
+	Nights            int   `json:"nights"`
+	RoomSubtotalCents int64 `json:"roomSubtotalCents"`
+	PetFeeCents       int64 `json:"petFeeCents"`
+	TaxableCents      int64 `json:"taxableCents"`
+	TaxCents          int64 `json:"taxCents"`
+	TotalCents        int64 `json:"totalCents"`
+	DepositCents      int64 `json:"depositCents"`
+	BalanceCents      int64 `json:"balanceCents"`
 }
 
 // Compute resolves an Input into a Quote.

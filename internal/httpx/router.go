@@ -35,13 +35,23 @@ func NewRouter(d Deps) http.Handler {
 			q := db.New(d.Pool)
 			api.Get("/availability", searchAvailability(q))
 			api.Get("/calendar", calendar(q))
+			api.Get("/rooms/{slug}", room(q))
+
+			// Creating a booking needs to start its own transaction rather
+			// than borrow a connection, because the booking and the hold that
+			// reserves its room have to commit together or not at all.
+			api.Post("/bookings", createBooking(d.Pool))
+			api.Get("/bookings/{code}", getBooking(q))
 		} else {
 			// Better an honest 503 than a route that silently does not exist.
 			api.Get("/availability", databaseRequired)
 			api.Get("/calendar", databaseRequired)
+			api.Get("/rooms/{slug}", databaseRequired)
+			api.Post("/bookings", databaseRequired)
+			api.Get("/bookings/{code}", databaseRequired)
 		}
 
-		// Remaining domain routes land here: rooms, bookings, admin.
+		// Remaining domain routes land here: admin.
 		api.NotFound(func(w http.ResponseWriter, r *http.Request) {
 			writeJSON(w, http.StatusNotFound, map[string]string{
 				"error": "no such endpoint",

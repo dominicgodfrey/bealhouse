@@ -11,6 +11,60 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const getRoomBySlug = `-- name: GetRoomBySlug :one
+SELECT
+  id,
+  slug,
+  name,
+  description,
+  view,
+  max_occupancy,
+  amenities,
+  is_accessible,
+  accessibility_features,
+  is_pet_friendly,
+  pet_fee_cents
+FROM rooms
+WHERE slug = $1
+`
+
+type GetRoomBySlugRow struct {
+	ID                    int64
+	Slug                  string
+	Name                  string
+	Description           string
+	View                  *string
+	MaxOccupancy          int32
+	Amenities             []string
+	IsAccessible          bool
+	AccessibilityFeatures []string
+	IsPetFriendly         bool
+	PetFeeCents           int32
+}
+
+// Everything the room page shows. Accessibility comes back even though the
+// filter is switched off (decision #22): the page should describe what is
+// actually true about a room, and the day real feature data exists it renders
+// without a query change.
+func (q *Queries) GetRoomBySlug(ctx context.Context, slug string) (GetRoomBySlugRow, error) {
+	row := q.db.QueryRow(ctx, getRoomBySlug, slug)
+	var i GetRoomBySlugRow
+	err := row.Scan(
+		&i.ID,
+		&i.Slug,
+		&i.Name,
+		&i.Description,
+		&i.View,
+		&i.MaxOccupancy,
+		&i.Amenities,
+		&i.IsAccessible,
+		&i.AccessibilityFeatures,
+		&i.IsPetFriendly,
+		&i.PetFeeCents,
+	)
+	return i, err
+}
+
 const getRoomIDBySlug = `-- name: GetRoomIDBySlug :one
 SELECT id FROM rooms WHERE slug = $1
 `
