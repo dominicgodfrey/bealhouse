@@ -26,14 +26,14 @@ Stack constraint: **TypeScript/React + Go**. No launch deadline — one complete
 | # | Decision | Choice |
 |---|---|---|
 | 1 | Distribution | Direct only. Availability rows carry a `source` field so Airbnb/Booking.com sync is a later adapter, not a rewrite |
-| 2 | Hosting | VPS (Hetzner/DO) + Caddy for automatic TLS. Bluehost = domain/DNS/email only |
+| 2 | Hosting | **Hetzner Cloud CX22, Ashburn VA (~$5/mo)** + Caddy for automatic TLS. Bluehost = domain/DNS/email only. See *VPS* below |
 | 3 | Rendering | Vite React SPA embedded in ONE Go binary via `embed.FS`; Go injects per-route meta + JSON-LD with live DB data |
 | 4 | Pricing | Seasonal date-range rates + minimum-stay. Guest count is a **capacity filter only**, never a price input |
 | 5 | Rate storage | Materialized nightly calendar `(room_id, date, price_cents, min_stay)` |
 | 6 | Payment | Deposit at booking; balance auto-charged off-session at **T-7 days** |
 | 7 | Short notice | Arrival < 8 days ⇒ charge **full amount** at booking, no deposit split, no scheduled job |
-| 8 | Deposit | First night's rate + its 8.5% tax |
-| 9 | Cancellation | ≥7 days: full refund. <7 days: refund all but night one. Deposit **is** the penalty |
+| 8 | Deposit | **50% of the all-in total** (room + pet fee + tax), rounded up. Balance = total − deposit, so the two always reconcile *(revised; was first night + tax)* |
+| 9 | Cancellation | ≥7 days: full refund. <7 days: **50% refund** — the forfeit is exactly the deposit *(revised)* |
 | 10 | Multi-room | Schema `booking → booking_rooms` from day one; v1 UI single-room |
 | 11 | Out of scope | Table reservations, guest accounts, gift certificates, event booking/deposits |
 | 12 | Menu | Structured admin editor (name, description/ingredients, price + course grouping) → JSON-LD `Menu` |
@@ -46,20 +46,26 @@ Stack constraint: **TypeScript/React + Go**. No launch deadline — one complete
 | 19 | Guest self-service | Signed expiring link in confirmation email → view booking + **cancel**, refund executes automatically. Date changes go through the owner |
 | 20 | **Minimum stay** | **Global default 2 nights**, stored in `settings` (not hardcoded). A season may override it upward (e.g. 3 on holiday weekends) |
 | 21 | **Rate administration** | Seasons are **owner-editable in admin** as a room × season price grid; saving regenerates the nightly calendar for **future dates only** |
-| 22 | **Accessibility** | Rooms carry `is_accessible` + structured `accessibility_features[]`. Search exposes an accessibility filter; result cards and room pages show the tag |
+| 22 | **Accessibility** | **Filter switched off.** Every room requires stairs, including the two the owner considers most accessible, so no room sets `is_accessible`. The schema and its constraint remain; `settings.accessibility_notice` carries a stairs disclaimer shown with every search *(revised)* |
+| 23 | **Pet fee** | Back Lavender only: **$50 per stay**, taxed with the room charge, refundable on the same terms. The search checkbox does double duty — it filters to pet-friendly rooms *and* adds the fee. Unchecked, Back Lavender still appears at no fee |
 
 ### Payment lifecycle
 
 ```
-book (arrival ≥ 8d) → charge deposit (night 1 + tax), save payment method off-session
+book (arrival ≥ 8d) → charge deposit (50% of all-in), save payment method off-session
 T-8 days            → email "you will be charged $X in 24 hours"
 T-7 days            → off-session charge of balance
    ├─ success       → email receipt
    └─ failure       → email "you still owe $X, contact the inn" + unmissable admin flag
 book (arrival < 8d) → charge full amount, no scheduled job
 cancel ≥ 7d out     → refund everything paid
-cancel < 7d out     → refund everything except night one + its tax
+cancel < 7d out     → refund everything paid minus 50% of the total
 ```
+
+Refunds derive from **what was actually collected**, not from the total. That is what keeps them
+correct when the T-7 charge failed: the guest has paid only the deposit, the penalty consumes it,
+and the refund is zero rather than a negative the inn would try to collect. Implemented and tested
+in `internal/pricing`.
 
 ---
 
@@ -118,6 +124,28 @@ Deploy is `scp` + `systemctl restart`. No CORS, no split pipelines, no version s
 frontend and backend, and the whole system can be run locally with one command.
 
 ---
+
+## VPS (decision #2)
+
+**Hetzner Cloud CX22, Ashburn VA — 2 vCPU, 4 GB RAM, 40 GB SSD, ~$5/month.**
+
+Chosen against the owner's stated priority order: stability first regardless of price, then low
+price, then simplicity.
+
+- **Stability** is the gate, not a tiebreak. Hetzner publishes a 99.9% cloud SLA and has a long
+  operational record, so it clears the bar. Anything that did not would be excluded no matter how
+  cheap.
+- **Price** is the next tiebreak among providers that clear the gate, and Hetzner wins it decisively:
+  the comparable DigitalOcean droplet is roughly $12/month for half the RAM.
+- **Simplicity** ranked last. DigitalOcean's console and documentation are gentler, and that is the
+  one real thing being traded away. It is a defensible reversal if the extra ~$7/month is worth it.
+
+The 4 GB is not incidental. Postgres plus the Go binary would fit in 1 GB, but the image pipeline
+generating AVIF and WebP variants is memory-hungry, and that is where a smaller box would fail.
+
+Ashburn keeps the server in the US and close to New Hampshire. Budget roughly 20% on top for
+provider snapshots, **in addition to** the nightly `pg_dump` to Backblaze B2 — a provider snapshot is
+not a tested restore.
 
 ## The job runner
 
@@ -180,16 +208,24 @@ rooms.accessibility_features  text[]    -- 'step_free_entry', 'ground_floor',
 ```
 
 A bare "accessible" boolean is a **promise a guest plans a trip around**, and a wheelchair user who
-arrives to find three steps at the entrance has been genuinely harmed. So the flag drives search and
-the tag, while the structured feature list is what actually renders on the room page — a guest can
-verify the specific thing they need rather than trusting one word.
+arrives to find three steps at the entrance has been genuinely harmed.
 
-- **Search:** `GET /api/availability?...&accessible=true` filters to `is_accessible = true`.
-  Presented as a checkbox beside dates and guests, not buried in an "advanced" panel.
-- **Results & room page:** accessible rooms carry a visible tag; the room page lists the specific
-  features. Fed into JSON-LD via `amenityFeature` so it surfaces in search.
-- **Honesty rule:** admin should only let `is_accessible` be set when at least one feature is
-  present, and the room page should state what is *not* available where relevant.
+**Current state: the filter is off and no room sets the flag.** The owner initially marked Mrs.
+Beal's Suite and Rose Chamber as accessibility friendly, then clarified that both still require
+stairs — as does every room in the house. So nothing claims accessibility, and there is no filter to
+offer.
+
+What remains, and why:
+
+- **The honesty rule is a database constraint, not admin-form validation.**
+  `CHECK (NOT is_accessible OR cardinality(accessibility_features) > 0)` — the flag cannot be set
+  without naming at least one specific feature. Enforcing it only in the form that happens to write
+  it would leave the promise dependent on which code path was used.
+- **`settings.accessibility_notice`** carries a stairs disclaimer, returned with every availability
+  search so the UI cannot quietly omit it. It is editable data rather than hardcoded copy, so the
+  owner can reword it without a deploy.
+- **Turning the filter back on** needs only real feature data and re-enabling the search parameter.
+  The schema, the constraint, and the query shape are already there.
 
 ---
 
@@ -276,11 +312,14 @@ Same React bundle under `/admin`, responsive-first so it's genuinely usable one-
 
 Dependency-ordered, not deadline-driven (single launch).
 
-1. **Foundation** — repo, Docker Compose Postgres, migrations, sqlc, one Go binary serving Vite,
-   Caddy, deploy script.
-2. **Domain core** — rooms (incl. accessibility), settings, rate seasons → calendar generator,
-   `room_occupancy` + exclusion constraint, availability query. *Concurrency tests here, before any UI.*
-3. **Booking flow** — search → results → room page → confirm → hold. No payment yet.
+1. ~~**Foundation**~~ **DONE** — repo, Docker Compose Postgres, goose migrations, sqlc, one Go
+   binary serving Vite. Caddy and the deploy script still outstanding, and belong with step 8.
+2. ~~**Domain core**~~ **DONE** — rooms, settings, rate seasons → calendar generator,
+   `room_occupancy` + exclusion constraint, availability query, and `internal/pricing` brought
+   forward from step 4. Concurrency tests written before any UI, as planned, and they found a real
+   deadlock (see below).
+3. **Booking flow** ← **NEXT** — search → results → room page → confirm → hold. No payment yet, so
+   none of it needs a Stripe account.
 4. **Payments** — Stripe Payment Element, webhooks, deposit/full logic, job runner, T-8/T-7 jobs,
    refunds.
 5. **Comms** — Resend, email templates, PDF generation, signed manage-booking link + self-service
@@ -305,13 +344,32 @@ Dependency-ordered, not deadline-driven (single launch).
   a 2-night query against a 3-night holiday season also returns nothing.
 - **Min-stay bypass:** `POST /api/bookings` with a hand-crafted 1-night payload must be rejected
   server-side, not merely hidden by the date picker.
-- **Accessibility filter:** `accessible=true` returns only accessible rooms; the tag renders on both
-  the result card and the room page.
+- **Pet fee:** `pet=true` returns only pet-friendly rooms and adds $50 to the quote as its own line;
+  unchecked, the same room appears at no fee.
+- **Accessibility filter:** *(deferred — the filter is off; see Accessibility above)*
 - **Rate rebuild safety:** confirm a booking, edit the season covering its dates, rebuild, and assert
   the booking's total, nightly prices, and balance are **unchanged**.
 - **Hold expiry:** create a hold, advance past TTL, confirm the sweeper frees the room.
-- **Money:** assert cents arithmetic against hand-computed totals — 3 nights × $189 + 8.5% tax,
-  deposit = night one + its tax, and each refund branch.
+- **Money:** assert cents arithmetic against hand-computed totals, the 50% deposit and its rounding,
+  and each refund branch. *(Done — `internal/pricing`.)*
+
+### What the concurrency tests actually found
+
+Firing 16 simultaneous bookings at the last room did **not** reliably produce the clean `23P01`
+exclusion violation the design assumed. Roughly once in 25 runs Postgres instead raised `40P01
+deadlock_detected`: concurrent inserts wait on each other's uncommitted rows, and the deadlock
+detector breaks the cycle by aborting one. In production that is an error page mid-checkout which a
+guest cannot tell apart from the room genuinely being gone.
+
+Retrying with backoff reduced it but stayed probabilistic — staggered overlapping spans still leaked
+raw errors after five attempts. The fix is a **per-room advisory lock** taken in the same statement
+as the insert (`pg_advisory_xact_lock(4771, room_id)`), so waiters queue in a defined order and no
+cycle can form. Losers now get `23P01` every time. It is scoped per room, so the other six are
+unaffected, and it made the contended path roughly three times faster by removing the lock-wait
+pileup.
+
+Verified over 200 runs of the full occupancy suite plus a deliberately adversarial staggered-overlap
+test that asserts a caller never sees anything except success or a clean "room taken".
 
 **Payments** — Stripe CLI (`stripe listen --forward-to localhost:8080/webhooks/stripe`) for the full
 matrix: success, decline, 3DS required, duplicate webhook delivery (must be idempotent), out-of-order
