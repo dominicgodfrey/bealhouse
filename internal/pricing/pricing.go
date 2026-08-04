@@ -9,12 +9,44 @@
 // arithmetic exhaustively testable in isolation.
 package pricing
 
+import "time"
+
 // Rate is a tax rate in hundred-thousandths, mirroring settings.tax_rate's
 // numeric(6,5) so the two can never drift. NH Meals & Rooms at 8.5% is
 // Rate(8500).
 type Rate int64
 
+const (
+	// BalanceLeadDays is how far before arrival the balance is charged
+	// off-session (decision #6).
+	BalanceLeadDays = 7
+
+	// ShortNoticeDays is the window inside which there is no time left to run
+	// the T-7 job, so the stay is charged in full at booking instead
+	// (decision #7).
+	ShortNoticeDays = 8
+)
+
 const rateScale = 100_000
+
+// IsShortNotice reports whether an arrival is too close for the balance to be
+// charged on schedule.
+//
+// Both arguments are civil dates. The clock stays outside this package: the
+// caller resolves "today" at the inn and hands it in, which is what keeps the
+// boundary exhaustively testable rather than dependent on when the test runs.
+func IsShortNotice(today, checkin time.Time) bool {
+	return checkin.Before(today.AddDate(0, 0, ShortNoticeDays))
+}
+
+// BalanceChargeDate is when the balance is charged off-session: T-7.
+//
+// Meaningful only when the arrival is not short notice — inside that window the
+// date has already passed, which is exactly why those bookings are charged in
+// full up front instead.
+func BalanceChargeDate(checkin time.Time) time.Time {
+	return checkin.AddDate(0, 0, -BalanceLeadDays)
+}
 
 // Input is everything needed to quote one stay in one room.
 type Input struct {

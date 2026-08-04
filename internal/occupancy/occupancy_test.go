@@ -18,6 +18,9 @@ import (
 func setup(t *testing.T) (context.Context, *db.Queries, *pgxpool.Pool) {
 	t.Helper()
 	pool := testdb.Connect(t)
+	// These tests commit real rows and empty the table to start clean, so they
+	// have to take turns with the other packages that do the same.
+	testdb.Exclusive(t, pool)
 	testdb.ResetOccupancy(t, pool)
 	return context.Background(), db.New(pool), pool
 }

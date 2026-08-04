@@ -1,6 +1,9 @@
 package pricing
 
-import "testing"
+import (
+	"testing"
+	"time"
+)
 
 // NH Meals & Rooms, the only rate the inn currently uses.
 const nh = Rate(8500)
@@ -174,5 +177,40 @@ func TestLatePenaltyEqualsDeposit(t *testing.T) {
 	}
 	if q.Penalty(false) != 0 {
 		t.Errorf("on-time penalty = %d, want 0", q.Penalty(false))
+	}
+}
+
+// The short-notice boundary decides whether a guest is charged half or all of
+// their stay, so it is worth pinning to the day. Decision #7 draws it at
+// "arrival in fewer than 8 days".
+func TestShortNoticeBoundary(t *testing.T) {
+	today := time.Date(2026, time.June, 1, 0, 0, 0, 0, time.UTC)
+
+	tests := []struct {
+		daysOut int
+		want    bool
+	}{
+		{0, true}, // arriving today
+		{6, true},
+		{7, true},  // T-7 is today: the job would have to have run already
+		{8, false}, // the first arrival with a day to spare
+		{9, false},
+		{60, false},
+	}
+
+	for _, tt := range tests {
+		checkin := today.AddDate(0, 0, tt.daysOut)
+		if got := IsShortNotice(today, checkin); got != tt.want {
+			t.Errorf("arrival in %d days: short notice = %v, want %v", tt.daysOut, got, tt.want)
+		}
+	}
+}
+
+func TestBalanceChargeDate(t *testing.T) {
+	checkin := time.Date(2026, time.June, 15, 0, 0, 0, 0, time.UTC)
+	want := time.Date(2026, time.June, 8, 0, 0, 0, 0, time.UTC)
+
+	if got := BalanceChargeDate(checkin); !got.Equal(want) {
+		t.Errorf("balance charges on %s, want %s", got.Format(time.DateOnly), want.Format(time.DateOnly))
 	}
 }
