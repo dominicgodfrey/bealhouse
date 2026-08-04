@@ -112,7 +112,12 @@ ORM) · `goose` migrations · `pgx` · Stripe Go SDK · `go-pdf/fpdf` for confir
 Public site and admin are one bundle, admin behind a guarded route (responsive, works on a phone).
 
 **Type safety across the boundary** — Go handlers annotated → OpenAPI spec → `openapi-typescript`
-generates the TS client. One binary, one contract, no drift.
+generates the TS client. One binary, one contract, no drift. *Not built yet: the booking flow's
+types are hand-written in `web/src/lib/api.ts`, which is the one file the generator replaces.*
+
+TanStack Query is likewise still ahead. The four booking screens each load one thing, and a
+twenty-line hook covers it; the library earns its place when the admin console's calendar needs
+caching and background refresh.
 
 **Everything else** — Caddy (auto-TLS, reverse proxy) · Cloudflare free tier (CDN + DNS) · Sentry ·
 nightly `pg_dump` + uploads to Backblaze B2 with a *tested* restore.
@@ -154,7 +159,7 @@ Survives restarts, idempotent by design, no external scheduler.
 
 | Job | Trigger |
 |---|---|
-| `hold.sweep` | every minute — delete expired `kind='hold'` rows |
+| `hold.sweep` | every minute — delete expired `kind='hold'` rows, then expire the pending bookings behind them. *Running today as a plain in-process ticker (`booking.RunSweeper`), which step 4 folds into this table* |
 | `balance.warn` | T-8 days — "charged in 24 hours" email |
 | `balance.charge` | T-7 days — off-session PaymentIntent; on failure mark `payment_failed` + notify |
 | `email.send` | queued sends with exponential backoff retry |
@@ -285,6 +290,12 @@ free nights, and honours the 2-night minimum. With 7 rooms it would otherwise be
 a range where room A is free early and room B free late but *no single room* covers the stay.
 Correct and cheap at this size.
 
+`GET /api/calendar` serves this: per room, the unbroken runs of sellable nights, each night carrying
+the minimum stay in force on it. The client can then answer both of its questions — can a guest
+arrive on this date, can they leave on that one — without a round trip per click. The test that
+matters compares the picker's rule against the search over every span in a window and asserts they
+agree, in both directions.
+
 ---
 
 ## Admin console
@@ -318,10 +329,11 @@ Dependency-ordered, not deadline-driven (single launch).
    `room_occupancy` + exclusion constraint, availability query, and `internal/pricing` brought
    forward from step 4. Concurrency tests written before any UI, as planned, and they found a real
    deadlock (see below).
-3. **Booking flow** ← **NEXT** — search → results → room page → confirm → hold. No payment yet, so
-   none of it needs a Stripe account.
-4. **Payments** — Stripe Payment Element, webhooks, deposit/full logic, job runner, T-8/T-7 jobs,
-   refunds.
+3. ~~**Booking flow**~~ **DONE** — search → results → room page → confirm → hold, plus the calendar
+   the date picker greys from and the sweeper that reclaims abandoned checkouts. No Stripe anywhere
+   in it, as planned.
+4. **Payments** ← **NEXT** — Stripe Payment Element, webhooks, deposit/full logic, job runner,
+   T-8/T-7 jobs, refunds.
 5. **Comms** — Resend, email templates, PDF generation, signed manage-booking link + self-service
    cancel.
 6. **Admin** — auth, upcoming/paid-vs-owed view, calendar, list, manual CRUD, rate editor, blocking,
@@ -338,18 +350,26 @@ Dependency-ordered, not deadline-driven (single launch).
 **Correctness (the parts that cost real money if wrong)**
 
 - **Double-booking:** fire N concurrent `POST /api/bookings` at the last available room; assert
-  exactly one succeeds and the rest get a clean "just taken" response.
-- **Turnover:** book Jun 10–13 and Jun 13–15 on the same room; both must succeed.
+  exactly one succeeds and the rest get a clean "just taken" response. *(Done — at the booking
+  layer as well as the occupancy one. A loser lands in one of two places depending on how close the
+  race was: the room was gone before it searched, or it was taken from under it at the insert. Both
+  are clean 409s; neither is a raw database error.)*
+- **Turnover:** book Jun 10–13 and Jun 13–15 on the same room; both must succeed. *(Done, for holds
+  as well as bookings.)*
 - **Min-stay:** a 1-night query returns nothing anywhere on the calendar (global default is 2), and
   a 2-night query against a 3-night holiday season also returns nothing.
 - **Min-stay bypass:** `POST /api/bookings` with a hand-crafted 1-night payload must be rejected
-  server-side, not merely hidden by the date picker.
+  server-side, not merely hidden by the date picker. *(Done — the booking path re-runs the
+  availability query itself rather than trusting the client, so capacity, pets, occupancy, rate
+  coverage and min-stay are all re-checked by the same SQL that produced the search results.)*
 - **Pet fee:** `pet=true` returns only pet-friendly rooms and adds $50 to the quote as its own line;
   unchecked, the same room appears at no fee.
 - **Accessibility filter:** *(deferred — the filter is off; see Accessibility above)*
 - **Rate rebuild safety:** confirm a booking, edit the season covering its dates, rebuild, and assert
   the booking's total, nightly prices, and balance are **unchanged**.
-- **Hold expiry:** create a hold, advance past TTL, confirm the sweeper frees the room.
+- **Hold expiry:** create a hold, advance past TTL, confirm the sweeper frees the room. *(Done — and
+  the booking behind it is marked `expired`, so a guest returning to their link is told what
+  happened.)*
 - **Money:** assert cents arithmetic against hand-computed totals, the 50% deposit and its rounding,
   and each refund branch. *(Done — `internal/pricing`.)*
 

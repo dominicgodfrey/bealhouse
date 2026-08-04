@@ -4,14 +4,17 @@ Booking engine, marketing site, and admin console for a 7-room inn. One Go binar
 serves the JSON API and an embedded React SPA. See [ARCHITECTURE.md](ARCHITECTURE.md)
 for the design and the build order this repo follows.
 
-**Status:** build-order steps 1 and 2 complete — foundation, rooms, occupancy,
-rates, and availability, all behind tests against a real Postgres. No booking
-flow, payments, or UI yet.
+**Status:** build-order steps 1–3 complete — foundation, the domain core, and
+the booking flow end to end: search, results, room page, confirm, and a real
+hold on the room. No payment yet, so none of it needs a Stripe account.
 
 | Working today | Where |
 |---|---|
-| `GET /api/availability` | [internal/httpx](internal/httpx/availability.go) |
+| The booking flow, search → hold | [web/src/routes](web/src/routes) |
+| `GET /api/availability` · `/calendar` · `/rooms/{slug}` | [internal/httpx](internal/httpx) |
+| `POST /api/bookings` — books and holds, revalidating server-side | [internal/booking](internal/booking/booking.go) |
 | Double-booking prevention | [internal/occupancy](internal/occupancy/occupancy.go) |
+| Sellable spans per room, for the date picker | [internal/availability](internal/availability/calendar.go) |
 | Seasons → nightly calendar | [internal/rates](internal/rates/rates.go) |
 | Deposits, tax, pet fee, refunds | [internal/pricing](internal/pricing/pricing.go) |
 
@@ -70,10 +73,12 @@ compile time.
 ## Layout
 
 ```
-cmd/server/              entrypoint: config, DB pool, HTTP server, graceful shutdown
+cmd/server/              entrypoint: config, DB pool, HTTP server, hold sweeper
 internal/config/         environment + .env loading
 internal/httpx/          chi router, JSON API, SPA serving with history fallback
-internal/availability/   the search: capacity, pets, occupancy, rates, min stay
+internal/availability/   the search: capacity, pets, occupancy, rates, min stay;
+                         and the sellable spans the date picker greys from
+internal/booking/        a booking and its hold, in one transaction
 internal/occupancy/      the exclusion constraint and its error translation
 internal/rates/          seasons to nightly calendar
 internal/pricing/        integer-cent money: deposits, tax, pet fee, refunds
@@ -82,9 +87,16 @@ internal/testdb/         test helpers: real Postgres, rolled-back transactions
 internal/db/migrations/  goose SQL migrations
 internal/db/queries/     hand-written SQL; sqlc generates Go into internal/db/gen
 internal/db/seed/        the seven rooms and a placeholder rate season
-web/                     Vite + React + Tailwind SPA
+web/src/lib/             the API client, civil dates, money, span rules
+web/src/routes/          search, results, room, confirm, held
 web/embed.go             embeds web/dist into the binary
 ```
+
+Dates in the frontend are `YYYY-MM-DD` strings, never `Date` objects. A `Date`
+is an instant, and the moment one is used for a check-in the guest's browser
+timezone starts deciding what day it is — someone in Los Angeles opening the
+picker at 9pm would be offered yesterday. `web/src/lib/dates.ts` mirrors
+`internal/civil` on the server.
 
 Tests need Postgres running and seeded; they skip cleanly when it is not
 reachable. Tests that rewrite reference data run inside a rolled-back
@@ -103,5 +115,10 @@ None of it should be edited in SQL once admin exists.
 
 ## Not yet built
 
-Steps 3–8 of the build order: the booking flow and holds, Stripe, email and
-PDFs, the admin console, marketing content, and launch.
+Steps 4–8 of the build order: Stripe, email and PDFs, the admin console,
+marketing content, and launch.
+
+The booking flow stops at a held room. The hold is real — the exclusion
+constraint enforces it against everyone else, and an in-process sweeper
+reclaims it a minute after it lapses — but there is no way to pay for it yet,
+which is exactly where step 4 begins.

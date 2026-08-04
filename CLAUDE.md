@@ -6,7 +6,7 @@ Direct booking engine, marketing site, and admin console for a 7-room inn.
 anything about money, dates, or availability — several were revised after the
 document was first written and the revisions are marked.
 
-**Build-order steps 1 and 2 are done. Step 3, the booking flow, is next.**
+**Build-order steps 1, 2 and 3 are done. Step 4, payments, is next.**
 
 ## Local setup
 
@@ -93,11 +93,22 @@ faking. Tests that rewrite reference data run inside a rolled-back transaction
 (`testdb.Tx`), so `go test ./...` never leaves the dev database altered.
 
 Concurrency tests are the reason step 2 was built before any UI. They found a real
-deadlock. If you touch `room_occupancy` or `occupancy.Create`, re-run them hard:
+deadlock. If you touch `room_occupancy`, `occupancy.Create` or `booking.Create`,
+re-run them hard:
 
 ```bash
-go test ./internal/occupancy/ -count=100 -timeout 20m
+go test ./internal/occupancy/ ./internal/booking/ -count=100 -timeout 20m
 ```
+
+**Two rules keep the packages from tripping over each other.** `go test ./...` runs
+them in parallel against one shared database, so:
+
+- A test that **commits** rows takes `testdb.Exclusive` first. Otherwise another
+  package's `DELETE FROM room_occupancy` lands mid-race and turns a concurrency
+  assertion into a coin flip.
+- Each package books in **its own stretch of calendar** — occupancy uses fixed 2027
+  and 2028 dates, availability uses today+120 to +150, booking uses today+200. A
+  committed booking inside another package's window silently breaks that package.
 
 ## Content is the owner's, not ours
 
@@ -108,21 +119,43 @@ marked `PLACEHOLDER`, amenities are empty, there is one flat rate season, and
 than seeded rows — a placeholder in the database is one somebody has to remember
 to delete. Do not invent content, and do not seed guesses.
 
-## Step 3: the booking flow
+## The booking flow, as built
 
-Search → results → room page → confirm → hold. Notes before starting:
+Search → results → room page → confirm → hold, with no Stripe anywhere in it.
 
-- **No Stripe account is needed for any of it.** The hold is a `room_occupancy` row
-  with an expiry; payment is step 4. The owner wants Stripe deferred as long as
-  reasonably possible, so keep step 3 free of it.
-- `GET /api/availability` already returns everything a result card needs: beds,
-  amenities, photos with a placeholder fallback, per-night prices, and a full
-  quote with the pet fee as its own field so the price preview can show the $50
-  explicitly.
-- The date picker must grey out dates from **valid whole spans per room**, not
-  free nights — with seven rooms it is otherwise possible to select a range where
-  no single room covers the whole stay (decision #14).
-- `POST /api/bookings` must re-validate dates, capacity, min-stay and price
-  server-side. The date picker is a convenience, not a security boundary.
-- With placeholder content the pages will look skeletal. That is expected; build
-  the layout so real content drops in.
+- **A booking and its hold are written in one transaction** by `booking.Create`.
+  The hold is a `room_occupancy` row with an expiry, so the exclusion constraint
+  guards a checkout in progress exactly the way it guards a confirmed stay.
+- **The booking path re-runs the availability query rather than trusting the
+  client.** Capacity, pets, occupancy, rate coverage and min-stay are therefore
+  re-checked by the same SQL that produced the search results — one rule set, not
+  two that drift. A hand-crafted one-night payload is refused.
+- That check is not what claims the room. A concurrent booker can pass it a moment
+  later; the exclusion constraint still decides at the insert. `booking.IsUnavailable`
+  covers both outcomes, which are different internally and identical to a guest.
+- **`GET /api/calendar` is what the date picker greys from**: unbroken runs of
+  sellable nights per room, each night carrying its minimum stay. Not free nights —
+  with seven rooms their union contains stays no single room covers (decision #14).
+- **Frontend dates are `YYYY-MM-DD` strings, never `Date` objects**, for the same
+  reason the server uses `internal/civil`. See `web/src/lib/dates.ts`.
+- The API returns `[]` and never `null` for an empty list. A room with no photos
+  crashed the results page once already; there is a test that fails if a null
+  reaches the wire.
+- **`booking.RunSweeper` is a plain ticker, not the job runner.** It reclaims
+  lapsed holds so an abandoned checkout cannot take a room off sale forever. Step 4
+  folds it into the durable `jobs` table.
+
+## Step 4: payments
+
+- The `bookings` money columns are **snapshots, not a ledger**: `deposit_cents` and
+  `balance_due_cents` describe how the quote splits and never change again. What is
+  still collectable comes from `amount_paid_cents` and `status`. Two CHECK
+  constraints depend on that staying true, so record payments rather than rewriting
+  the split.
+- `balance_charge_at` being NULL is the short-notice flag (decision #7), not a
+  missing value: those stays are charged in full at booking and have no T-7 job.
+- `pricing.ChargeAtBooking`, `Penalty` and `Refund` are already written and tested,
+  including the case where the T-7 charge failed and the refund must not go
+  negative.
+- Promotion from hold to booking belongs to the `payment_intent.succeeded`
+  **webhook**, not the browser redirect (decision, step 6 of the booking flow).
