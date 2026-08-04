@@ -10,6 +10,48 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+type Booking struct {
+	ID                    int64
+	Code                  string
+	GuestID               int64
+	Status                string
+	Checkin               pgtype.Date
+	Checkout              pgtype.Date
+	Guests                int32
+	WithPet               bool
+	RoomSubtotalCents     int64
+	PetFeeCents           int64
+	TaxCents              int64
+	TaxRateSnapshot       pgtype.Numeric
+	TotalCents            int64
+	DepositCents          int64
+	BalanceDueCents       int64
+	AmountPaidCents       int64
+	BalanceChargeAt       pgtype.Date
+	StripeCustomerID      string
+	StripePaymentMethodID string
+	CreatedAt             time.Time
+	UpdatedAt             time.Time
+}
+
+type BookingRoom struct {
+	ID            int64
+	BookingID     int64
+	RoomID        int64
+	Checkin       pgtype.Date
+	Checkout      pgtype.Date
+	NightlyPrices []byte
+}
+
+type Guest struct {
+	ID        int64
+	Email     string
+	Name      string
+	Phone     string
+	CreatedAt time.Time
+	UpdatedAt time.Time
+}
+
 type RateCalendar struct {
 	RoomID     int64
 	Date       pgtype.Date
