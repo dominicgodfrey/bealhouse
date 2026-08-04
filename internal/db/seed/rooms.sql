@@ -1,45 +1,61 @@
 -- The seven real rooms, as supplied by the owner. Re-runnable: rooms upsert on
 -- slug, and each room's beds are replaced wholesale.
 --
--- NOT seeded here: nightly rates. Those belong to rate_season_prices, which
--- arrives with the rates schema. The owner's "starting at" prices are 2-night
--- totals, so the base per-night rates are $200 (Mrs. Beal's, Garden, Flume) and
--- $150 (Rose, Blue, Washington, Back Lavender).
+-- NOT seeded here:
 --
--- ACCESSIBILITY: the owner marked Mrs. Beal's Suite and Rose Chamber as
--- "accessibility friendly", but did not say which features that means. The
--- rooms table refuses is_accessible = true without at least one named feature,
--- so both are seeded false rather than making a promise nobody has verified.
--- Flip them on once the real features are known -- see the commented UPDATE at
--- the bottom of this file.
+--   Rates.       Nightly prices belong to rate_season_prices. The owner's
+--                "starting at" figures are 2-night totals, so the base
+--                per-night rates are $200 (Mrs. Beal's, Garden, Flume) and
+--                $150 (Rose, Blue, Washington, Back Lavender).
+--
+--   Amenities.   Left empty deliberately. The owner adds and removes these in
+--                the admin console; seeding guesses would only have to be
+--                undone.
+--
+--   Photos.      Uploaded through admin once the image pipeline exists.
+--
+-- Accessibility: every room requires stairs, so is_accessible stays false on
+-- all seven and the search filter is not offered. settings.accessibility_notice
+-- carries the disclaimer shown to guests instead.
+--
+-- Descriptions are marked placeholders on purpose: if one ever reaches the
+-- live site it should be unmistakable rather than plausible.
 
 BEGIN;
 
-INSERT INTO rooms (slug, name, view, max_occupancy, is_pet_friendly, pet_fee_cents, sort_order)
+INSERT INTO rooms (slug, name, description, view, max_occupancy, is_pet_friendly, pet_fee_cents, sort_order)
 VALUES
   ('mrs-beals-suite', 'Mrs. Beal''s Suite',
+   'PLACEHOLDER — final copy to be supplied by the owner.',
    'Street and mountain view in front, hill view in back', 3, false, 0, 1),
 
   ('garden-suite', 'Garden Suite',
+   'PLACEHOLDER — final copy to be supplied by the owner.',
    'Front room has mountain and street view; back room has hill view', 4, false, 0, 2),
 
   ('flume', 'Flume',
+   'PLACEHOLDER — final copy to be supplied by the owner.',
    'Street and mountain view', 2, false, 0, 3),
 
   ('rose-chamber', 'Rose Chamber',
-   NULL, 2, false, 0, 4),
+   'PLACEHOLDER — final copy to be supplied by the owner.',
+   'Backyard, obstructed view', 2, false, 0, 4),
 
   ('washington-room', 'Washington Room',
+   'PLACEHOLDER — final copy to be supplied by the owner.',
    'Street and mountain view', 2, false, 0, 5),
 
   ('blue-room', 'Blue Room',
+   'PLACEHOLDER — final copy to be supplied by the owner.',
    'Hill view at the back', 2, false, 0, 6),
 
   ('back-lavender', 'Back Lavender',
+   'PLACEHOLDER — final copy to be supplied by the owner.',
    'Hill view over the backyard', 3, true, 5000, 7)
 
 ON CONFLICT (slug) DO UPDATE SET
   name            = EXCLUDED.name,
+  description     = EXCLUDED.description,
   view            = EXCLUDED.view,
   max_occupancy   = EXCLUDED.max_occupancy,
   is_pet_friendly = EXCLUDED.is_pet_friendly,
@@ -66,9 +82,3 @@ JOIN (VALUES
 ) AS b(slug, bed_type, count, location) ON b.slug = r.slug;
 
 COMMIT;
-
--- Pending the owner's answer on which accessibility features each room has:
---
--- UPDATE rooms SET is_accessible = true,
---   accessibility_features = ARRAY['step_free_entry', 'ground_floor']
--- WHERE slug IN ('mrs-beals-suite', 'rose-chamber');
