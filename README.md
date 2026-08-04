@@ -4,7 +4,16 @@ Booking engine, marketing site, and admin console for a 7-room inn. One Go binar
 serves the JSON API and an embedded React SPA. See [ARCHITECTURE.md](ARCHITECTURE.md)
 for the design and the build order this repo follows.
 
-**Status:** build-order step 1 (foundation) complete. No domain logic yet.
+**Status:** build-order steps 1 and 2 complete — foundation, rooms, occupancy,
+rates, and availability, all behind tests against a real Postgres. No booking
+flow, payments, or UI yet.
+
+| Working today | Where |
+|---|---|
+| `GET /api/availability` | [internal/httpx](internal/httpx/availability.go) |
+| Double-booking prevention | [internal/occupancy](internal/occupancy/occupancy.go) |
+| Seasons → nightly calendar | [internal/rates](internal/rates/rates.go) |
+| Deposits, tax, pet fee, refunds | [internal/pricing](internal/pricing/pricing.go) |
 
 ## Prerequisites
 
@@ -61,21 +70,38 @@ compile time.
 ## Layout
 
 ```
-cmd/server/           entrypoint: config, DB pool, HTTP server, graceful shutdown
-internal/config/      environment + .env loading
-internal/httpx/       chi router, /api/health, SPA serving with history fallback
+cmd/server/              entrypoint: config, DB pool, HTTP server, graceful shutdown
+internal/config/         environment + .env loading
+internal/httpx/          chi router, JSON API, SPA serving with history fallback
+internal/availability/   the search: capacity, pets, occupancy, rates, min stay
+internal/occupancy/      the exclusion constraint and its error translation
+internal/rates/          seasons to nightly calendar
+internal/pricing/        integer-cent money: deposits, tax, pet fee, refunds
+internal/civil/          the inn's calendar in America/New_York
+internal/testdb/         test helpers: real Postgres, rolled-back transactions
 internal/db/migrations/  goose SQL migrations
-internal/db/queries/  hand-written SQL; sqlc generates Go into internal/db/gen
-web/                  Vite + React + Tailwind SPA
-web/embed.go          embeds web/dist into the binary
+internal/db/queries/     hand-written SQL; sqlc generates Go into internal/db/gen
+internal/db/seed/        the seven rooms and a placeholder rate season
+web/                     Vite + React + Tailwind SPA
+web/embed.go             embeds web/dist into the binary
 ```
+
+Tests need Postgres running and seeded; they skip cleanly when it is not
+reachable. Tests that rewrite reference data run inside a rolled-back
+transaction, so `go test ./...` never leaves the dev database altered.
 
 `web/dist/` is committed with an empty `.gitkeep` because `//go:embed all:dist`
 will not compile against a missing directory. Vite's `emptyOutDir` deletes it on
 every build, so a small plugin in `vite.config.ts` writes it back.
 
+## Content ownership
+
+Room descriptions, photos, amenities, and rate seasons are all owner-managed
+through the admin console. What is in the seed is placeholder: descriptions are
+marked as such, amenities are empty, and there is a single flat rate season.
+None of it should be edited in SQL once admin exists.
+
 ## Not yet built
 
-Steps 2–8 of the build order: rooms and rates, the occupancy table and its
-exclusion constraint, availability, booking, Stripe, email, admin, and content.
-Step 2 is next, and its concurrency tests come before any UI.
+Steps 3–8 of the build order: the booking flow and holds, Stripe, email and
+PDFs, the admin console, marketing content, and launch.
