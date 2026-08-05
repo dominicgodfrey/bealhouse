@@ -1,7 +1,7 @@
 import { Elements, PaymentElement, useElements, useStripe } from '@stripe/react-stripe-js'
 import { loadStripe, type Stripe } from '@stripe/stripe-js'
 import { useState } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { useNavigate, useParams } from 'react-router'
 
 import { ErrorNote, Layout, Loading } from '../components/Layout'
 import { devPay, openPayment, type PaymentIntent } from '../lib/api'

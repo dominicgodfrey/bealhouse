@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Link, useParams, useSearchParams } from 'react-router-dom'
+import { Link, useParams, useSearchParams } from 'react-router'
 
 import { ErrorNote, Layout, Loading } from '../components/Layout'
 import { PriceBreakdown } from '../components/PriceBreakdown'

@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate } from 'react-router'
 
 import type { Stay } from '../lib/api'
 import { formatLong, nights } from '../lib/dates'

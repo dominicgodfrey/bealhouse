@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router'
 
 import { ErrorNote, Layout, Loading } from '../components/Layout'
 import { PriceBreakdown } from '../components/PriceBreakdown'

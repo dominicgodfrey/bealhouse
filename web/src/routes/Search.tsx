@@ -1,4 +1,4 @@
-import { useSearchParams } from 'react-router-dom'
+import { useSearchParams } from 'react-router'
 
 import { ErrorNote, Layout, Loading } from '../components/Layout'
 import { RoomCard } from '../components/RoomCard'

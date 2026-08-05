@@ -1,4 +1,4 @@
-import { Link } from 'react-router-dom'
+import { Link } from 'react-router'
 
 import type { Room, Stay } from '../lib/api'
 import { formatCents, formatCentsShort } from '../lib/money'
