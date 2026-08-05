@@ -20,6 +20,17 @@ type Config struct {
 	StripeWebhookSecret  string
 	StripePublishableKey string
 
+	// StripeFake substitutes a processor that mints ids and takes no money, so
+	// the whole booking journey can be walked through before the account
+	// exists.
+	//
+	// Opt-in and nothing else: it is never implied by ENV, because ENV defaults
+	// to "dev" and an unconfigured production deploy would otherwise be
+	// indistinguishable from a laptop. gateway.New refuses it alongside any
+	// real Stripe setting and outside dev; this field only says it was asked
+	// for.
+	StripeFake bool
+
 	// SiteURL is the public origin, used to build links that leave the site —
 	// chiefly the ones in emails, which cannot be relative.
 	SiteURL string
@@ -55,6 +66,7 @@ func Load() Config {
 		StripeSecretKey:      env("STRIPE_SECRET_KEY", ""),
 		StripeWebhookSecret:  env("STRIPE_WEBHOOK_SECRET", ""),
 		StripePublishableKey: env("STRIPE_PUBLISHABLE_KEY", ""),
+		StripeFake:           env("STRIPE_FAKE", "") == "true",
 
 		SiteURL:      env("SITE_URL", ""),
 		EmailLogoURL: env("EMAIL_LOGO_URL", ""),
