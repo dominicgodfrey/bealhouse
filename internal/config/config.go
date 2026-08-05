@@ -29,6 +29,16 @@ type Config struct {
 	// at nothing is worse than the inn's name in text, which is what the
 	// templates fall back to. No logo has been supplied yet.
 	EmailLogoURL string
+
+	// BehindProxy says a trusted reverse proxy sits in front of this server and
+	// terminates TLS — Caddy, in the deployed shape (decision #2).
+	//
+	// It decides whether X-Forwarded-For is believed, and so who the rate
+	// limiter thinks a request is from. Off by default because the safe
+	// mistake is to under-trust: with it wrongly on, anyone can pick their own
+	// address and walk around the booking limit; with it wrongly off, everyone
+	// behind the proxy shares one bucket and the limit is merely too strict.
+	BehindProxy bool
 }
 
 // Load reads .env (if present) into the environment, then builds a Config.
@@ -48,6 +58,8 @@ func Load() Config {
 
 		SiteURL:      env("SITE_URL", ""),
 		EmailLogoURL: env("EMAIL_LOGO_URL", ""),
+
+		BehindProxy: env("BEHIND_PROXY", "") == "true",
 	}
 }
 

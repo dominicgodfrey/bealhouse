@@ -80,8 +80,12 @@ func run() error {
 	slog.Warn("no email provider configured; queued messages will be logged, not sent")
 
 	srv := &http.Server{
-		Addr:              cfg.Addr,
-		Handler:           httpx.NewRouter(httpx.Deps{Pool: pool, SPA: web.Dist()}),
+		Addr: cfg.Addr,
+		Handler: httpx.NewRouter(httpx.Deps{
+			Pool:        pool,
+			SPA:         web.Dist(),
+			BehindProxy: cfg.BehindProxy,
+		}),
 		ReadHeaderTimeout: 10 * time.Second,
 		WriteTimeout:      30 * time.Second,
 		IdleTimeout:       60 * time.Second,
