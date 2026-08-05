@@ -49,6 +49,15 @@ it the server still boots and reports `db: not_configured`.
   `C:\Program Files\Docker\Docker\resources\bin` if a command is not found.
 - **`go test -race` does not work** — it needs cgo and there is no C compiler here.
   Stress concurrency with `-count=N` instead.
+- **Docker Desktop can fail to start after an unclean shutdown**, crashing with
+  "remove …engine.sock: The file cannot be accessed by the system." It leaves
+  orphaned AF_UNIX socket reparse points that nothing — not Docker, not
+  `Remove-Item`, not `del` — can delete. **Rename the parent directory aside**
+  and it starts clean; Docker recreates it. The two seen so far are
+  `%LOCALAPPDATA%\docker-secrets-engine\` and `%LOCALAPPDATA%\Docker\run\`, and
+  the error names whichever it hit first, so expect to do it more than once.
+  The dialog's "Reset to factory defaults" would also fix it and would destroy
+  every container and volume, including this project's Postgres data. Do not.
 - **Do not rewrite Go or SQL files with PowerShell string replacement.** It mangles
   UTF-8; em-dashes in comments came back as mojibake. Use the Edit tool, and run
   `gofmt -l .` afterwards either way.
