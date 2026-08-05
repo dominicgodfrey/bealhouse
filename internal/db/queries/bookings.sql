@@ -111,11 +111,27 @@ ORDER BY r.sort_order;
 -- Expire pending bookings whose hold is gone. Run after the sweeper: the hold
 -- is what reserved the room, so once it has lapsed the booking is dead and
 -- should say so rather than sit pending forever.
+--
+-- ...unless a payment is in flight. A guest working through a 3-D Secure
+-- challenge can outlive the fifteen-minute hold, and marking their booking
+-- expired seconds before the webhook confirms it would tell them the room was
+-- gone while their money was on its way. The grace period is settings-driven
+-- and starts when the PaymentIntent is created.
+--
+-- This does not keep the room off sale: the hold has already been swept on its
+-- own TTL, so a guest who pays after the grace period still finds their booking
+-- expired and gets it resolved by the re-claim path in internal/payments — with
+-- a refund if the room really did go to somebody else.
 -- name: ExpireAbandonedBookings :execrows
 UPDATE bookings b
 SET status = 'expired', updated_at = now()
+FROM settings s
 WHERE b.status = 'pending'
   AND NOT EXISTS (
     SELECT 1 FROM room_occupancy o
     WHERE o.booking_id = b.id AND o.kind = 'hold'
+  )
+  AND (
+    b.payment_started_at IS NULL
+    OR b.payment_started_at <= now() - (s.payment_grace_minutes * interval '1 minute')
   );

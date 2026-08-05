@@ -105,6 +105,25 @@ func TestMinimumStayCannotBeBypassed(t *testing.T) {
 	}
 }
 
+// The maximum stay is the picker's rule and the server's rule, for the same
+// reason the minimum is: a hand-crafted payload must not get a two-month stay
+// past the booking endpoint.
+func TestMaximumStayCannotBeBypassed(t *testing.T) {
+	ctx, q, b := setup(t)
+
+	settings, err := q.GetSettings(ctx)
+	if err != nil {
+		t.Fatalf("loading settings: %v", err)
+	}
+
+	req := request()
+	req.Checkout = day(200 + int(settings.MaxStayNights) + 1)
+
+	if _, err := Create(ctx, b, req); !errors.Is(err, availability.ErrStayTooLong) {
+		t.Errorf("an over-long payload got %v, want ErrStayTooLong", err)
+	}
+}
+
 // Capacity is a filter in search and a rule here. Rose Chamber sleeps two.
 func TestCapacityCannotBeBypassed(t *testing.T) {
 	ctx, _, b := setup(t)

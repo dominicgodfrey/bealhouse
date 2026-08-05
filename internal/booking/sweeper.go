@@ -8,6 +8,10 @@ import (
 	db "bealhouse/internal/db/gen"
 )
 
+// SweepJobKind is the durable job that runs Sweep. Registered by the server
+// with the rest of the background work.
+const SweepJobKind = "hold.sweep"
+
 // SweepInterval matches the cadence ARCHITECTURE.md gives the hold.sweep job.
 // A hold outliving its TTL by up to a minute costs nothing: the room is not
 // double-booked, it is briefly still held by someone who has gone.
@@ -36,34 +40,25 @@ func Sweep(ctx context.Context, q *db.Queries) (holds int64, expired int64, err 
 	return holds, expired, nil
 }
 
-// RunSweeper sweeps until the context is cancelled.
+// SweepJob adapts Sweep to the job runner's handler signature.
 //
-// This is deliberately not the job runner. ARCHITECTURE.md's durable `jobs`
-// table with FOR UPDATE SKIP LOCKED arrives with payments in build-order step
-// 4, and hold.sweep becomes one row in it; this is the smallest thing that
-// makes step 3 correct on its own, because a hold nobody reclaims takes a room
-// off sale permanently.
+// Step 3 ran this on a plain ticker, which was the smallest thing that made
+// that step correct on its own — a hold nobody reclaims takes a room off sale
+// permanently. It is a durable job now, as ARCHITECTURE.md always intended:
+// the schedule survives a restart, and two servers running it do not sweep
+// twice.
 //
-// A failed sweep is logged and retried on the next tick rather than being
-// fatal: the database being briefly unreachable is not a reason to bring down
-// a server that is otherwise taking bookings.
-func RunSweeper(ctx context.Context, q *db.Queries) {
-	ticker := time.NewTicker(SweepInterval)
-	defer ticker.Stop()
-
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		case <-ticker.C:
-			holds, expired, err := Sweep(ctx, q)
-			if err != nil {
-				slog.Error("sweeping expired holds", "err", err)
-				continue
-			}
-			if holds > 0 || expired > 0 {
-				slog.Info("reclaimed abandoned checkouts", "holds", holds, "bookings", expired)
-			}
+// A failed sweep is reported to the runner, which retries it with backoff. The
+// work is idempotent, so a retry costs nothing.
+func SweepJob(q *db.Queries) func(context.Context, []byte) error {
+	return func(ctx context.Context, _ []byte) error {
+		holds, expired, err := Sweep(ctx, q)
+		if err != nil {
+			return err
 		}
+		if holds > 0 || expired > 0 {
+			slog.Info("reclaimed abandoned checkouts", "holds", holds, "bookings", expired)
+		}
+		return nil
 	}
 }

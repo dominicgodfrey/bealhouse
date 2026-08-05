@@ -17,7 +17,9 @@ import (
 	"bealhouse/internal/booking"
 	"bealhouse/internal/config"
 	db "bealhouse/internal/db/gen"
+	"bealhouse/internal/email"
 	"bealhouse/internal/httpx"
+	"bealhouse/internal/jobs"
 	"bealhouse/web"
 )
 
@@ -47,12 +49,35 @@ func run() error {
 		slog.Warn("SPA bundle is empty; non-API routes will 503 until `make web` runs")
 	}
 
-	// Without this an abandoned checkout holds its room forever, which is
-	// worse than the double-booking the hold exists to prevent. Step 4's
-	// durable job runner takes this over along with the T-7 charges.
+	// Background work. Without the sweep an abandoned checkout holds its room
+	// forever, which is worse than the double-booking the hold exists to
+	// prevent.
 	if pool != nil {
-		go booking.RunSweeper(ctx, db.New(pool))
+		q := db.New(pool)
+
+		runner := jobs.New(q)
+		runner.Every(booking.SweepJobKind, booking.SweepInterval, booking.SweepJob(q))
+
+		// Email is queued, never sent inline, so a provider outage delays a
+		// confirmation rather than failing the booking that earned it.
+		mail, err := email.New(email.Brand{
+			LogoURL: cfg.EmailLogoURL,
+			SiteURL: cfg.SiteURL,
+		})
+		if err != nil {
+			return err
+		}
+		runner.Handle(email.JobKind, mail.Handler(email.LogSender{}))
+
+		go runner.Run(ctx)
 	}
+
+	if !cfg.StripeConfigured() {
+		slog.Warn("Stripe is not configured; rooms can be held but not paid for")
+	}
+	// Said plainly rather than left to be discovered: the queue will accept and
+	// drain messages, and every one of them will be logged instead of delivered.
+	slog.Warn("no email provider configured; queued messages will be logged, not sent")
 
 	srv := &http.Server{
 		Addr:              cfg.Addr,

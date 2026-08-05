@@ -108,6 +108,16 @@ func ResetOccupancy(t *testing.T, pool *pgxpool.Pool) {
 	}
 }
 
+// ResetJobs empties the job queue. The runner's periodic rows are re-created on
+// the next start, so this leaves nothing that needed keeping.
+func ResetJobs(t *testing.T, pool *pgxpool.Pool) {
+	t.Helper()
+
+	if _, err := pool.Exec(context.Background(), "DELETE FROM jobs"); err != nil {
+		t.Fatalf("resetting jobs: %v", err)
+	}
+}
+
 // ResetBookings removes every booking and the guests left with nothing to their
 // name, so a test that commits real bookings does not accumulate them in the
 // developer's database.

@@ -20,6 +20,12 @@ var (
 	ErrCheckoutNotAfterCheckin = errors.New("availability: check-out must be after check-in")
 	ErrCheckinInPast           = errors.New("availability: check-in is in the past")
 	ErrGuestsOutOfRange        = errors.New("availability: at least one guest is required")
+
+	// ErrStayTooLong means the stay is longer than the engine sells
+	// (decision #27). Unlike the other three this one has somewhere to send the
+	// guest — a month-plus stay is a conversation with the owner — so the API
+	// says so rather than just refusing.
+	ErrStayTooLong = errors.New("availability: that stay is longer than can be booked online")
 )
 
 // Request is a search as the guest expressed it.
@@ -103,13 +109,15 @@ type Result struct {
 // picker that greys out impossible selections is a convenience, not a security
 // boundary.
 func Search(ctx context.Context, q *db.Queries, req Request) (Result, error) {
-	if err := validate(req); err != nil {
-		return Result{}, err
-	}
-
+	// Settings first: the longest sellable stay is owner-configurable, so the
+	// date checks cannot be answered without them.
 	settings, err := q.GetSettings(ctx)
 	if err != nil {
 		return Result{}, fmt.Errorf("availability: loading settings: %w", err)
+	}
+
+	if err := validate(req, int(settings.MaxStayNights)); err != nil {
+		return Result{}, err
 	}
 
 	rows, err := q.SearchAvailability(ctx, db.SearchAvailabilityParams{
@@ -181,7 +189,7 @@ func Search(ctx context.Context, q *db.Queries, req Request) (Result, error) {
 	return result, nil
 }
 
-func validate(req Request) error {
+func validate(req Request, maxStayNights int) error {
 	if !req.Checkout.After(req.Checkin) {
 		return ErrCheckoutNotAfterCheckin
 	}
@@ -190,6 +198,12 @@ func validate(req Request) error {
 	}
 	if req.Guests < 1 {
 		return ErrGuestsOutOfRange
+	}
+	// Checked here rather than only in the picker, for the same reason the
+	// minimum stay is: a client-side calendar is a convenience, not a security
+	// boundary, and booking.Create re-runs this very function.
+	if maxStayNights > 0 && civil.Nights(req.Checkin, req.Checkout) > maxStayNights {
+		return ErrStayTooLong
 	}
 	return nil
 }

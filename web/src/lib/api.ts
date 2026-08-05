@@ -67,6 +67,8 @@ export type Calendar = {
   guests: number
   withPet: boolean
   rooms: { slug: string; spans: Span[] }[]
+  /** The longest stay on sale. Longer ones are arranged with the inn directly. */
+  maxStayNights: number
 }
 
 export type BookedRoom = {

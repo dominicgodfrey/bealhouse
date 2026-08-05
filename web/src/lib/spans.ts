@@ -21,6 +21,8 @@ export type SpanIndex = {
   /** Whether any room covers this exact stay. */
   covers(checkin: string, checkout: string): boolean
   empty: boolean
+  /** The longest stay on sale, so the picker can say why it stops offering. */
+  maxStayNights: number
 }
 
 /** offsetIn returns how far into a span a date falls, or -1 if it is outside. */
@@ -31,6 +33,12 @@ function offsetIn(span: Span, date: string): number {
 
 export function indexSpans(calendar: Calendar | null): SpanIndex {
   const spans: Span[] = calendar?.rooms.flatMap((room) => room.spans) ?? []
+
+  // The longest stay on sale (decision #27). Sent by the API rather than
+  // hardcoded here, and mirrored by availability.Search on the server, so a
+  // guest cannot get a longer stay through by editing the request. Zero or a
+  // missing value means no cap, matching how the server reads it.
+  const maxStayNights = calendar?.maxStayNights ?? 0
 
   const arrivals = new Set<string>()
   for (const span of spans) {
@@ -49,7 +57,10 @@ export function indexSpans(calendar: Calendar | null): SpanIndex {
       const offset = offsetIn(span, checkin)
       if (offset < 0) continue
 
-      const remaining = span.minStays.length - offset
+      let remaining = span.minStays.length - offset
+      if (maxStayNights > 0) {
+        remaining = Math.min(remaining, maxStayNights)
+      }
       for (let stay = span.minStays[offset]; stay <= remaining; stay++) {
         out.add(addDays(checkin, stay))
       }
@@ -62,6 +73,7 @@ export function indexSpans(calendar: Calendar | null): SpanIndex {
     departures,
     covers: (checkin, checkout) => departures(checkin).has(checkout),
     empty: spans.length === 0,
+    maxStayNights,
   }
 }
 

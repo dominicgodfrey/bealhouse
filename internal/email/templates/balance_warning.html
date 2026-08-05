@@ -1,0 +1,17 @@
+{{define "balance_warning_subject"}}PLACEHOLDER — your balance will be charged tomorrow{{end}}
+
+{{define "balance_warning_body"}}
+  {{/*
+    PLACEHOLDER. The T-8 heads-up (decision #6), sent by the balance.warn job
+    the day before the card is charged off-session.
+
+    This one is not a courtesy. A charge nobody was warned about is the one that
+    gets disputed, so it should state the amount, the date it will be taken, and
+    the card it will go to.
+  */}}
+  <p style="margin:0 0 12px 0;"><strong>Balance charge reminder</strong></p>
+  <p style="margin:0;color:#57534e;">
+    This template is not written yet. It warns the guest, the day before, that
+    the remaining balance is about to be charged to the card on file.
+  </p>
+{{end}}

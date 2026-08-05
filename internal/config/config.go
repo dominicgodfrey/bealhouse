@@ -11,6 +11,24 @@ type Config struct {
 	Addr        string
 	DatabaseURL string
 	Env         string
+
+	// Stripe. Absent rather than invalid when the account is not set up yet:
+	// the server still boots and the booking flow still holds rooms, exactly
+	// the way it does without a DATABASE_URL. Only the endpoints that move
+	// money refuse.
+	StripeSecretKey      string
+	StripeWebhookSecret  string
+	StripePublishableKey string
+
+	// SiteURL is the public origin, used to build links that leave the site —
+	// chiefly the ones in emails, which cannot be relative.
+	SiteURL string
+
+	// EmailLogoURL is the letterhead image. Absolute and publicly reachable, or
+	// empty: mail clients do not resolve relative paths, and an <img> pointing
+	// at nothing is worse than the inn's name in text, which is what the
+	// templates fall back to. No logo has been supplied yet.
+	EmailLogoURL string
 }
 
 // Load reads .env (if present) into the environment, then builds a Config.
@@ -23,10 +41,28 @@ func Load() Config {
 		Addr:        env("ADDR", ":8080"),
 		DatabaseURL: env("DATABASE_URL", ""),
 		Env:         env("ENV", "dev"),
+
+		StripeSecretKey:      env("STRIPE_SECRET_KEY", ""),
+		StripeWebhookSecret:  env("STRIPE_WEBHOOK_SECRET", ""),
+		StripePublishableKey: env("STRIPE_PUBLISHABLE_KEY", ""),
+
+		SiteURL:      env("SITE_URL", ""),
+		EmailLogoURL: env("EMAIL_LOGO_URL", ""),
 	}
 }
 
 func (c Config) IsDev() bool { return c.Env == "dev" }
+
+// StripeConfigured reports whether money can actually be moved.
+//
+// Both halves are required and neither is useful alone: the secret key creates
+// PaymentIntents, and without the webhook secret nothing could verify that a
+// callback claiming one succeeded really came from Stripe. Treating a partial
+// configuration as "on" would mean promoting bookings on unverified requests,
+// so it is deliberately all or nothing.
+func (c Config) StripeConfigured() bool {
+	return c.StripeSecretKey != "" && c.StripeWebhookSecret != ""
+}
 
 func env(key, fallback string) string {
 	if v := os.Getenv(key); v != "" {

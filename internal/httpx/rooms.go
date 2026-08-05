@@ -85,6 +85,10 @@ func searchProblem(err error) (string, bool) {
 		return "check-in cannot be in the past", true
 	case errors.Is(err, availability.ErrGuestsOutOfRange):
 		return "at least one guest is required", true
+	// The one refusal with somewhere to send the guest. Everything else here is
+	// a correctable mistake; this is an invitation to get in touch.
+	case errors.Is(err, availability.ErrStayTooLong):
+		return "that stay is longer than we can book online; please contact the inn to arrange it", true
 	default:
 		return "", false
 	}

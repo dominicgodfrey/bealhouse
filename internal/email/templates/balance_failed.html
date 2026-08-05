@@ -1,0 +1,17 @@
+{{define "balance_failed_subject"}}PLACEHOLDER — we could not take your balance{{end}}
+
+{{define "balance_failed_body"}}
+  {{/*
+    PLACEHOLDER. Sent when the off-session charge is declined. The booking stays
+    confirmed — the guest is still arriving — so this asks them to get in touch
+    rather than telling them anything has been cancelled.
+
+    The owner gets their own unmissable flag in admin at the same time; this is
+    the guest's half of that.
+  */}}
+  <p style="margin:0 0 12px 0;"><strong>Payment problem</strong></p>
+  <p style="margin:0;color:#57534e;">
+    This template is not written yet. It tells the guest their balance could not
+    be charged and asks them to contact the inn. The booking is not cancelled.
+  </p>
+{{end}}

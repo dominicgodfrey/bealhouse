@@ -1,0 +1,19 @@
+{{define "booking_confirmation_subject"}}PLACEHOLDER — booking confirmation{{end}}
+
+{{define "booking_confirmation_body"}}
+  {{/*
+    PLACEHOLDER. Sent once payment succeeds and the hold has become a booking —
+    from the payment_intent.succeeded webhook, not the browser redirect, so it
+    reaches a guest who closed the tab.
+
+    Should eventually carry: the booking reference, room, dates, the per-night
+    breakdown with tax, what was charged today, and what will be charged at T-7
+    (or that the stay is paid in full). Plus the signed manage-booking link from
+    decision #19 and the PDF.
+  */}}
+  <p style="margin:0 0 12px 0;"><strong>Booking confirmation</strong></p>
+  <p style="margin:0;color:#57534e;">
+    This template is not written yet. It confirms a paid booking and gives the
+    guest their reference, dates, and payment summary.
+  </p>
+{{end}}

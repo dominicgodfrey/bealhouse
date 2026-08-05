@@ -58,6 +58,12 @@ type Calendar struct {
 	Guests  int         `json:"guests"`
 	WithPet bool        `json:"withPet"`
 	Rooms   []RoomSpans `json:"rooms"`
+
+	// MaxStayNights is the longest stay on sale (decision #27). Sent with the
+	// calendar rather than hardcoded in the client, so raising it in settings
+	// changes the picker without a deploy — the same reason the minimum stay
+	// travels on every night.
+	MaxStayNights int `json:"maxStayNights"`
 }
 
 // Spans returns the sellable spans for a window.
@@ -74,6 +80,11 @@ func Spans(ctx context.Context, q *db.Queries, req CalendarRequest) (Calendar, e
 		guests = 1
 	}
 
+	settings, err := q.GetSettings(ctx)
+	if err != nil {
+		return Calendar{}, fmt.Errorf("availability: loading settings: %w", err)
+	}
+
 	rows, err := q.ListSellableNights(ctx, db.ListSellableNightsParams{
 		FromDate: pgtype.Date{Time: from, Valid: true},
 		ToDate:   pgtype.Date{Time: to, Valid: true},
@@ -85,11 +96,12 @@ func Spans(ctx context.Context, q *db.Queries, req CalendarRequest) (Calendar, e
 	}
 
 	return Calendar{
-		From:    from.Format(time.DateOnly),
-		To:      to.Format(time.DateOnly),
-		Guests:  guests,
-		WithPet: req.WithPet,
-		Rooms:   group(rows),
+		From:          from.Format(time.DateOnly),
+		To:            to.Format(time.DateOnly),
+		Guests:        guests,
+		WithPet:       req.WithPet,
+		Rooms:         group(rows),
+		MaxStayNights: int(settings.MaxStayNights),
 	}, nil
 }
 

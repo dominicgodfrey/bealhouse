@@ -129,6 +129,21 @@ export function DateRangePicker({ checkin, checkout, guests, withPet, onChange }
             </p>
           )}
 
+          {/* The picker stops offering departures past the maximum stay, which
+              without a word of explanation just looks like the calendar has
+              run out. Longer stays are genuinely available — they are arranged
+              with the owner rather than sold here (decision #27).
+
+              Deliberately not a link: there is no contact route yet and the
+              inn's address is the owner's to supply, not ours to invent. This
+              becomes a link when step 7 adds the contact page. */}
+          {index.maxStayNights > 0 && (
+            <p className="mt-3 text-sm text-neutral-600">
+              Stays of up to {index.maxStayNights} nights can be booked here. For anything
+              longer, please contact the inn and we will arrange it with you.
+            </p>
+          )}
+
           {choosing === 'checkout' && (
             <button
               type="button"

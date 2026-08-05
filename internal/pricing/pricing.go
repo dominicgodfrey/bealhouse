@@ -39,6 +39,17 @@ func IsShortNotice(today, checkin time.Time) bool {
 	return checkin.Before(today.AddDate(0, 0, ShortNoticeDays))
 }
 
+// IsLateCancellation reports whether a cancellation falls inside the window
+// that forfeits the deposit (decision #9).
+//
+// The boundary is the same T-7 the balance charge uses, and inclusive on the
+// guest's side: cancelling exactly seven days out is in time. Both arguments
+// are civil dates and the clock stays outside this package, for the same reason
+// IsShortNotice takes today as an argument.
+func IsLateCancellation(on, checkin time.Time) bool {
+	return checkin.Before(on.AddDate(0, 0, BalanceLeadDays))
+}
+
 // BalanceChargeDate is when the balance is charged off-session: T-7.
 //
 // Meaningful only when the arrival is not short notice — inside that window the
@@ -119,7 +130,8 @@ func (q Quote) ChargeAtBooking(shortNotice bool) int64 {
 	return q.DepositCents
 }
 
-// Penalty is the amount the inn keeps when a stay is cancelled.
+// Penalty is the cancellation charge: the amount the inn keeps because of when
+// the guest cancelled, before any processing cost is considered.
 //
 // Cancelling on time costs nothing. Cancelling late forfeits half the total,
 // which is exactly the deposit — so in the ordinary case, where the balance has
@@ -132,14 +144,43 @@ func (q Quote) Penalty(late bool) int64 {
 	return q.DepositCents
 }
 
+// ProcessingFee is the card processor's cut of what was collected, rounded up.
+//
+// It is charged on the way in and is not returned when a payment is refunded,
+// so refunding every cent the guest paid would leave the inn out of pocket by
+// this much on a cancellation it had no part in (decision #26). Rounding up
+// rather than to nearest is deliberate and worth a fraction of a cent: the
+// whole point is that the inn is never short.
+func ProcessingFee(paidCents int64, rate Rate) int64 {
+	if paidCents <= 0 || rate <= 0 {
+		return 0
+	}
+	return ceilScaled(paidCents, rate)
+}
+
+// Retained is everything the inn keeps out of what was collected.
+//
+// The larger of the cancellation penalty and the processing fee, not their sum.
+// The penalty already dwarfs the processor's cut — half the stay against three
+// percent of it — and the fee has in that case already been paid for out of
+// money the guest is not getting back. Adding them would charge a late
+// canceller twice for the same card transaction.
+func (q Quote) Retained(paidCents int64, late bool, processing Rate) int64 {
+	penalty := q.Penalty(late)
+	if fee := ProcessingFee(paidCents, processing); fee > penalty {
+		return fee
+	}
+	return penalty
+}
+
 // Refund is what to return to the card, given what has actually been collected.
 //
 // Deriving this from amount paid rather than from the total is what makes it
 // correct when the T-7 balance charge failed: the guest has paid only the
 // deposit, the penalty is the deposit, and the refund is zero rather than a
 // negative number the inn would try to collect.
-func (q Quote) Refund(paidCents int64, late bool) int64 {
-	refund := paidCents - q.Penalty(late)
+func (q Quote) Refund(paidCents int64, late bool, processing Rate) int64 {
+	refund := paidCents - q.Retained(paidCents, late, processing)
 	if refund < 0 {
 		return 0
 	}
@@ -150,6 +191,11 @@ func (q Quote) Refund(paidCents int64, late bool) int64 {
 // plausible stay (a $10,000 booking reaches 8.5e9).
 func tax(baseCents int64, rate Rate) int64 {
 	return (baseCents*int64(rate) + rateScale/2) / rateScale
+}
+
+// ceilScaled rounds a scaled-rate multiplication up, in integers.
+func ceilScaled(baseCents int64, rate Rate) int64 {
+	return (baseCents*int64(rate) + rateScale - 1) / rateScale
 }
 
 // halfRoundedUp returns ceil(n/2) for non-negative n.

@@ -79,8 +79,11 @@ func (q *Queries) GetRoomIDBySlug(ctx context.Context, slug string) (int64, erro
 const getSettings = `-- name: GetSettings :one
 SELECT
   default_min_stay,
+  max_stay_nights,
   (tax_rate * 100000)::bigint AS tax_rate_scaled,
+  (refund_processing_rate * 100000)::bigint AS refund_processing_rate_scaled,
   hold_ttl_minutes,
+  payment_grace_minutes,
   checkin_time,
   checkout_time,
   accessibility_notice
@@ -88,12 +91,15 @@ FROM settings WHERE id
 `
 
 type GetSettingsRow struct {
-	DefaultMinStay      int32
-	TaxRateScaled       int64
-	HoldTtlMinutes      int32
-	CheckinTime         pgtype.Time
-	CheckoutTime        pgtype.Time
-	AccessibilityNotice string
+	DefaultMinStay             int32
+	MaxStayNights              int32
+	TaxRateScaled              int64
+	RefundProcessingRateScaled int64
+	HoldTtlMinutes             int32
+	PaymentGraceMinutes        int32
+	CheckinTime                pgtype.Time
+	CheckoutTime               pgtype.Time
+	AccessibilityNotice        string
 }
 
 // The tax rate is scaled to hundred-thousandths in SQL so Go never decodes a
@@ -103,8 +109,11 @@ func (q *Queries) GetSettings(ctx context.Context) (GetSettingsRow, error) {
 	var i GetSettingsRow
 	err := row.Scan(
 		&i.DefaultMinStay,
+		&i.MaxStayNights,
 		&i.TaxRateScaled,
+		&i.RefundProcessingRateScaled,
 		&i.HoldTtlMinutes,
+		&i.PaymentGraceMinutes,
 		&i.CheckinTime,
 		&i.CheckoutTime,
 		&i.AccessibilityNotice,

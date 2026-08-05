@@ -26,8 +26,11 @@ WHERE slug = sqlc.arg(slug);
 -- name: GetSettings :one
 SELECT
   default_min_stay,
+  max_stay_nights,
   (tax_rate * 100000)::bigint AS tax_rate_scaled,
+  (refund_processing_rate * 100000)::bigint AS refund_processing_rate_scaled,
   hold_ttl_minutes,
+  payment_grace_minutes,
   checkin_time,
   checkout_time,
   accessibility_notice

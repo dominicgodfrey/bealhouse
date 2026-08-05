@@ -32,6 +32,10 @@ type Booking struct {
 	StripePaymentMethodID string
 	CreatedAt             time.Time
 	UpdatedAt             time.Time
+	PaymentIntentID       string
+	PaymentStartedAt      pgtype.Timestamptz
+	BalanceChargeFailedAt pgtype.Timestamptz
+	BalanceWarnedAt       pgtype.Timestamptz
 }
 
 type BookingRoom struct {
@@ -50,6 +54,28 @@ type Guest struct {
 	Phone     string
 	CreatedAt time.Time
 	UpdatedAt time.Time
+}
+
+type Job struct {
+	ID        int64
+	Kind      string
+	RunAt     time.Time
+	Payload   []byte
+	Attempts  int32
+	LastError string
+	UniqueKey *string
+	CreatedAt time.Time
+}
+
+// The ledger. bookings.amount_paid_cents is the gross of the succeeded charges here and is never reduced by a refund - pricing.Refund derives from what was collected, so decrementing it would make a second cancellation compute a different answer.
+type Payment struct {
+	ID          int64
+	BookingID   int64
+	StripeID    string
+	Kind        string
+	AmountCents int64
+	Status      string
+	CreatedAt   time.Time
 }
 
 type RateCalendar struct {
@@ -132,4 +158,16 @@ type Setting struct {
 	CheckoutTime        pgtype.Time
 	UpdatedAt           time.Time
 	AccessibilityNotice string
+	// How long after a PaymentIntent is created the sweeper leaves a pending booking alone. Longer than hold_ttl_minutes on purpose: a 3-D Secure challenge can outlive the hold.
+	PaymentGraceMinutes int32
+	// Retained from every refund to cover the card processor. The cancellation penalty absorbs it when that is larger, so a late cancellation is not charged twice.
+	RefundProcessingRate pgtype.Numeric
+	// Longest bookable stay. The date picker stops offering departures beyond it and the availability query refuses them, so a hand-crafted payload cannot get around it either.
+	MaxStayNights int32
+}
+
+type StripeEvent struct {
+	ID         string
+	Type       string
+	ReceivedAt time.Time
 }

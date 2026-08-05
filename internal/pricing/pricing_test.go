@@ -136,9 +136,14 @@ func TestChargeAtBooking(t *testing.T) {
 	}
 }
 
+// stripeCut is the 3% the inn keeps to cover the card processor (decision #26).
+const stripeCut = Rate(3000)
+
 func TestRefund(t *testing.T) {
 	// Three nights, so the deposit and one night's rate are not the same
 	// number and a mistake cannot hide behind a coincidence.
+	//
+	// 45000 room + 3825 tax = 48825 total; deposit 24413, balance 24412.
 	q := Compute(Input{NightlyCents: []int64{15000, 15000, 15000}, TaxRate: nh})
 
 	tests := []struct {
@@ -147,22 +152,92 @@ func TestRefund(t *testing.T) {
 		late bool
 		want int64
 	}{
-		{"cancel on time after paying in full", q.TotalCents, false, q.TotalCents},
-		{"cancel on time having paid only the deposit", q.DepositCents, false, q.DepositCents},
+		// Cancelling in time is still a "full" refund from the guest's side,
+		// less the cut the processor already took and will not give back.
+		// 3% of 48825 is 1464.75, rounded up to 1465.
+		{"cancel on time after paying in full", q.TotalCents, false, 47360},
+		// 3% of 24413 is 732.39, rounded up to 733.
+		{"cancel on time having paid only the deposit", q.DepositCents, false, 23680},
+
+		// Late cancellations are unchanged: the forfeited deposit already
+		// covers the processor many times over, and charging the fee on top
+		// would penalise the same transaction twice.
 		{"cancel late after paying in full", q.TotalCents, true, q.BalanceCents},
 		// The T-7 charge failed, so the guest paid only the deposit and the
 		// penalty consumes all of it. The inn must not compute a negative
 		// refund and try to collect it.
 		{"cancel late having paid only the deposit", q.DepositCents, true, 0},
 		{"cancel late having paid nothing", 0, true, 0},
+		{"cancel on time having paid nothing", 0, false, 0},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := q.Refund(tt.paid, tt.late); got != tt.want {
+			if got := q.Refund(tt.paid, tt.late, stripeCut); got != tt.want {
 				t.Errorf("Refund(paid=%d, late=%v) = %d, want %d", tt.paid, tt.late, got, tt.want)
 			}
 		})
+	}
+}
+
+// The point of decision #26, stated as the property it has to hold: whatever
+// was collected and whenever the guest cancels, the inn keeps at least what the
+// processor took. Anything less and a cancellation costs the inn money.
+func TestRefundNeverLeavesTheInnOutOfPocket(t *testing.T) {
+	quotes := []Quote{
+		Compute(Input{NightlyCents: []int64{15000, 15000}, TaxRate: nh}),
+		Compute(Input{NightlyCents: []int64{15000, 15000, 15000}, PetFeeCents: 5000, TaxRate: nh}),
+		Compute(Input{NightlyCents: []int64{9999}, TaxRate: nh}),
+		Compute(Input{NightlyCents: []int64{1}, TaxRate: nh}),
+	}
+
+	for _, q := range quotes {
+		for _, paid := range []int64{0, 1, 99, q.DepositCents, q.TotalCents} {
+			for _, late := range []bool{false, true} {
+				refund := q.Refund(paid, late, stripeCut)
+
+				if refund < 0 {
+					t.Errorf("total %d paid %d late %v: negative refund %d", q.TotalCents, paid, late, refund)
+				}
+				if refund > paid {
+					t.Errorf("total %d paid %d late %v: refunded %d, more than was collected",
+						q.TotalCents, paid, late, refund)
+				}
+				if kept, fee := paid-refund, ProcessingFee(paid, stripeCut); kept < fee {
+					t.Errorf("total %d paid %d late %v: kept %d but the processor took %d",
+						q.TotalCents, paid, late, kept, fee)
+				}
+			}
+		}
+	}
+}
+
+// Rounding up, not to nearest: a fee rounded down would leave the inn a cent
+// short, which is the exact thing decision #26 exists to prevent.
+func TestProcessingFeeRoundsUp(t *testing.T) {
+	tests := []struct {
+		paid int64
+		want int64
+	}{
+		{0, 0},
+		{1, 1},        // 0.03 rounds up to a whole cent
+		{100, 3},      // exact
+		{101, 4},      // 3.03
+		{48825, 1465}, // 1464.75
+		{33, 1},       // 0.99
+		{34, 2},       // 1.02
+	}
+
+	for _, tt := range tests {
+		if got := ProcessingFee(tt.paid, stripeCut); got != tt.want {
+			t.Errorf("ProcessingFee(%d) = %d, want %d", tt.paid, got, tt.want)
+		}
+	}
+
+	// A zero rate is the switch for "the processor costs nothing", and must not
+	// invent a cent from rounding.
+	if got := ProcessingFee(10000, 0); got != 0 {
+		t.Errorf("ProcessingFee at a zero rate = %d, want 0", got)
 	}
 }
 

@@ -231,6 +231,35 @@ func TestSingleNightStaysAreRejected(t *testing.T) {
 	}
 }
 
+// Decision #27: a stay longer than a month is a conversation with the owner,
+// not something the engine sells. The boundary is settings-driven, so this
+// reads it rather than hardcoding 31.
+func TestStaysLongerThanTheMaximumAreRefused(t *testing.T) {
+	ctx, q := setup(t)
+
+	settings, err := q.GetSettings(ctx)
+	if err != nil {
+		t.Fatalf("loading settings: %v", err)
+	}
+	max := int(settings.MaxStayNights)
+
+	// Exactly the maximum is still on sale.
+	res := search(t, ctx, q, Request{Checkin: day(30), Checkout: day(30 + max), Guests: 1})
+	if len(res.Rooms) == 0 {
+		t.Errorf("a %d-night stay returned nothing; the maximum itself must still be bookable", max)
+	}
+	if res.Nights != max {
+		t.Errorf("nights = %d, want %d", res.Nights, max)
+	}
+
+	// One night more is not, and says so specifically rather than coming back
+	// as an empty result the guest cannot interpret.
+	_, err = Search(ctx, q, Request{Checkin: day(30), Checkout: day(30 + max + 1), Guests: 1})
+	if !errors.Is(err, ErrStayTooLong) {
+		t.Errorf("a %d-night stay got %v, want ErrStayTooLong", max+1, err)
+	}
+}
+
 // Beyond the generated horizon there are no rates, so nothing is sellable —
 // rather than being sold at a guessed price.
 func TestDatesBeyondTheRateHorizonReturnNothing(t *testing.T) {

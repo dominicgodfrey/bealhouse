@@ -1,0 +1,61 @@
+{{define "layout"}}<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{{.Brand.InnName}}</title>
+  </head>
+  <!--
+    Table layout and inline styles on purpose. Mail clients are not browsers:
+    Outlook renders with Word's engine, Gmail strips <style> blocks in some
+    contexts, and flexbox is not dependable anywhere. This is the boring shape
+    that survives all of them.
+  -->
+  <body style="margin:0;padding:0;background-color:#f5f5f4;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"
+           style="background-color:#f5f5f4;padding:24px 12px;">
+      <tr>
+        <td align="center">
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"
+                 style="max-width:560px;background-color:#ffffff;border:1px solid #e7e5e4;border-radius:8px;">
+
+            <tr>
+              <td align="center" style="padding:28px 24px 8px 24px;">
+                {{/*
+                  The logo when one is configured, the inn's name when not.
+                  Never a broken image: a guest with images switched off, or a
+                  deploy where the asset has not been uploaded yet, still gets
+                  a letterhead that reads.
+                */}}
+                {{if .Brand.LogoURL}}
+                  <img src="{{.Brand.LogoURL}}" alt="{{.Brand.InnName}}" width="160"
+                       style="display:block;border:0;max-width:160px;height:auto;" />
+                {{else}}
+                  <p style="margin:0;font-family:Georgia,'Times New Roman',serif;font-size:22px;
+                            letter-spacing:0.02em;color:#1c1917;">{{.Brand.InnName}}</p>
+                {{end}}
+              </td>
+            </tr>
+
+            <tr>
+              <td style="padding:8px 24px 28px 24px;font-family:-apple-system,BlinkMacSystemFont,
+                         'Segoe UI',Helvetica,Arial,sans-serif;font-size:15px;line-height:1.55;
+                         color:#1c1917;">
+                {{.Data}}
+              </td>
+            </tr>
+
+          </table>
+
+          <p style="margin:16px 0 0 0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',
+                    Helvetica,Arial,sans-serif;font-size:12px;color:#78716c;">
+            {{.Brand.InnName}}{{if .Brand.SiteURL}} &middot;
+              <a href="{{.Brand.SiteURL}}" style="color:#78716c;">{{.Brand.SiteURL}}</a>
+            {{end}}
+          </p>
+        </td>
+      </tr>
+    </table>
+  </body>
+</html>
+{{end}}
