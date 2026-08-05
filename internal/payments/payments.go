@@ -27,6 +27,7 @@ package payments
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"strings"
@@ -521,6 +522,13 @@ func RecordRefund(ctx context.Context, beginner Beginner, in Charge) (Result, er
 		return Result{}, fmt.Errorf("payments: cancelling the booking: %w", err)
 	}
 
+	// In the same transaction as the refund row, so a guest is never told money
+	// is coming back without a record of it, or left with a refund nobody
+	// mentioned.
+	if err := cancellationMail(ctx, q, found, in.AmountCents); err != nil {
+		return Result{}, err
+	}
+
 	if err := tx.Commit(ctx); err != nil {
 		return Result{}, fmt.Errorf("payments: committing: %w", err)
 	}
@@ -530,6 +538,14 @@ func RecordRefund(ctx context.Context, beginner Beginner, in Charge) (Result, er
 		Code:        found.Code,
 		RefundCents: in.AmountCents,
 	}, nil
+}
+
+// decodePayload reads a job's JSON payload.
+func decodePayload(payload []byte, into any) error {
+	if err := json.Unmarshal(payload, into); err != nil {
+		return fmt.Errorf("payments: decoding the job payload: %w", err)
+	}
+	return nil
 }
 
 // StartPayment notes that a PaymentIntent now exists for a booking, which is
@@ -625,6 +641,13 @@ func secureRoom(ctx context.Context, tx pgx.Tx, q *db.Queries, b db.GetBookingFo
 //
 // Any rooms re-claimed before the failing one are released, so a multi-room
 // booking does not leave half a stay occupying rooms nobody is coming to.
+//
+// **The refund is queued as a job, inside this transaction.** Returning the
+// amount for the caller to act on was not enough: RecordCharge is idempotent, so
+// a caller that failed to issue the refund would get AlreadyApplied on the
+// redelivery and the money would never go back — a guest charged for a room
+// somebody else is standing in, with nothing left anywhere to notice it. In the
+// queue it survives a crash, a restart and a Stripe outage, and retries itself.
 func refundDue(
 	ctx context.Context,
 	tx pgx.Tx,
@@ -638,17 +661,26 @@ func refundDue(
 	if err := q.CancelBooking(ctx, b.ID); err != nil {
 		return Result{}, fmt.Errorf("payments: cancelling the booking: %w", err)
 	}
+
+	// Everything collected, this charge included. AmountPaidCents was read before
+	// the row was updated, so the addition here is deliberate rather than a stale
+	// read. Penalty-free, and deliberately not through pricing.Refund: decision
+	// #9's forfeit is for a guest who changed their mind, and this guest did not
+	// — the inn could not honour the stay (decision #24).
+	owed := b.AmountPaidCents + justPaid
+
+	if err := QueueRefund(ctx, q, b.Code); err != nil {
+		return Result{}, err
+	}
+
 	if err := tx.Commit(ctx); err != nil {
 		return Result{}, fmt.Errorf("payments: committing: %w", err)
 	}
 	return Result{
-		Outcome:   RefundDue,
-		BookingID: b.ID,
-		Code:      b.Code,
-		// Everything collected, this charge included. AmountPaidCents was read
-		// before the row was updated, so the addition here is deliberate rather
-		// than a stale read.
-		RefundCents: b.AmountPaidCents + justPaid,
+		Outcome:     RefundDue,
+		BookingID:   b.ID,
+		Code:        b.Code,
+		RefundCents: owed,
 	}, nil
 }
 

@@ -343,6 +343,14 @@ Rules that hold whatever gets built on top:
   exclusion constraint decide; a lost race means cancel and refund in full. The
   re-claim runs inside a **savepoint**, because losing it raises `23P01`, which
   would otherwise poison the transaction and take the payment record down with it.
+- **The refund on that path is a queued job, not a value returned to the caller**
+  (`payment.refund`, queued inside the transaction that cancelled the booking).
+  `RecordCharge` is idempotent, so a caller that failed to issue the refund would
+  get `AlreadyApplied` on the redelivery and the money would never go back — a
+  guest charged for a room somebody else is standing in, with nothing anywhere
+  left to notice it. The job refunds each collected payment against the intent
+  that took it, so a deposit-plus-balance stay produces two refunds rather than
+  one Stripe would reject.
 - **The sweeper leaves mid-payment bookings alone** for
   `settings.payment_grace_minutes`. That protects the booking's bookkeeping only —
   the hold is still reclaimed on its own TTL, so the room always goes back on sale.

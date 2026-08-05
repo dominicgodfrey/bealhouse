@@ -85,6 +85,13 @@ func run() error {
 		runner.Every(payments.ChargeJobKind, payments.ChargeInterval,
 			payments.ChargeJob(q, pool, processor))
 
+		// Money going back for a stay the inn could not honour (decision #24).
+		// Queued by RecordCharge inside the transaction that cancelled the
+		// booking, so a cancelled stay with no refund behind it is not a state
+		// this system can reach — and the queue's retry is what carries it
+		// through a Stripe outage.
+		runner.Handle(payments.RefundJobKind, payments.RefundJob(pool, processor))
+
 		// Rolls the nightly calendar's far edge forward. Without it the horizon
 		// creeps closer every month until a guest planning next autumn finds no
 		// price and the room quietly stops appearing in the search.

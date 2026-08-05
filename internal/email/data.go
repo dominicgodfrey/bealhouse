@@ -85,6 +85,22 @@ type BalanceWarningData struct {
 	Checkout string `json:"Checkout"`
 }
 
+// CancellationRefundData confirms a cancellation and states the refund.
+//
+// Used for decision #24 — a stay the inn could not honour, refunded in full —
+// and, once self-service cancellation lands in step 5, for a guest who changed
+// their mind, where the figure comes from pricing.Refund instead.
+type CancellationRefundData struct {
+	Code      string `json:"Code"`
+	GuestName string `json:"GuestName"`
+
+	// Refunded is what is going back, already formatted.
+	Refunded string `json:"Refunded"`
+
+	Checkin  string `json:"Checkin"`
+	Checkout string `json:"Checkout"`
+}
+
 // BalanceReceiptData confirms the T-7 charge went through. The guest was warned
 // a day earlier and this is what closes that loop.
 type BalanceReceiptData struct {
