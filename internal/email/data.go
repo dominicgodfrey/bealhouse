@@ -1,0 +1,75 @@
+package email
+
+import (
+	"fmt"
+	"strconv"
+	"strings"
+	"time"
+)
+
+// The values each message is rendered against.
+//
+// One type per message rather than a union with half its fields blank: these
+// are the vocabulary somebody writing the copy has to work from, and a struct
+// that only sometimes has a `ChargeOn` teaches them nothing about which.
+//
+// **Money and dates arrive pre-formatted.** An Envelope's Data goes through the
+// jobs table as JSON and comes back as `map[string]any`, which turns every
+// number into a float64 — and integer cents becoming a float, anywhere, is the
+// one rule this system does not bend (CLAUDE.md). Formatting in Go on the way in
+// keeps the arithmetic integral and makes the round trip lossless. The cost is
+// that a queued message renders with the formatting it was queued with; that
+// buys correctness for a difference measured in minutes.
+//
+// The json tags match the field names on purpose, so `{{.Data.Code}}` reads the
+// same before the round trip and after it.
+
+// BalanceWarningData is the T-8 heads-up: decision #6's promise that the T-7
+// charge is never a surprise.
+type BalanceWarningData struct {
+	Code      string `json:"Code"`
+	GuestName string `json:"GuestName"`
+
+	// Amount is what will be taken, formatted: "$412.50".
+	Amount string `json:"Amount"`
+
+	// ChargeOn is the day it will be taken — the whole point of the message.
+	ChargeOn string `json:"ChargeOn"`
+
+	Checkin  string `json:"Checkin"`
+	Checkout string `json:"Checkout"`
+}
+
+// Money renders integer cents the way a guest reads them: "$1,234.56".
+//
+// The dollars and the remainder are separated with integer division and printed
+// as two fields. Cents never become a float on the way, here or anywhere else.
+//
+// Exported because the packages that build these payloads hold the cents, and
+// the rule about how the inn writes an amount to a guest belongs here with the
+// templates rather than being reinvented at each call site.
+func Money(cents int64) string {
+	sign := ""
+	if cents < 0 {
+		sign, cents = "-", -cents
+	}
+
+	digits := strconv.FormatInt(cents/100, 10)
+
+	var grouped strings.Builder
+	for i := range digits {
+		if i > 0 && (len(digits)-i)%3 == 0 {
+			grouped.WriteByte(',')
+		}
+		grouped.WriteByte(digits[i])
+	}
+
+	return fmt.Sprintf("%s$%s.%02d", sign, grouped.String(), cents%100)
+}
+
+// Day renders a civil date for a guest: "Monday, January 2, 2026".
+//
+// Spelled out and carrying its year, unlike the picker's "Thu, Oct 1". An email
+// is read weeks after it arrives and often on a phone in a hurry, and "Oct 1"
+// is the kind of shorthand that has somebody turn up a year late.
+func Day(d time.Time) string { return d.Format("Monday, January 2, 2006") }

@@ -20,6 +20,7 @@ import (
 	"bealhouse/internal/email"
 	"bealhouse/internal/httpx"
 	"bealhouse/internal/jobs"
+	"bealhouse/internal/payments"
 	"bealhouse/web"
 )
 
@@ -57,6 +58,11 @@ func run() error {
 
 		runner := jobs.New(q)
 		runner.Every(booking.SweepJobKind, booking.SweepInterval, booking.SweepJob(q))
+
+		// Decision #6's T-8 heads-up. It needs the pool rather than the shared
+		// queries handle because each warning has to queue its email and mark
+		// the booking warned in one transaction.
+		runner.Every(payments.WarnJobKind, payments.WarnInterval, payments.WarnJob(q, pool))
 
 		// Email is queued, never sent inline, so a provider outage delays a
 		// confirmation rather than failing the booking that earned it.

@@ -680,10 +680,32 @@ func RefundFor(ctx context.Context, q *db.Queries, code string, on time.Time) (R
 }
 
 // Due is a stay with money still to collect.
+//
+// It carries the guest and the saved card as well as the amount, because the
+// only two callers are a job that emails the guest and a job that charges them.
+// Both scans fetch it in one query rather than looking each booking up again:
+// a per-row round trip is a batch that can fail halfway through, leaving some
+// guests warned and some not.
 type Due struct {
 	BookingID   int64
 	Code        string
 	AmountCents int64
+
+	GuestEmail string
+	GuestName  string
+
+	// ChargeOn is the day the balance comes off the card: T-7 (decision #6).
+	// A civil date, like every other date the guest ever sees.
+	ChargeOn time.Time
+	Checkin  time.Time
+	Checkout time.Time
+
+	// CustomerID and PaymentMethodID are what an off-session charge needs. Empty
+	// on a booking whose deposit never saved a card, which is a reason the T-7
+	// charge fails rather than a reason to leave it out of the scan — the owner
+	// still has to hear about it.
+	CustomerID      string
+	PaymentMethodID string
 }
 
 // DueForBalanceCharge lists confirmed stays whose balance is collectable on the
@@ -712,7 +734,14 @@ func DueForBalanceCharge(ctx context.Context, q *db.Queries, on time.Time) ([]Du
 			// What is left rather than the snapshotted balance: if the deposit
 			// failed and was retried, or the guest was charged in part, the
 			// remainder is the honest number to collect.
-			AmountCents: r.TotalCents - r.AmountPaidCents,
+			AmountCents:     r.TotalCents - r.AmountPaidCents,
+			GuestEmail:      r.GuestEmail,
+			GuestName:       r.GuestName,
+			ChargeOn:        r.BalanceChargeAt.Time,
+			Checkin:         r.Checkin.Time,
+			Checkout:        r.Checkout.Time,
+			CustomerID:      r.StripeCustomerID,
+			PaymentMethodID: r.StripePaymentMethodID,
 		})
 	}
 	return out, nil
@@ -734,9 +763,16 @@ func DueForBalanceWarning(ctx context.Context, q *db.Queries, on time.Time) ([]D
 	out := make([]Due, 0, len(rows))
 	for _, r := range rows {
 		out = append(out, Due{
-			BookingID:   r.ID,
-			Code:        r.Code,
-			AmountCents: r.TotalCents - r.AmountPaidCents,
+			BookingID:       r.ID,
+			Code:            r.Code,
+			AmountCents:     r.TotalCents - r.AmountPaidCents,
+			GuestEmail:      r.GuestEmail,
+			GuestName:       r.GuestName,
+			ChargeOn:        r.BalanceChargeAt.Time,
+			Checkin:         r.Checkin.Time,
+			Checkout:        r.Checkout.Time,
+			CustomerID:      r.StripeCustomerID,
+			PaymentMethodID: r.StripePaymentMethodID,
 		})
 	}
 	return out, nil

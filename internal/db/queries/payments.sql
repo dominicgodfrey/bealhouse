@@ -133,15 +133,32 @@ DELETE FROM room_occupancy WHERE booking_id = sqlc.arg(booking_id);
 -- The amount_paid_cents < total_cents test is what makes the scan idempotent:
 -- once the charge lands, the booking stops matching, so re-running the scan is
 -- free and a missed day catches up by itself.
+--
+-- The guest and the saved card come back with it. Both scans exist only to send
+-- a guest a message or take their money, and a second round trip per row to
+-- find out who they are would be a query that can fail halfway through a batch.
 -- name: ListBookingsDueForBalanceCharge :many
-SELECT id, code, total_cents, amount_paid_cents, balance_due_cents
-FROM bookings
-WHERE status = 'confirmed'
-  AND balance_charge_at IS NOT NULL
-  AND balance_charge_at <= sqlc.arg(on_date)
-  AND amount_paid_cents < total_cents
-  AND balance_charge_failed_at IS NULL
-ORDER BY balance_charge_at, id;
+SELECT
+  b.id,
+  b.code,
+  b.checkin,
+  b.checkout,
+  b.balance_charge_at,
+  b.total_cents,
+  b.amount_paid_cents,
+  b.balance_due_cents,
+  b.stripe_customer_id,
+  b.stripe_payment_method_id,
+  g.email AS guest_email,
+  g.name  AS guest_name
+FROM bookings b
+JOIN guests g ON g.id = b.guest_id
+WHERE b.status = 'confirmed'
+  AND b.balance_charge_at IS NOT NULL
+  AND b.balance_charge_at <= sqlc.arg(on_date)
+  AND b.amount_paid_cents < b.total_cents
+  AND b.balance_charge_failed_at IS NULL
+ORDER BY b.balance_charge_at, b.id;
 
 -- Confirmed stays to warn the day before the charge (T-8).
 --
@@ -155,15 +172,28 @@ ORDER BY balance_charge_at, id;
 -- message is the honest one to send at that point, not a warning about a charge
 -- that has already been attempted.
 -- name: ListBookingsToWarnAboutBalance :many
-SELECT id, code, total_cents, amount_paid_cents, balance_due_cents
-FROM bookings
-WHERE status = 'confirmed'
-  AND balance_charge_at IS NOT NULL
-  AND balance_charge_at <= sqlc.arg(on_date)
-  AND balance_warned_at IS NULL
-  AND balance_charge_failed_at IS NULL
-  AND amount_paid_cents < total_cents
-ORDER BY balance_charge_at, id;
+SELECT
+  b.id,
+  b.code,
+  b.checkin,
+  b.checkout,
+  b.balance_charge_at,
+  b.total_cents,
+  b.amount_paid_cents,
+  b.balance_due_cents,
+  b.stripe_customer_id,
+  b.stripe_payment_method_id,
+  g.email AS guest_email,
+  g.name  AS guest_name
+FROM bookings b
+JOIN guests g ON g.id = b.guest_id
+WHERE b.status = 'confirmed'
+  AND b.balance_charge_at IS NOT NULL
+  AND b.balance_charge_at <= sqlc.arg(on_date)
+  AND b.balance_warned_at IS NULL
+  AND b.balance_charge_failed_at IS NULL
+  AND b.amount_paid_cents < b.total_cents
+ORDER BY b.balance_charge_at, b.id;
 
 -- Note that the T-8 warning has gone out.
 --

@@ -134,22 +134,42 @@ func (q *Queries) GetBookingForPayment(ctx context.Context, code string) (GetBoo
 }
 
 const listBookingsDueForBalanceCharge = `-- name: ListBookingsDueForBalanceCharge :many
-SELECT id, code, total_cents, amount_paid_cents, balance_due_cents
-FROM bookings
-WHERE status = 'confirmed'
-  AND balance_charge_at IS NOT NULL
-  AND balance_charge_at <= $1
-  AND amount_paid_cents < total_cents
-  AND balance_charge_failed_at IS NULL
-ORDER BY balance_charge_at, id
+SELECT
+  b.id,
+  b.code,
+  b.checkin,
+  b.checkout,
+  b.balance_charge_at,
+  b.total_cents,
+  b.amount_paid_cents,
+  b.balance_due_cents,
+  b.stripe_customer_id,
+  b.stripe_payment_method_id,
+  g.email AS guest_email,
+  g.name  AS guest_name
+FROM bookings b
+JOIN guests g ON g.id = b.guest_id
+WHERE b.status = 'confirmed'
+  AND b.balance_charge_at IS NOT NULL
+  AND b.balance_charge_at <= $1
+  AND b.amount_paid_cents < b.total_cents
+  AND b.balance_charge_failed_at IS NULL
+ORDER BY b.balance_charge_at, b.id
 `
 
 type ListBookingsDueForBalanceChargeRow struct {
-	ID              int64
-	Code            string
-	TotalCents      int64
-	AmountPaidCents int64
-	BalanceDueCents int64
+	ID                    int64
+	Code                  string
+	Checkin               pgtype.Date
+	Checkout              pgtype.Date
+	BalanceChargeAt       pgtype.Date
+	TotalCents            int64
+	AmountPaidCents       int64
+	BalanceDueCents       int64
+	StripeCustomerID      string
+	StripePaymentMethodID string
+	GuestEmail            string
+	GuestName             string
 }
 
 // Confirmed stays whose balance is due and not yet collected.
@@ -157,6 +177,10 @@ type ListBookingsDueForBalanceChargeRow struct {
 // The amount_paid_cents < total_cents test is what makes the scan idempotent:
 // once the charge lands, the booking stops matching, so re-running the scan is
 // free and a missed day catches up by itself.
+//
+// The guest and the saved card come back with it. Both scans exist only to send
+// a guest a message or take their money, and a second round trip per row to
+// find out who they are would be a query that can fail halfway through a batch.
 func (q *Queries) ListBookingsDueForBalanceCharge(ctx context.Context, onDate pgtype.Date) ([]ListBookingsDueForBalanceChargeRow, error) {
 	rows, err := q.db.Query(ctx, listBookingsDueForBalanceCharge, onDate)
 	if err != nil {
@@ -169,9 +193,16 @@ func (q *Queries) ListBookingsDueForBalanceCharge(ctx context.Context, onDate pg
 		if err := rows.Scan(
 			&i.ID,
 			&i.Code,
+			&i.Checkin,
+			&i.Checkout,
+			&i.BalanceChargeAt,
 			&i.TotalCents,
 			&i.AmountPaidCents,
 			&i.BalanceDueCents,
+			&i.StripeCustomerID,
+			&i.StripePaymentMethodID,
+			&i.GuestEmail,
+			&i.GuestName,
 		); err != nil {
 			return nil, err
 		}
@@ -184,23 +215,43 @@ func (q *Queries) ListBookingsDueForBalanceCharge(ctx context.Context, onDate pg
 }
 
 const listBookingsToWarnAboutBalance = `-- name: ListBookingsToWarnAboutBalance :many
-SELECT id, code, total_cents, amount_paid_cents, balance_due_cents
-FROM bookings
-WHERE status = 'confirmed'
-  AND balance_charge_at IS NOT NULL
-  AND balance_charge_at <= $1
-  AND balance_warned_at IS NULL
-  AND balance_charge_failed_at IS NULL
-  AND amount_paid_cents < total_cents
-ORDER BY balance_charge_at, id
+SELECT
+  b.id,
+  b.code,
+  b.checkin,
+  b.checkout,
+  b.balance_charge_at,
+  b.total_cents,
+  b.amount_paid_cents,
+  b.balance_due_cents,
+  b.stripe_customer_id,
+  b.stripe_payment_method_id,
+  g.email AS guest_email,
+  g.name  AS guest_name
+FROM bookings b
+JOIN guests g ON g.id = b.guest_id
+WHERE b.status = 'confirmed'
+  AND b.balance_charge_at IS NOT NULL
+  AND b.balance_charge_at <= $1
+  AND b.balance_warned_at IS NULL
+  AND b.balance_charge_failed_at IS NULL
+  AND b.amount_paid_cents < b.total_cents
+ORDER BY b.balance_charge_at, b.id
 `
 
 type ListBookingsToWarnAboutBalanceRow struct {
-	ID              int64
-	Code            string
-	TotalCents      int64
-	AmountPaidCents int64
-	BalanceDueCents int64
+	ID                    int64
+	Code                  string
+	Checkin               pgtype.Date
+	Checkout              pgtype.Date
+	BalanceChargeAt       pgtype.Date
+	TotalCents            int64
+	AmountPaidCents       int64
+	BalanceDueCents       int64
+	StripeCustomerID      string
+	StripePaymentMethodID string
+	GuestEmail            string
+	GuestName             string
 }
 
 // Confirmed stays to warn the day before the charge (T-8).
@@ -226,9 +277,16 @@ func (q *Queries) ListBookingsToWarnAboutBalance(ctx context.Context, onDate pgt
 		if err := rows.Scan(
 			&i.ID,
 			&i.Code,
+			&i.Checkin,
+			&i.Checkout,
+			&i.BalanceChargeAt,
 			&i.TotalCents,
 			&i.AmountPaidCents,
 			&i.BalanceDueCents,
+			&i.StripeCustomerID,
+			&i.StripePaymentMethodID,
+			&i.GuestEmail,
+			&i.GuestName,
 		); err != nil {
 			return nil, err
 		}
