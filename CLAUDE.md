@@ -6,7 +6,9 @@ Direct booking engine, marketing site, and admin console for a 7-room inn.
 anything about money, dates, or availability — several were revised after the
 document was first written and the revisions are marked.
 
-**Build-order steps 1, 2 and 3 are done. Step 4, payments, is next.**
+**Build-order steps 1, 2 and 3 are done. Step 4, payments, is half done: everything
+that does not need a Stripe key is built and tested — see *Step 4* below for what
+is left.**
 
 ## Local setup
 
@@ -51,9 +53,19 @@ it the server still boots and reports `db: not_configured`.
 
 ## Conventions that matter
 
-- **Money is integer cents. Never floats, anywhere.** The tax rate crosses the
-  database boundary pre-scaled to hundred-thousandths (`pricing.Rate`) so no
-  numeric is ever decoded into a float64.
+- **Money is integer cents. Never floats, anywhere.** Both rates — tax and the
+  refund processing retention — cross the database boundary pre-scaled to
+  hundred-thousandths (`pricing.Rate`) so no numeric is ever decoded into a
+  float64.
+- **A refund always keeps the card processor's cut** (decision #26, 3% in
+  `settings.refund_processing_rate`). Stripe does not return its fee when a
+  payment is refunded, so `pricing.Refund` retains `max(penalty, fee)` — the max,
+  not the sum, or a late cancellation pays for the same transaction twice. The
+  fee rounds **up**. `TestRefundNeverLeavesTheInnOutOfPocket` is the property
+  that matters; leave it in place.
+- **Stays are capped at `settings.max_stay_nights`** (decision #27, 31 nights).
+  Enforced in `availability.Search`, so `booking.Create` inherits it by re-running
+  that query. The picker greys past it and says why.
 - **Two different date conventions, deliberately.** `room_occupancy.during` is
   half-open `[check-in, check-out)`, so the checkout date is not a night and
   same-day turnovers do not collide. Rate seasons use **inclusive** `ends_on`,
@@ -106,9 +118,28 @@ them in parallel against one shared database, so:
 - A test that **commits** rows takes `testdb.Exclusive` first. Otherwise another
   package's `DELETE FROM room_occupancy` lands mid-race and turns a concurrency
   assertion into a coin flip.
-- Each package books in **its own stretch of calendar** — occupancy uses fixed 2027
-  and 2028 dates, availability uses today+120 to +150, booking uses today+200. A
-  committed booking inside another package's window silently breaks that package.
+- **...and so does a rolled-back test that runs a job runner.** `jobs` and `email`
+  share one `jobs` table, and `jobs`' concurrency test commits rows into it. A
+  runner under test will happily claim one of those, find no handler, and turn an
+  assertion about what was sent into a coin flip. Both packages empty the queue
+  inside their own transaction *and* take `Exclusive`. Count by `kind`, never
+  `CountJobs`, for the same reason.
+- Each package books in **its own stretch of calendar**. A committed booking inside
+  another package's window silently breaks that package.
+
+  | Package | Window |
+  |---|---|
+  | occupancy | fixed 2027 and 2028 dates |
+  | availability — search tests | today+30 to +35 |
+  | availability — calendar tests | today+120 to +150 |
+  | booking | today+200 |
+  | payments | today+300 |
+
+  **The today+30 window is the soft spot.** The date picker opens on the current
+  month, so clicking through the booking flow by hand lands a real hold right in
+  it, and the availability search tests then fail with a room mysteriously
+  missing. If those tests fail that way and pass in isolation, look for a stray
+  `pending` booking before suspecting the code.
 
 ## Content is the owner's, not ours
 
@@ -118,6 +149,15 @@ marked `PLACEHOLDER`, amenities are empty, there is one flat rate season, and
 `web/public/placeholders/*.svg` stands in for photos as a **UI fallback** rather
 than seeded rows — a placeholder in the database is one somebody has to remember
 to delete. Do not invent content, and do not seed guesses.
+
+The same goes for **email copy** (`internal/email/templates/`). All six templates
+are blank on purpose: a subject marked `PLACEHOLDER` and one line saying what the
+message is for. Write the shared layout, never the sentences a guest reads.
+
+There is also **no logo asset in the repo.** The letterhead renders
+`EMAIL_LOGO_URL` when set and the inn's name in text when not, which is today's
+state. It must be an absolute URL — mail clients do not resolve relative paths,
+Gmail strips `data:` URIs from `<img>`, and CID attachments hurt deliverability.
 
 ## The booking flow, as built
 
@@ -141,21 +181,117 @@ Search → results → room page → confirm → hold, with no Stripe anywhere i
 - The API returns `[]` and never `null` for an empty list. A room with no photos
   crashed the results page once already; there is a test that fails if a null
   reaches the wire.
-- **`booking.RunSweeper` is a plain ticker, not the job runner.** It reclaims
-  lapsed holds so an abandoned checkout cannot take a room off sale forever. Step 4
-  folds it into the durable `jobs` table.
+- **The hold sweep is a durable job now** (`booking.SweepJob`, registered on
+  `internal/jobs` as `hold.sweep`). It reclaims lapsed holds so an abandoned
+  checkout cannot take a room off sale forever. The step-3 ticker is gone.
+
+## The HTTP surface
+
+- **`POST /api/bookings` is rate limited harder than everything else, and that
+  is about revenue rather than load.** It needs no account and no payment, and
+  every call takes a real room off sale for `hold_ttl_minutes`. With seven rooms
+  and no limit, a loop holds the whole inn indefinitely and the owner watches an
+  empty house show as fully booked. Reads share a much looser bucket.
+- **The limiter's key must not be client-chosen.** chi's `middleware.RealIP` was
+  removed: it reads the *first* `X-Forwarded-For` entry, which is whatever the
+  caller sent, because Caddy appends rather than replaces. `clientIP` reads the
+  **last** hop and only when `BEHIND_PROXY=true`; without it the header is
+  ignored entirely. Wrongly on, anyone invents an address and walks around the
+  limit — so it is off by default.
+- **Per-process, not per-cluster.** One binary on one VPS (decision #2) makes
+  that fine. A second box makes the limit per-box, which is a reason to move it
+  to Caddy or Postgres, not a reason to have skipped it.
+- **The SPA fallback answers GET and HEAD only.** A POST to an unrouted path is
+  somebody expecting an endpoint, and answering it with index.html and a 200 is
+  worse than answering nothing — see the webhook note below.
+- **The CSP already allows Stripe** (`js.stripe.com`, `hooks.stripe.com`,
+  `api.stripe.com`) because the Payment Element will not load otherwise. It has
+  no `unsafe-inline` for scripts and the Vite build needs none; keep it that way.
+  HSTS is asserted only on a request that actually arrived over TLS.
 
 ## Step 4: payments
 
+**Built and tested** (no Stripe account needed for any of it):
+
+- `internal/payments` is the whole state machine, and it **knows nothing about
+  Stripe** — it takes amounts and opaque object ids. That is deliberate: it is what
+  lets the hard cases be tested against real Postgres with no key and no network.
+  `RecordCharge`, `RecordFailure`, `RecordRefund`, `Seen`, and the T-7/T-8 scans.
+- `internal/jobs` is the durable runner: one table, `FOR UPDATE SKIP LOCKED`,
+  leased claims, backoff. `hold.sweep` runs on it.
+- Migration 00008: `payments`, `jobs`, `stripe_events`.
+- `internal/email` renders the six messages and queues them as `email.send` jobs.
+  **Never send inline** — the queue is the outbox, and its retry is why a Resend
+  outage delays a confirmation instead of failing the booking that earned it.
+  Swap `LogSender` for the real client; nothing else moves.
+
+**Still to do, and all of it needs keys:** the Stripe SDK,
+`POST /api/bookings/{code}/payment-intent`, the signature-verified
+`POST /webhooks/stripe` (register it on the **root** router — everything outside
+`/api` falls through to the SPA, which now 404s a POST rather than answering
+index.html with a 200), the off-session `balance.charge` handler, and the
+Payment Element on the front end. The webhook handler should be thin: verify the
+signature against the **raw body**, then call `RecordCharge` with the event id in
+`Charge.EventID` and answer 200.
+
+**Do not gate that call on `payments.Seen`.** `Seen` commits on its own
+connection, so marking the event handled out there and doing the work in
+`RecordCharge`'s transaction lets the two come apart: the work fails, Stripe
+redelivers, `Seen` says "already handled", and a payment that was never recorded
+is skipped forever. `RecordCharge` takes the event id and writes it inside its
+own transaction for exactly this reason. `Seen` is for event types that write no
+payment row.
+
+**The PaymentIntent's amount must be derived server-side** from the booking's
+own `deposit_cents`/`total_cents`, never read from the request body — otherwise a
+guest names their own price. `RecordCharge` will not confirm a stay whose gross
+collected falls short of what was due at booking (`Underpaid`), but that is a
+backstop, not the control.
+
+Rules that hold whatever gets built on top:
+
 - The `bookings` money columns are **snapshots, not a ledger**: `deposit_cents` and
-  `balance_due_cents` describe how the quote splits and never change again. What is
-  still collectable comes from `amount_paid_cents` and `status`. Two CHECK
-  constraints depend on that staying true, so record payments rather than rewriting
-  the split.
+  `balance_due_cents` describe how the quote splits and never change again. Two
+  CHECK constraints depend on that staying true, so record payments rather than
+  rewriting the split.
+- **`amount_paid_cents` is the gross and only ever grows.** A refund is a row in
+  `payments`, never a subtraction (decision #25) — `pricing.Refund` derives from
+  what was collected, so reducing it makes a second cancellation compute a smaller
+  refund off an already-reduced figure.
+- **Idempotency is the unique index on `payments (stripe_id, status)`**, not a
+  flag read earlier in the handler. Stripe delivers at least once and redelivers
+  on any non-2xx. `stripe_events` covers the event types that write no payment
+  row.
+  **The `status` half of that key is not decoration.** A declined card is retried
+  on the *same* PaymentIntent, so one id legitimately carries one failed row and
+  one succeeded row. While the index was on `stripe_id` alone the success
+  collided with the failure, `RecordCharge` read the empty insert as "already
+  applied", and the guest was charged for a booking that stayed pending until the
+  sweeper resold the room. `TestDeclinedCardRetriedOnTheSameIntentStillConfirms`
+  is the regression; leave it in place.
+- **A late payment is a real case, not an edge case** (decision #24). If the hold
+  has lapsed, `payments` re-claims the room through `occupancy.Create` and lets the
+  exclusion constraint decide; a lost race means cancel and refund in full. The
+  re-claim runs inside a **savepoint**, because losing it raises `23P01`, which
+  would otherwise poison the transaction and take the payment record down with it.
+- **The sweeper leaves mid-payment bookings alone** for
+  `settings.payment_grace_minutes`. That protects the booking's bookkeeping only —
+  the hold is still reclaimed on its own TTL, so the room always goes back on sale.
 - `balance_charge_at` being NULL is the short-notice flag (decision #7), not a
   missing value: those stays are charged in full at booking and have no T-7 job.
-- `pricing.ChargeAtBooking`, `Penalty` and `Refund` are already written and tested,
-  including the case where the T-7 charge failed and the refund must not go
-  negative.
 - Promotion from hold to booking belongs to the `payment_intent.succeeded`
   **webhook**, not the browser redirect (decision, step 6 of the booking flow).
+- **Job scheduling uses the database's clock.** `run_at` defaults to `now()` in SQL
+  rather than being stamped in Go; the claim compares against `now()`, and inside a
+  transaction that is the transaction's start time, so a Go-stamped "run now" job is
+  never due.
+- **A panicking job handler costs its job a retry, not the process.** The runner
+  is a goroutine, so an unrecovered panic anywhere in a handler takes the binary
+  down and the booking API with it. `jobs.run` recovers, records the panic and
+  its stack in `last_error`, and backs the job off like any other failure.
+- **The T-8 warning scan catches up and must be marked done.** It looks for
+  charges due within a day and not yet warned, so a server that was off for T-8
+  still sends it late rather than never — decision #6's whole point is that the
+  T-7 charge is not a surprise. Call `payments.MarkWarned` **in the same
+  transaction that queues the email**, or the same guest is warned every day
+  until they arrive.

@@ -56,6 +56,14 @@ That is deliberate, so frontend work does not require Postgres running.
 constraint to make double-booking structurally impossible. Migration 00001
 installs `btree_gist` for exactly that reason.
 
+## Behind a proxy
+
+`POST /api/bookings` is rate limited per client address, because it is anonymous
+and every call takes a room off sale for the hold TTL. **Deployed behind Caddy,
+set `BEHIND_PROXY=true`** — otherwise every guest looks like the proxy, shares one
+bucket, and legitimate traffic starts seeing 429s. Locally it stays unset: the
+header it enables is only trustworthy when something trusted sets it.
+
 ## Day-to-day
 
 | Task | Command |

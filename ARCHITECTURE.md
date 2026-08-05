@@ -33,7 +33,7 @@ Stack constraint: **TypeScript/React + Go**. No launch deadline — one complete
 | 6 | Payment | Deposit at booking; balance auto-charged off-session at **T-7 days** |
 | 7 | Short notice | Arrival < 8 days ⇒ charge **full amount** at booking, no deposit split, no scheduled job |
 | 8 | Deposit | **50% of the all-in total** (room + pet fee + tax), rounded up. Balance = total − deposit, so the two always reconcile *(revised; was first night + tax)* |
-| 9 | Cancellation | ≥7 days: full refund. <7 days: **50% refund** — the forfeit is exactly the deposit *(revised)* |
+| 9 | Cancellation | ≥7 days: full refund **less the card processor's cut** (see #26). <7 days: **50% refund** — the forfeit is exactly the deposit *(revised twice)* |
 | 10 | Multi-room | Schema `booking → booking_rooms` from day one; v1 UI single-room |
 | 11 | Out of scope | Table reservations, guest accounts, gift certificates, event booking/deposits |
 | 12 | Menu | Structured admin editor (name, description/ingredients, price + course grouping) → JSON-LD `Menu` |
@@ -48,6 +48,12 @@ Stack constraint: **TypeScript/React + Go**. No launch deadline — one complete
 | 21 | **Rate administration** | Seasons are **owner-editable in admin** as a room × season price grid; saving regenerates the nightly calendar for **future dates only** |
 | 22 | **Accessibility** | **Filter switched off.** Every room requires stairs, including the two the owner considers most accessible, so no room sets `is_accessible`. The schema and its constraint remain; `settings.accessibility_notice` carries a stairs disclaimer shown with every search *(revised)* |
 | 23 | **Pet fee** | Back Lavender only: **$50 per stay**, taxed with the room charge, refundable on the same terms. The search checkbox does double duty — it filters to pet-friendly rooms *and* adds the fee. Unchecked, Back Lavender still appears at no fee |
+| 24 | **Payment after the room is gone** | A charge that lands once the hold has lapsed re-claims the room through the exclusion constraint. If it is still free the stay is confirmed; if it was resold the booking is **cancelled and the whole amount refunded**, penalty-free — the guest did not change their mind, so decision #9 does not apply |
+| 25 | **The ledger vs. the snapshot** | `bookings.amount_paid_cents` is the **gross** collected and only ever grows; refunds are rows in `payments`, never a subtraction. `pricing.Refund` derives from what was collected, so reducing it would make a second cancellation compute a smaller refund off an already-reduced figure |
+| 26 | **Processing retention** | Every refund keeps **3%** of what was collected, configurable in `settings.refund_processing_rate`. Stripe's fee is taken on the way in and is **not** returned when a payment is refunded, so a literal full refund costs the inn that much on a cancellation it had no part in. Retention is `max(cancellation penalty, processing fee)` — **not** their sum, because a late cancellation's forfeited deposit already covers the processor many times over and adding both would charge the same transaction twice. Rounded **up**, since the entire point is that the inn is never short |
+| 27 | **Maximum stay** | **31 nights**, in `settings.max_stay_nights`. Longer stays are arranged with the owner: the rates, cleaning and deposit/balance split this engine implements are not what a month-plus booking needs. The date picker stops offering departures past it and `availability.Search` refuses them, so a hand-crafted payload cannot get one through either |
+| 28 | **Payment idempotency key** | `payments (stripe_id, status)`, **not `stripe_id` alone**. A declined card is retried on the same PaymentIntent, so one id carries a failed attempt and then a successful one; keying on the id alone made the success collide with the failure and drop a payment the guest had already been charged for. Both attempts are kept — the decline is what an owner needs when a charge is disputed |
+| 29 | **Holding a room costs something** | `POST /api/bookings` is anonymous, free, and takes a room off sale for the hold TTL, so it is rate limited per client address far more tightly than the read endpoints. Seven rooms is a small enough inventory that an unmetered hold endpoint is a denial-of-service on the business, not on the server. The limiter's key is the last proxy hop and is only trusted when `BEHIND_PROXY` says a proxy exists |
 
 ### Payment lifecycle
 
@@ -58,7 +64,7 @@ T-7 days            → off-session charge of balance
    ├─ success       → email receipt
    └─ failure       → email "you still owe $X, contact the inn" + unmissable admin flag
 book (arrival < 8d) → charge full amount, no scheduled job
-cancel ≥ 7d out     → refund everything paid
+cancel ≥ 7d out     → refund everything paid, less the 3% the processor kept
 cancel < 7d out     → refund everything paid minus 50% of the total
 ```
 
@@ -66,6 +72,11 @@ Refunds derive from **what was actually collected**, not from the total. That is
 correct when the T-7 charge failed: the guest has paid only the deposit, the penalty consumes it,
 and the refund is zero rather than a negative the inn would try to collect. Implemented and tested
 in `internal/pricing`.
+
+The retention is `max(penalty, processing fee)` (decision #26), which is why the late branch above
+is unchanged: the forfeited deposit already absorbs the processor's cut. The property worth holding
+onto, and the one the tests assert directly, is that **the inn never ends up out of pocket** — for
+any amount collected, on either side of the boundary, what it keeps is at least what Stripe took.
 
 ---
 
@@ -157,12 +168,25 @@ not a tested restore.
 An in-process goroutine polling a durable `jobs` table every 60s with `FOR UPDATE SKIP LOCKED`.
 Survives restarts, idempotent by design, no external scheduler.
 
+Built in `internal/jobs`. A claimed job is **leased, not deleted** — the claim
+pushes `run_at` forward so no other runner takes it, and a runner that dies
+mid-job leaves work that returns on its own. Every handler must therefore
+tolerate running twice, the same discipline the webhook path lives under.
+
+The runner is a goroutine inside the binary that serves guests, so a **panic in
+any handler is recovered** and recorded as an ordinary job failure with its
+stack in `last_error`. Background work misbehaving costs that job a retry; it
+must never cost the inn its booking API.
+Scheduling is the **database's clock**, not the caller's: `run_at` defaults to
+`now()` in SQL, because the claim compares against `now()` and two clocks
+deciding when a job is due is a bug that only shows up under load.
+
 | Job | Trigger |
 |---|---|
-| `hold.sweep` | every minute — delete expired `kind='hold'` rows, then expire the pending bookings behind them. *Running today as a plain in-process ticker (`booking.RunSweeper`), which step 4 folds into this table* |
-| `balance.warn` | T-8 days — "charged in 24 hours" email |
+| `hold.sweep` | every minute — delete expired `kind='hold'` rows, then expire the pending bookings behind them. *Durable since step 4; the step-3 ticker is gone* |
+| `balance.warn` | T-8 days — "charged in 24 hours" email. The scan catches up rather than matching a single day, so a server that was off for T-8 sends it late instead of never; `balance_warned_at` is what stops it repeating, and must be set in the same transaction that queues the mail |
 | `balance.charge` | T-7 days — off-session PaymentIntent; on failure mark `payment_failed` + notify |
-| `email.send` | queued sends with exponential backoff retry |
+| `email.send` | queued sends with exponential backoff retry. *Built: `internal/email` renders and the runner delivers. A `Sender` interface stands where the Resend client goes; until it exists, `LogSender` writes each message to the log and says plainly that nothing was sent* |
 | `rates.rebuild` | on season save, and monthly — regenerate the nightly calendar 24 months forward |
 | `backup.verify` | weekly — assert last night's dump is non-empty and restorable |
 
@@ -332,10 +356,27 @@ Dependency-ordered, not deadline-driven (single launch).
 3. ~~**Booking flow**~~ **DONE** — search → results → room page → confirm → hold, plus the calendar
    the date picker greys from and the sweeper that reclaims abandoned checkouts. No Stripe anywhere
    in it, as planned.
-4. **Payments** ← **NEXT** — Stripe Payment Element, webhooks, deposit/full logic, job runner,
-   T-8/T-7 jobs, refunds.
+4. **Payments** ← **IN PROGRESS.** The Stripe-independent half is built and tested: the `payments`
+   ledger, the `jobs` runner (with `hold.sweep` moved into it), the `stripe_events` idempotency
+   table, and `internal/payments` — the state machine that records a charge, promotes the hold,
+   re-claims a room whose hold lapsed, and works out when money has to go back. What is left needs
+   API keys: the Stripe SDK, `POST /api/bookings/{code}/payment-intent`, the signature-verified
+   `POST /webhooks/stripe` that calls into the state machine, the off-session `balance.charge`
+   handler, and the Payment Element on the front end.
+
+   *A review of the half that is built found and fixed four things worth naming, since three of
+   them would have cost money rather than merely looked wrong: the idempotency key was `stripe_id`
+   alone and dropped the payment of any guest whose first card declined (decision #28); marking a
+   webhook event handled committed separately from the work it guarded, so a failure mid-handler
+   made Stripe stop retrying a payment that was never recorded; a panicking job handler took the
+   whole binary down; and the T-8 warning was skipped permanently if the server missed that exact
+   day. The unmetered hold endpoint (decision #29) was the fourth.*
 5. **Comms** — Resend, email templates, PDF generation, signed manage-booking link + self-service
-   cancel.
+   cancel. *`internal/email` exists and renders: the shared letterhead layout and one file per
+   message, all six deliberately **blank** — a line saying what each is for and nothing else. The
+   copy is the owner's to write, like room descriptions and photos. The letterhead takes a logo
+   from `EMAIL_LOGO_URL` and falls back to the inn's name in text; **no logo asset has been
+   supplied yet**, so the fallback is what renders today.*
 6. **Admin** — auth, upcoming/paid-vs-owed view, calendar, list, manual CRUD, rate editor, blocking,
    guest search.
 7. **Content & marketing** — home, restaurant + menu editor, events + inquiry form, about, image
@@ -372,6 +413,16 @@ Dependency-ordered, not deadline-driven (single launch).
   happened.)*
 - **Money:** assert cents arithmetic against hand-computed totals, the 50% deposit and its rounding,
   and each refund branch. *(Done — `internal/pricing`.)*
+- **Declined then retried:** record a failed attempt and then a successful one on the *same*
+  PaymentIntent id; the stay must end up confirmed with the deposit collected once, and both
+  attempts must be in the ledger. *(Done — this was a real bug, decision #28. The guest was charged
+  and the booking stayed pending until the sweeper resold the room.)*
+- **Underpayment:** a charge for less than the amount due at booking is recorded but confirms
+  nothing, and topping it up confirms. *(Done — a backstop under the rule that the PaymentIntent's
+  amount is derived server-side.)*
+- **Held inventory:** hammering `POST /api/bookings` must stop taking rooms off sale, and must not
+  be bypassable by varying `X-Forwarded-For`. *(Done — decision #29.)*
+- **Job panics:** a handler that panics fails its job and leaves the server running. *(Done.)*
 
 ### What the concurrency tests actually found
 
