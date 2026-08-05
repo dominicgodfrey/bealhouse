@@ -21,6 +21,7 @@ import (
 	"bealhouse/internal/httpx"
 	"bealhouse/internal/jobs"
 	"bealhouse/internal/payments"
+	"bealhouse/internal/rates"
 	"bealhouse/web"
 )
 
@@ -63,6 +64,11 @@ func run() error {
 		// queries handle because each warning has to queue its email and mark
 		// the booking warned in one transaction.
 		runner.Every(payments.WarnJobKind, payments.WarnInterval, payments.WarnJob(q, pool))
+
+		// Rolls the nightly calendar's far edge forward. Without it the horizon
+		// creeps closer every month until a guest planning next autumn finds no
+		// price and the room quietly stops appearing in the search.
+		runner.Every(rates.RebuildJobKind, rates.RebuildInterval, rates.RebuildJob(q))
 
 		// Email is queued, never sent inline, so a provider outage delays a
 		// confirmation rather than failing the booking that earned it.

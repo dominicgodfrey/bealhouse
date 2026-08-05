@@ -8,6 +8,7 @@ package rates
 
 import (
 	"context"
+	"log/slog"
 	"time"
 
 	"github.com/jackc/pgx/v5/pgtype"
@@ -39,4 +40,32 @@ func Rebuild(ctx context.Context, q *db.Queries, from, to time.Time) (int64, err
 func RebuildHorizon(ctx context.Context, q *db.Queries) (int64, error) {
 	today := civil.Today()
 	return Rebuild(ctx, q, today, civil.AddMonths(today, HorizonMonths))
+}
+
+// RebuildJobKind is the durable job that rolls the calendar forward.
+const RebuildJobKind = "rates.rebuild"
+
+// RebuildInterval is the monthly cadence ARCHITECTURE.md gives the job.
+//
+// The calendar would go stale slowly rather than suddenly without it: nothing
+// breaks on the day it stops being regenerated, the far edge of the horizon
+// just creeps closer until a guest planning next autumn finds no price and the
+// room silently drops out of the search. Saving a season in admin rebuilds
+// immediately; this is what covers the months nobody edits anything.
+const RebuildInterval = 30 * 24 * time.Hour
+
+// RebuildJob adapts RebuildHorizon to the runner's handler signature.
+//
+// Safe to run twice, like every handler here: the rebuild replaces a date range
+// wholesale rather than appending to it, and it is future-only, so it cannot
+// reach a night somebody has already been sold.
+func RebuildJob(q *db.Queries) func(context.Context, []byte) error {
+	return func(ctx context.Context, _ []byte) error {
+		nights, err := RebuildHorizon(ctx, q)
+		if err != nil {
+			return err
+		}
+		slog.Info("rebuilt the nightly rate calendar", "nights", nights)
+		return nil
+	}
 }
