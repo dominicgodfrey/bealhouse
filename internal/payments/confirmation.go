@@ -88,3 +88,47 @@ func confirmationMail(ctx context.Context, q *db.Queries, b db.GetBookingForPaym
 		},
 	})
 }
+
+// balanceReceipt tells a guest the T-7 charge went through.
+//
+// Queued in the transaction that recorded the money, like every other message
+// here. The guest was warned a day earlier that this was coming (decision #6);
+// this is what closes that loop, and a charge with no receipt behind it is what
+// a disputed transaction looks like from the guest's side.
+func balanceReceipt(ctx context.Context, q *db.Queries, b db.GetBookingForPaymentRow, in Charge) error {
+	return email.Queue(ctx, q, email.Envelope{
+		To:       b.GuestEmail,
+		Template: email.BalanceReceipt,
+		Data: email.BalanceReceiptData{
+			Code:      b.Code,
+			GuestName: b.GuestName,
+			Amount:    email.Money(in.AmountCents),
+			Total:     email.Money(b.TotalCents),
+			Checkin:   email.Day(b.Checkin.Time),
+			Checkout:  email.Day(b.Checkout.Time),
+		},
+	})
+}
+
+// balanceFailed tells a guest their card was refused.
+//
+// The stay is not cancelled and this message must not read as though it were:
+// the guest is still arriving, there is just money outstanding and a
+// conversation to have. Queued alongside MarkBalanceChargeFailed, so the flag
+// the owner sees and the message the guest gets cannot disagree.
+func balanceFailed(ctx context.Context, q *db.Queries, b db.GetBookingForPaymentRow) error {
+	return email.Queue(ctx, q, email.Envelope{
+		To:       b.GuestEmail,
+		Template: email.BalanceFailed,
+		Data: email.BalanceFailedData{
+			Code:      b.Code,
+			GuestName: b.GuestName,
+			// What is left, not the snapshotted balance: if a partial payment
+			// landed at some point, the remainder is the honest figure to ask
+			// a guest to settle.
+			Outstanding: email.Money(b.TotalCents - b.AmountPaidCents),
+			Checkin:     email.Day(b.Checkin.Time),
+			Checkout:    email.Day(b.Checkout.Time),
+		},
+	})
+}

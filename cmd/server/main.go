@@ -52,6 +52,19 @@ func run() error {
 		slog.Warn("SPA bundle is empty; non-API routes will 503 until `make web` runs")
 	}
 
+	// Chosen before anything is wired, because the background jobs need it as
+	// much as the HTTP surface does. It refuses rather than guessing when the
+	// settings contradict each other — notably STRIPE_FAKE anywhere it has no
+	// business being — so a server that cannot say for certain which processor
+	// it has does not start.
+	processor, webhookSecret, err := gateway.New(cfg)
+	if err != nil {
+		return err
+	}
+	if !cfg.StripeConfigured() && !cfg.StripeFake {
+		slog.Warn("Stripe is not configured; rooms can be held but not paid for")
+	}
+
 	// Background work. Without the sweep an abandoned checkout holds its room
 	// forever, which is worse than the double-booking the hold exists to
 	// prevent.
@@ -65,6 +78,12 @@ func run() error {
 		// queries handle because each warning has to queue its email and mark
 		// the booking warned in one transaction.
 		runner.Every(payments.WarnJobKind, payments.WarnInterval, payments.WarnJob(q, pool))
+
+		// And the charge itself. With no processor configured this runs, finds
+		// whatever is due, and fails every one of them loudly — which is the
+		// honest behaviour: money that should have been collected was not.
+		runner.Every(payments.ChargeJobKind, payments.ChargeInterval,
+			payments.ChargeJob(q, pool, processor))
 
 		// Rolls the nightly calendar's far edge forward. Without it the horizon
 		// creeps closer every month until a guest planning next autumn finds no
@@ -85,16 +104,6 @@ func run() error {
 		go runner.Run(ctx)
 	}
 
-	// Refuses rather than guessing when the settings contradict each other —
-	// notably STRIPE_FAKE anywhere it has no business being. A server that
-	// cannot say for certain which processor it has must not start.
-	processor, webhookSecret, err := gateway.New(cfg)
-	if err != nil {
-		return err
-	}
-	if !cfg.StripeConfigured() && !cfg.StripeFake {
-		slog.Warn("Stripe is not configured; rooms can be held but not paid for")
-	}
 	// Said plainly rather than left to be discovered: the queue will accept and
 	// drain messages, and every one of them will be logged instead of delivered.
 	slog.Warn("no email provider configured; queued messages will be logged, not sent")

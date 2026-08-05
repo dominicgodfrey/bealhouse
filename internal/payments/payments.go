@@ -368,8 +368,17 @@ func RecordCharge(ctx context.Context, beginner Beginner, in Charge) (Result, er
 	// the commit would lose a confirmation to any crash in between — for a
 	// guest whose card has already been charged, and with nothing left to
 	// retry it.
-	if newlyConfirmed {
+	switch {
+	case newlyConfirmed:
 		if err := confirmationMail(ctx, q, found, in); err != nil {
+			return Result{}, err
+		}
+
+	// The stay was already confirmed and this is its balance landing. A receipt,
+	// not a second confirmation — and the message that closes the loop the T-8
+	// warning opened.
+	case in.Kind == KindBalance:
+		if err := balanceReceipt(ctx, q, found, in); err != nil {
 			return Result{}, err
 		}
 	}
@@ -436,6 +445,12 @@ func RecordFailure(ctx context.Context, beginner Beginner, in Charge) (Result, e
 	if in.Kind == KindBalance {
 		if err := q.MarkBalanceChargeFailed(ctx, found.ID); err != nil {
 			return Result{}, fmt.Errorf("payments: flagging the failed balance charge: %w", err)
+		}
+		// The guest hears about it in the same transaction as the flag the owner
+		// sees, so the two can never disagree about whether the money is
+		// outstanding.
+		if err := balanceFailed(ctx, q, found); err != nil {
+			return Result{}, err
 		}
 	}
 

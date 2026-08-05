@@ -85,6 +85,34 @@ type BalanceWarningData struct {
 	Checkout string `json:"Checkout"`
 }
 
+// BalanceReceiptData confirms the T-7 charge went through. The guest was warned
+// a day earlier and this is what closes that loop.
+type BalanceReceiptData struct {
+	Code      string `json:"Code"`
+	GuestName string `json:"GuestName"`
+
+	// Amount is what was just taken; Total is what the stay cost altogether.
+	Amount string `json:"Amount"`
+	Total  string `json:"Total"`
+
+	Checkin  string `json:"Checkin"`
+	Checkout string `json:"Checkout"`
+}
+
+// BalanceFailedData tells a guest their card was refused and the inn needs to
+// hear from them. The stay is not cancelled — they are still arriving, there is
+// just money outstanding.
+type BalanceFailedData struct {
+	Code      string `json:"Code"`
+	GuestName string `json:"GuestName"`
+
+	// Outstanding is what is still owed.
+	Outstanding string `json:"Outstanding"`
+
+	Checkin  string `json:"Checkin"`
+	Checkout string `json:"Checkout"`
+}
+
 // Money renders integer cents the way a guest reads them: "$1,234.56".
 //
 // The dollars and the remainder are separated with integer division and printed
