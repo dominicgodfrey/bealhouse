@@ -7,6 +7,7 @@ import (
 	"github.com/go-chi/chi/v5"
 
 	db "bealhouse/internal/db/gen"
+	"bealhouse/internal/gateway"
 	"bealhouse/internal/payments"
 )
 
@@ -26,6 +27,15 @@ type paymentIntentResponse struct {
 	// AmountCents is what the card will actually be charged, echoed back so the
 	// page can show the guest the figure rather than recomputing one.
 	AmountCents int64 `json:"amountCents"`
+
+	// DevPayment says this payment is against the fake processor, so the page
+	// should offer the stand-in button instead of a card form.
+	//
+	// Said explicitly rather than inferred from an empty publishable key. A
+	// deploy with real keys and a missing publishable one would look identical,
+	// and "the server told me to" is the wrong reason to show a developer's
+	// button to a paying guest.
+	DevPayment bool `json:"devPayment"`
 }
 
 // createPaymentIntent serves POST /api/bookings/{code}/payment-intent.
@@ -39,6 +49,8 @@ type paymentIntentResponse struct {
 // would be a guest naming their own price, and the ledger's Underpaid check is
 // the backstop under that rule rather than the rule itself.
 func createPaymentIntent(q *db.Queries, gw payments.Gateway, publishableKey string) http.HandlerFunc {
+	_, fake := gw.(*gateway.Fake)
+
 	return func(w http.ResponseWriter, r *http.Request) {
 		opened, err := payments.Open(r.Context(), q, gw, chi.URLParam(r, "code"))
 		if err != nil {
@@ -51,6 +63,7 @@ func createPaymentIntent(q *db.Queries, gw payments.Gateway, publishableKey stri
 			ClientSecret:   opened.ClientSecret,
 			PublishableKey: publishableKey,
 			AmountCents:    opened.AmountCents,
+			DevPayment:     fake,
 		})
 	}
 }

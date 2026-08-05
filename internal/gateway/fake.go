@@ -4,8 +4,13 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/hex"
+	"encoding/json"
 	"log/slog"
 	"sync"
+	"time"
+
+	stripe "github.com/stripe/stripe-go/v86"
+	"github.com/stripe/stripe-go/v86/webhook"
 
 	"bealhouse/internal/payments"
 )
@@ -99,6 +104,69 @@ func (f *Fake) ChargeOffSession(_ context.Context, in payments.OffSessionRequest
 
 func (f *Fake) Refund(_ context.Context, _ payments.RefundRequest) (string, error) {
 	return "re_fake_" + token(), nil
+}
+
+// FakePayment describes a payment the fake is pretending succeeded.
+type FakePayment struct {
+	BookingCode string
+	IntentID    string
+	AmountCents int64
+	Kind        string
+
+	// CustomerID and PaymentMethodID stand in for the card Stripe would have
+	// saved. Set when a T-7 charge is coming, so the whole of decision #6 can be
+	// walked through locally rather than only its first half.
+	CustomerID      string
+	PaymentMethodID string
+}
+
+// SucceededEvent builds a signed `payment_intent.succeeded` delivery.
+//
+// It exists so a developer with no Stripe account can walk the entire journey —
+// hold, pay, webhook, confirmed stay, confirmation email — through the real
+// webhook handler, signature verification and all. Nothing downstream of the
+// delivery is faked; only the delivery itself.
+//
+// A method on Fake rather than a package function, so it is unreachable without
+// one. The fake refuses to exist outside dev with no keys, which makes this
+// unreachable there too.
+func (f *Fake) SucceededEvent(in FakePayment) (body []byte, signature string) {
+	intent := map[string]any{
+		"id":              in.IntentID,
+		"object":          "payment_intent",
+		"amount":          in.AmountCents,
+		"amount_received": in.AmountCents,
+		"currency":        currency,
+		"status":          "succeeded",
+		"metadata": map[string]string{
+			metadataBookingCode: in.BookingCode,
+			metadataKind:        in.Kind,
+		},
+	}
+	if in.CustomerID != "" {
+		intent["customer"] = in.CustomerID
+	}
+	if in.PaymentMethodID != "" {
+		intent["payment_method"] = in.PaymentMethodID
+	}
+
+	body, err := json.Marshal(map[string]any{
+		"id":          "evt_fake_" + token(),
+		"object":      "event",
+		"api_version": stripe.APIVersion,
+		"created":     time.Now().Unix(),
+		"type":        eventPaymentSucceeded,
+		"data":        map[string]any{"object": intent},
+	})
+	if err != nil {
+		// Every value here is a string, an int64 or a map of them.
+		panic("gateway: encoding a fake event: " + err.Error())
+	}
+
+	return body, webhook.GenerateTestSignedPayload(&webhook.UnsignedPayload{
+		Payload: body,
+		Secret:  FakeWebhookSecret,
+	}).Header
 }
 
 // token is the random tail of a fake id. Long enough that two payments in the

@@ -13,6 +13,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	db "bealhouse/internal/db/gen"
+	"bealhouse/internal/gateway"
 	"bealhouse/internal/payments"
 )
 
@@ -94,6 +95,17 @@ func NewRouter(d Deps) http.Handler {
 		}
 		api.With(rateLimit(paying, d.BehindProxy)).
 			Post("/bookings/{code}/payment-intent", openPayment)
+
+		// Standing in for the card form, and only ever that. The route exists
+		// exactly when the processor is the fake — which needs STRIPE_FAKE set,
+		// no Stripe variable configured, and ENV=dev — so it is registered by
+		// the same decision that decided money cannot move, rather than by a
+		// separate flag that could disagree with it.
+		if fake, ok := d.Gateway.(*gateway.Fake); ok && d.Pool != nil {
+			slog.Warn("registering the FAKE payment route at POST /api/dev/pay/{code}")
+			api.With(rateLimit(paying, d.BehindProxy)).
+				Post("/dev/pay/{code}", devPay(fake, d.Pool, d.StripeWebhookSecret, d.OwnerEmail))
+		}
 
 		if d.Pool != nil {
 			q := db.New(d.Pool)

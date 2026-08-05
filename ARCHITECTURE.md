@@ -184,10 +184,10 @@ deciding when a job is due is a bug that only shows up under load.
 | Job | Trigger |
 |---|---|
 | `hold.sweep` | every minute — delete expired `kind='hold'` rows, then expire the pending bookings behind them. *Durable since step 4; the step-3 ticker is gone* |
-| `balance.warn` | T-8 days — "charged in 24 hours" email. The scan catches up rather than matching a single day, so a server that was off for T-8 sends it late instead of never; `balance_warned_at` is what stops it repeating, and must be set in the same transaction that queues the mail |
-| `balance.charge` | T-7 days — off-session PaymentIntent; on failure mark `payment_failed` + notify |
+| `balance.warn` | **Built.** T-8 — "charged in 24 hours" email. The scan catches up rather than matching a single day, so a server that was off for T-8 sends it late instead of never; `balance_warned_at` stops it repeating and is set in the same transaction that queues the mail. Runs hourly, because a daily job fires at whatever time the server last restarted |
+| `balance.charge` | **Built.** T-7 — off-session charge against the card saved at booking; on failure flag `balance_charge_failed_at` and mail the guest. A decline is an outcome, not a job failure: returned as an error the runner would retry hourly and mail the same guest every time. A network error *is* returned, because the money may have moved and this server does not know |
 | `email.send` | queued sends with exponential backoff retry. *Built: `internal/email` renders and the runner delivers. A `Sender` interface stands where the Resend client goes; until it exists, `LogSender` writes each message to the log and says plainly that nothing was sent* |
-| `rates.rebuild` | on season save, and monthly — regenerate the nightly calendar 24 months forward |
+| `rates.rebuild` | **Built.** Monthly, and on season save once admin exists — regenerate the nightly calendar 24 months forward. Nothing breaks on the day it stops: the horizon just creeps closer until a guest planning next autumn finds no price and the room drops out of the search with no error anywhere |
 | `backup.verify` | weekly — assert last night's dump is non-empty and restorable |
 
 **Email is never sent inline in a request** — it is always queued, so a Resend outage delays
@@ -356,13 +356,26 @@ Dependency-ordered, not deadline-driven (single launch).
 3. ~~**Booking flow**~~ **DONE** — search → results → room page → confirm → hold, plus the calendar
    the date picker greys from and the sweeper that reclaims abandoned checkouts. No Stripe anywhere
    in it, as planned.
-4. **Payments** ← **IN PROGRESS.** The Stripe-independent half is built and tested: the `payments`
-   ledger, the `jobs` runner (with `hold.sweep` moved into it), the `stripe_events` idempotency
-   table, and `internal/payments` — the state machine that records a charge, promotes the hold,
-   re-claims a room whose hold lapsed, and works out when money has to go back. What is left needs
-   API keys: the Stripe SDK, `POST /api/bookings/{code}/payment-intent`, the signature-verified
-   `POST /webhooks/stripe` that calls into the state machine, the off-session `balance.charge`
-   handler, and the Payment Element on the front end.
+4. **Payments** ← **IN PROGRESS, and further along than "needs keys" suggested.** Built and tested:
+   the `payments` ledger, the `jobs` runner, the `stripe_events` idempotency table, the state
+   machine, `POST /api/bookings/{code}/payment-intent`, the signature-verified
+   `POST /webhooks/stripe`, the `balance.warn` and `balance.charge` jobs, the confirmation and
+   receipt mail queued inside the transactions that earn it, and the Payment Element with the
+   return-polling page behind it.
+
+   *Almost none of that needed an account.* A webhook signature is an HMAC over the raw body with
+   a shared secret, so the tests hold both ends: tampered bodies, foreign secrets, replays outside
+   the tolerance window, and a delivery that must never reach the state machine. `internal/gateway`
+   holds everything Stripe-shaped; `internal/payments` still does not import the SDK, which is what
+   keeps the hard cases testable against real Postgres with no key and no network.
+
+   **What genuinely remains needs keys:** exercising `gateway.Stripe` against the real API at all —
+   every line of it is written and none of it has ever made a request — plus the publishable key
+   for the card form, and the verification matrix below (test cards, 3-D Secure, Test Clocks).
+   Until then `STRIPE_FAKE=true` substitutes a processor that mints ids and takes no money, so the
+   whole journey is walkable in a browser. It refuses to exist unless no Stripe variable is set at
+   all and `ENV=dev`, because ENV defaults to `dev` and an unconfigured production deploy would
+   otherwise look exactly like a laptop.
 
    *A review of the half that is built found and fixed four things worth naming, since three of
    them would have cost money rather than merely looked wrong: the idempotency key was `stripe_id`
@@ -423,6 +436,20 @@ Dependency-ordered, not deadline-driven (single launch).
 - **Held inventory:** hammering `POST /api/bookings` must stop taking rooms off sale, and must not
   be bypassable by varying `X-Forwarded-For`. *(Done — decision #29.)*
 - **Job panics:** a handler that panics fails its job and leaves the server running. *(Done.)*
+- **Forged webhook:** a delivery with no signature, one signed with another secret, one whose body
+  was altered after signing, and one replayed outside the tolerance window must all be refused —
+  and must not reach the payment state machine at all, rather than being stopped somewhere further
+  in where a later edit could let them through. *(Done, and with no Stripe account: the tests sign
+  their own payloads.)*
+- **Amount is the server's:** the pay endpoint takes no body, derives the deposit or full total
+  from the booking's own snapshot, and asks only for what is still outstanding. *(Done.)*
+- **T-7 decline vs. outage:** a refused card flags the booking, mails the guest and leaves the stay
+  confirmed; a network error fails the job instead, tells nobody, and flags nothing — the money may
+  have moved. One refused card must not stop the inn collecting from anybody else that day.
+  *(Done.)*
+- **Confirmed once:** a redelivered webhook must not send a second confirmation, and the T-7 charge
+  landing on a stay confirmed weeks earlier must send a receipt rather than a second "you're
+  booked". *(Done — the second was a real bug, caught by its own test.)*
 
 ### What the concurrency tests actually found
 

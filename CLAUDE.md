@@ -6,9 +6,11 @@ Direct booking engine, marketing site, and admin console for a 7-room inn.
 anything about money, dates, or availability — several were revised after the
 document was first written and the revisions are marked.
 
-**Build-order steps 1, 2 and 3 are done. Step 4, payments, is half done: everything
-that does not need a Stripe key is built and tested — see *Step 4* below for what
-is left.**
+**Build-order steps 1, 2 and 3 are done. Step 4, payments, is built end to end —
+the pay endpoint, the webhook, both balance jobs and the card form — and none of
+it has ever talked to Stripe. See *Step 4* below for what the account is still
+needed for, and for `STRIPE_FAKE`, which makes the whole journey walkable
+today.**
 
 ## Local setup
 
@@ -134,6 +136,7 @@ them in parallel against one shared database, so:
   | availability — calendar tests | today+120 to +150 |
   | booking | today+200 |
   | payments | today+300 |
+  | httpx — webhook test | today+400 |
 
   **The today+30 window is the soft spot.** The date picker opens on the current
   month, so clicking through the booking flow by hand lands a real hold right in
@@ -161,7 +164,9 @@ Gmail strips `data:` URIs from `<img>`, and CID attachments hurt deliverability.
 
 ## The booking flow, as built
 
-Search → results → room page → confirm → hold, with no Stripe anywhere in it.
+Search → results → room page → confirm → hold → pay → confirmed. Everything up to
+the hold has no Stripe in it at all and still works with no processor configured;
+only the last two steps need one.
 
 - **A booking and its hold are written in one transaction** by `booking.Create`.
   The hold is a `room_occupancy` row with an expiry, so the exclusion constraint
@@ -184,6 +189,12 @@ Search → results → room page → confirm → hold, with no Stripe anywhere i
 - **The hold sweep is a durable job now** (`booking.SweepJob`, registered on
   `internal/jobs` as `hold.sweep`). It reclaims lapsed holds so an abandoned
   checkout cannot take a room off sale forever. The step-3 ticker is gone.
+- **The browser redirect does not confirm anything** — the webhook does. A guest
+  who pays and closes the tab has still paid. The consequence is a real gap in
+  which the money has moved and the booking still says pending, so the return
+  page polls `GET /api/bookings/{code}` and, after 30s, says plainly that the
+  payment went through and the booking is catching up. That message is not an
+  error and must not read like one.
 
 ## The HTTP surface
 
@@ -211,28 +222,55 @@ Search → results → room page → confirm → hold, with no Stripe anywhere i
 
 ## Step 4: payments
 
-**Built and tested** (no Stripe account needed for any of it):
+**Built and tested, and almost none of it needed an account:**
 
-- `internal/payments` is the whole state machine, and it **knows nothing about
-  Stripe** — it takes amounts and opaque object ids. That is deliberate: it is what
-  lets the hard cases be tested against real Postgres with no key and no network.
-  `RecordCharge`, `RecordFailure`, `RecordRefund`, `Seen`, and the T-7/T-8 scans.
-- `internal/jobs` is the durable runner: one table, `FOR UPDATE SKIP LOCKED`,
-  leased claims, backoff. `hold.sweep` runs on it.
-- Migration 00008: `payments`, `jobs`, `stripe_events`.
+- `internal/payments` is the whole state machine, and it **still knows nothing
+  about Stripe** — it takes amounts and opaque object ids. That is what lets the
+  hard cases be tested against real Postgres with no key and no network.
+  `RecordCharge`, `RecordFailure`, `RecordRefund`, `Open`, `Seen`, the T-7/T-8
+  scans, and the two balance jobs.
+- **`internal/gateway` is where everything Stripe-shaped lives.** It implements
+  `payments.Gateway`, an interface of exactly three operations: open a payment,
+  charge a saved card off-session, send money back. `payments` defines the
+  interface and never imports the SDK. Three implementations — `Stripe`, `Fake`,
+  and `Disabled`, which is the default and fails every call.
+- `POST /api/bookings/{code}/payment-intent` and the signature-verified
+  `POST /webhooks/stripe`, on the **root** router.
+- `balance.warn` (T-8) and `balance.charge` (T-7), plus `rates.rebuild`.
 - `internal/email` renders the six messages and queues them as `email.send` jobs.
   **Never send inline** — the queue is the outbox, and its retry is why a Resend
   outage delays a confirmation instead of failing the booking that earned it.
   Swap `LogSender` for the real client; nothing else moves.
+- The Payment Element, and the return-polling page behind it.
 
-**Still to do, and all of it needs keys:** the Stripe SDK,
-`POST /api/bookings/{code}/payment-intent`, the signature-verified
-`POST /webhooks/stripe` (register it on the **root** router — everything outside
-`/api` falls through to the SPA, which now 404s a POST rather than answering
-index.html with a 200), the off-session `balance.charge` handler, and the
-Payment Element on the front end. The webhook handler should be thin: verify the
-signature against the **raw body**, then call `RecordCharge` with the event id in
-`Charge.EventID` and answer 200.
+**What the account is still for:** `gateway.Stripe` is written and has never made
+a request. Add `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET` and
+`STRIPE_PUBLISHABLE_KEY` and it is used automatically — no code moves. Then the
+verification matrix in ARCHITECTURE.md, which genuinely cannot be faked: test
+cards, 3-D Secure, `stripe listen`, and **Test Clocks** for T-8 and T-7.
+
+**`STRIPE_FAKE=true` until then.** It substitutes a processor that mints ids and
+takes no money, and the pay page offers a stand-in button instead of a card form.
+Everything past that button is real: `POST /api/dev/pay/{code}` builds a properly
+signed delivery and sends it through the same webhook handler, signature
+verification and state machine a live payment would use. It refuses to exist
+unless **no** Stripe variable is set at all and `ENV=dev` — the "no variables"
+half is doing the work, because ENV defaults to `dev` and a half-configured
+deploy is a mistake to stop on rather than a licence to fake the missing half.
+
+**A webhook signature needs no account to test.** It is an HMAC over the raw body
+with a shared secret, so tests hold both ends (`webhook.GenerateTestSignedPayload`).
+Read the raw body **before anything else touches it** — a decode-and-re-encode
+anywhere upstream makes every genuine delivery fail to verify.
+
+**Verify and decode in two steps**, with `webhook.ValidatePayload` rather than
+`ConstructEvent`. ConstructEvent folds a bad signature and an unexpected payload
+into one error, and the first is a 401 while the second is not. It also rejects
+an API-version mismatch outright, which would fail every delivery until somebody
+noticed a dashboard setting; `ParseWebhook` logs that and carries on, because it
+reads five long-stable fields off a PaymentIntent and a launch day where no
+payment is recorded is the worse outcome. **That is the one judgement call here
+worth revisiting** if the fields it reads ever stop being stable.
 
 **Do not gate that call on `payments.Seen`.** `Seen` commits on its own
 connection, so marking the event handled out there and doing the work in
@@ -242,11 +280,33 @@ is skipped forever. `RecordCharge` takes the event id and writes it inside its
 own transaction for exactly this reason. `Seen` is for event types that write no
 payment row.
 
-**The PaymentIntent's amount must be derived server-side** from the booking's
-own `deposit_cents`/`total_cents`, never read from the request body — otherwise a
-guest names their own price. `RecordCharge` will not confirm a stay whose gross
-collected falls short of what was due at booking (`Underpaid`), but that is a
-backstop, not the control.
+**The PaymentIntent's amount is derived server-side** from the booking's own
+`deposit_cents`/`total_cents`, never read from the request body — otherwise a
+guest names their own price. `payments.Open` does it and the endpoint accepts no
+body at all. `RecordCharge` will not confirm a stay whose gross collected falls
+short of what was due at booking (`Underpaid`), but that is a backstop, not the
+control.
+
+**Mail is queued inside the transaction that earns it**, always — the
+confirmation and owner copy in `RecordCharge`, the receipt on a balance landing,
+the failure notice beside `MarkBalanceChargeFailed`, the T-8 warning beside
+`MarkWarned`. The queue is a table, so the message and the fact commit together
+and a crash between them cannot lose either. `RecordCharge` confirms
+unconditionally but only mails when the status it read at the *start* of the
+transaction was not already confirmed; without that, the T-7 charge sends every
+guest a second "you're booked" a week before arrival.
+
+**Email payloads carry money and dates already formatted** (`email.Money`,
+`email.Day`). Data crosses the jobs table as JSON and comes back as
+`map[string]any`, which would turn integer cents into a float64. Payload JSON
+tags match the field names so `{{.Data.Code}}` reads the same either side of the
+queue.
+
+**A declined card is not a job failure.** `payments.Declined` from the gateway is
+an outcome — flag the booking, mail the guest, leave the stay confirmed. Any
+other error is returned so the runner retries, because the money may have moved
+and this server does not know. Getting these the wrong way round either mails a
+guest hourly or tells them their card failed after it was charged.
 
 Rules that hold whatever gets built on top:
 

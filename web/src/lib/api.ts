@@ -170,6 +170,53 @@ export function fetchBooking(code: string): Promise<Booking> {
   return request<Booking>(`/api/bookings/${encodeURIComponent(code)}`)
 }
 
+export type PaymentIntent = {
+  /**
+   * Authorises the browser to complete this one payment, and nothing else. It
+   * is a credential: it belongs in Stripe's card form and in no log, URL or
+   * error message.
+   */
+  clientSecret: string
+
+  /** Stripe's public account identifier. Safe to hold; useless on its own. */
+  publishableKey: string
+
+  /** What the card will be charged, decided by the server from the booking. */
+  amountCents: number
+
+  /**
+   * The server is running against the fake processor, so there is no card form
+   * to mount and the stand-in button applies. Never true on a deploy that can
+   * take real money.
+   */
+  devPayment: boolean
+}
+
+/**
+ * Opens a payment for a booking.
+ *
+ * Sends no body on purpose. The amount is the server's to decide from the
+ * booking it already has; anything this file could add would be a guest naming
+ * their own price.
+ */
+export function openPayment(code: string): Promise<PaymentIntent> {
+  return request<PaymentIntent>(`/api/bookings/${encodeURIComponent(code)}/payment-intent`, {
+    method: 'POST',
+  })
+}
+
+/**
+ * Stands in for the card form against the fake processor.
+ *
+ * The route exists only when the server has no Stripe configuration at all and
+ * is running in dev, so this 404s everywhere it should.
+ */
+export function devPay(code: string): Promise<{ status: string }> {
+  return request<{ status: string }>(`/api/dev/pay/${encodeURIComponent(code)}`, {
+    method: 'POST',
+  })
+}
+
 export function createBooking(body: {
   roomSlug: string
   checkin: string
