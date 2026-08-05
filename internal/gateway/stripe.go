@@ -59,9 +59,13 @@ func (s *Stripe) CreateIntent(ctx context.Context, in payments.IntentRequest) (p
 
 	// Keyed on the booking, so a guest who reloads the pay page gets the payment
 	// they already had rather than a second one holding a second authorisation
-	// against their card. The booking's amounts are a snapshot and cannot change
-	// underneath it (CLAUDE.md), so the reply is always still correct.
-	params.SetIdempotencyKey("intent:" + in.BookingCode)
+	// against their card.
+	//
+	// The amount is in the key as well, because Stripe rejects a reused key
+	// whose parameters have changed. A partial payment moves what is still
+	// outstanding, and a stay in that state has to be payable rather than stuck
+	// behind a 400 for the next day.
+	params.SetIdempotencyKey(fmt.Sprintf("intent:%s:%d", in.BookingCode, in.AmountCents))
 	params.Context = ctx
 
 	if in.SaveCard {

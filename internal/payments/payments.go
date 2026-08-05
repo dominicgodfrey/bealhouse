@@ -143,6 +143,29 @@ type Charge struct {
 
 	Kind        string
 	AmountCents int64
+
+	// CustomerID and PaymentMethodID are the card the processor kept, and are
+	// recorded on the booking in the same transaction as the payment.
+	//
+	// They arrive here rather than being stored when the payment was opened
+	// because there is no card at that point — the guest has not typed one yet.
+	// The webhook reporting a success is the first moment this system knows what
+	// it will charge at T-7, and a stay that reached confirmed without them is
+	// one whose balance could never be collected.
+	//
+	// Empty on a short-notice stay, which pays in full and is never charged
+	// again (decision #7), and on the balance charge itself.
+	CustomerID      string
+	PaymentMethodID string
+
+	// OwnerEmail gets the inn's own copy of a confirmed booking. Empty sends
+	// none, which is what the tests and the T-7 job want.
+	//
+	// It rides on the charge rather than being configuration this package
+	// reads, because the queueing has to happen inside RecordCharge's
+	// transaction and a package-level setting would be one more thing that can
+	// be wrong in one process and right in another.
+	OwnerEmail string
 }
 
 // Result is what happened, and what the caller still has to do about it.
@@ -287,6 +310,19 @@ func RecordCharge(ctx context.Context, beginner Beginner, in Charge) (Result, er
 		return Result{}, fmt.Errorf("payments: adding to the gross collected: %w", err)
 	}
 
+	// And so does the card, in the same transaction. A stay confirmed without
+	// the means to take its balance is one the guest finds out about at the
+	// door; committing them separately is a crash away from exactly that.
+	if in.CustomerID != "" && in.PaymentMethodID != "" {
+		if err := q.SaveBookingCard(ctx, db.SaveBookingCardParams{
+			ID:                    found.ID,
+			StripeCustomerID:      in.CustomerID,
+			StripePaymentMethodID: in.PaymentMethodID,
+		}); err != nil {
+			return Result{}, fmt.Errorf("payments: saving the card for the balance charge: %w", err)
+		}
+	}
+
 	// Nothing is confirmed until the money due at booking has actually arrived.
 	// Checked against the booking's own snapshot rather than against anything
 	// in the request, so it holds even if whatever created the PaymentIntent
@@ -314,9 +350,30 @@ func RecordCharge(ctx context.Context, beginner Beginner, in Charge) (Result, er
 		return refundDue(ctx, tx, q, found, in.AmountCents)
 	}
 
+	// Read before anything in this transaction changed it, which is what makes
+	// it the honest answer to "did this payment confirm the stay, or was it
+	// already confirmed?". ConfirmBooking below runs either way and is harmless
+	// on a stay that is already confirmed — but the confirmation email is not,
+	// and a guest whose T-7 balance lands reading it as a second booking is a
+	// phone call the owner did not need.
+	newlyConfirmed := found.Status != booking.StatusConfirmed
+
 	if err := q.ConfirmBooking(ctx, found.ID); err != nil {
 		return Result{}, fmt.Errorf("payments: confirming the booking: %w", err)
 	}
+
+	// The confirmation is queued in the same transaction that confirmed the
+	// stay, for the reason MarkWarned is (CLAUDE.md): the queue is a table, so
+	// the message and the fact that earned it commit together. Queueing after
+	// the commit would lose a confirmation to any crash in between — for a
+	// guest whose card has already been charged, and with nothing left to
+	// retry it.
+	if newlyConfirmed {
+		if err := confirmationMail(ctx, q, found, in); err != nil {
+			return Result{}, err
+		}
+	}
+
 	if err := tx.Commit(ctx); err != nil {
 		return Result{}, fmt.Errorf("payments: committing: %w", err)
 	}

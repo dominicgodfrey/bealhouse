@@ -60,7 +60,7 @@ func TestNewRefusesToFakeAnythingItShouldNot(t *testing.T) {
 		}, "error"},
 	} {
 		t.Run(c.name, func(t *testing.T) {
-			got, err := New(c.cfg)
+			got, secret, err := New(c.cfg)
 
 			if c.want == "error" {
 				if err == nil {
@@ -70,6 +70,23 @@ func TestNewRefusesToFakeAnythingItShouldNot(t *testing.T) {
 			}
 			if err != nil {
 				t.Fatalf("New: %v", err)
+			}
+
+			// The secret has to match the processor, or every delivery the fake
+			// signs is rejected by a route verifying against something else.
+			switch c.want {
+			case "stripe":
+				if secret != c.cfg.StripeWebhookSecret {
+					t.Errorf("webhook secret %q, want the configured one", secret)
+				}
+			case "fake":
+				if secret != FakeWebhookSecret {
+					t.Errorf("webhook secret %q, want the fake's", secret)
+				}
+			case "disabled":
+				if secret != "" {
+					t.Error("a disabled processor handed out a webhook secret")
+				}
 			}
 
 			var kind string

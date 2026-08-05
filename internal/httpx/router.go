@@ -13,6 +13,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	db "bealhouse/internal/db/gen"
+	"bealhouse/internal/payments"
 )
 
 // Deps are the collaborators the HTTP layer needs. Pool may be nil when the
@@ -20,6 +21,25 @@ import (
 type Deps struct {
 	Pool *pgxpool.Pool
 	SPA  fs.FS
+
+	// Gateway is the card processor. Never nil: with no keys configured it is
+	// gateway.Disabled, whose every operation fails and whose endpoints answer
+	// 503. A nil check here would be a fourth way to express "payments are off"
+	// and one more place to get it wrong.
+	Gateway payments.Gateway
+
+	// StripePublishableKey identifies the account to the card form in the
+	// browser. Public by design — it can do nothing on its own — and served to
+	// the page with the payment it belongs to.
+	StripePublishableKey string
+
+	// StripeWebhookSecret verifies that a delivery really came from Stripe.
+	// Empty leaves the webhook route unregistered rather than unverified.
+	StripeWebhookSecret string
+
+	// OwnerEmail gets the inn's own copy of a confirmed booking. Empty sends
+	// none.
+	OwnerEmail string
 
 	// BehindProxy says a trusted reverse proxy terminates TLS in front of this
 	// server, which is the deployed shape (Caddy, decision #2). It decides
@@ -43,6 +63,7 @@ func NewRouter(d Deps) http.Handler {
 
 	reads := newLimiter(apiRate, apiBurst)
 	bookings := newLimiter(bookingRate, bookingBurst)
+	paying := newLimiter(paymentRate, paymentBurst)
 
 	r.Route("/api", func(api chi.Router) {
 		api.Use(rateLimit(reads, d.BehindProxy))
@@ -63,6 +84,16 @@ func NewRouter(d Deps) http.Handler {
 			makeBooking = createBooking(d.Pool)
 		}
 		api.With(rateLimit(bookings, d.BehindProxy)).Post("/bookings", makeBooking)
+
+		// Opening a payment calls out to the processor on the inn's account, so
+		// it gets its own allowance rather than sharing the readers' loose one.
+		// It takes no inventory off sale, so it does not need booking's.
+		openPayment := databaseRequired
+		if d.Pool != nil {
+			openPayment = createPaymentIntent(db.New(d.Pool), d.Gateway, d.StripePublishableKey)
+		}
+		api.With(rateLimit(paying, d.BehindProxy)).
+			Post("/bookings/{code}/payment-intent", openPayment)
 
 		if d.Pool != nil {
 			q := db.New(d.Pool)
@@ -86,14 +117,33 @@ func NewRouter(d Deps) http.Handler {
 		})
 	})
 
+	// The webhook, on the root router rather than under /api.
+	//
+	// It is Stripe's own route and answers to a signature rather than to this
+	// server's rate limits or JSON conventions, so it does not belong in the
+	// guest-facing API's middleware stack. It is also what actually confirms a
+	// booking: the browser redirect does not, because a guest who pays and
+	// closes the tab has still paid.
+	//
+	// Registered only when both a pool and a webhook secret exist. Without a
+	// secret nothing could verify a delivery, and a route that accepted
+	// unverified ones would let anyone confirm their own stay for free — so the
+	// path is left to fall through to the 404 below, which is what makes Stripe
+	// retry rather than record every event as delivered.
+	if d.Pool != nil && d.StripeWebhookSecret != "" {
+		r.Post("/webhooks/stripe", stripeWebhook(d.Pool, d.StripeWebhookSecret, d.OwnerEmail))
+	}
+
 	// Everything that is not /api is the SPA. No CORS, no second origin.
 	//
 	// Reads only. A POST to an unrouted path is not a client-side route that
 	// needs index.html, it is a caller who thinks an endpoint exists — and
 	// answering it with the page and a 200 is worse than answering nothing.
-	// `POST /webhooks/stripe` is the case this is written for: registered on
-	// the root router in the next step, and until it exists Stripe would
-	// otherwise record every event as delivered successfully and never retry.
+	// `POST /webhooks/stripe` is the case this is written for, and it still
+	// matters now that the route exists: it is registered only when a webhook
+	// secret is configured, so a deploy that forgets one must 404 and have
+	// Stripe retry rather than answer index.html and have it record every
+	// payment as delivered.
 	spa := serveSPA(d.SPA)
 	r.NotFound(func(w http.ResponseWriter, r *http.Request) {
 		switch r.Method {

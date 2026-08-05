@@ -83,19 +83,22 @@ func (q *Queries) CountBookingOccupancy(ctx context.Context, bookingID *int64) (
 
 const getBookingForPayment = `-- name: GetBookingForPayment :one
 SELECT
-  id,
-  code,
-  status,
-  checkin,
-  checkout,
-  total_cents,
-  deposit_cents,
-  balance_due_cents,
-  amount_paid_cents,
-  balance_charge_at,
-  payment_intent_id
-FROM bookings
-WHERE code = $1
+  b.id,
+  b.code,
+  b.status,
+  b.checkin,
+  b.checkout,
+  b.total_cents,
+  b.deposit_cents,
+  b.balance_due_cents,
+  b.amount_paid_cents,
+  b.balance_charge_at,
+  b.payment_intent_id,
+  g.email AS guest_email,
+  g.name  AS guest_name
+FROM bookings b
+JOIN guests g ON g.id = b.guest_id
+WHERE b.code = $1
 `
 
 type GetBookingForPaymentRow struct {
@@ -110,10 +113,19 @@ type GetBookingForPaymentRow struct {
 	AmountPaidCents int64
 	BalanceChargeAt pgtype.Date
 	PaymentIntentID string
+	GuestEmail      string
+	GuestName       string
 }
 
-// What the payment path needs to know about a booking. Deliberately narrower
-// than GetBookingByCode: no guest join, because nothing here emails anybody.
+// What the payment path needs to know about a booking.
+//
+// The guest comes with it. Opening a payment names them to the processor for
+// its receipt, and confirming one queues the inn's own confirmation inside the
+// same transaction that recorded the money -- so a second lookup would be a
+// second thing that can fail after the money has moved.
+//
+// Still narrower than GetBookingByCode: no rooms, no nightly prices. Nothing on
+// this path renders a stay.
 func (q *Queries) GetBookingForPayment(ctx context.Context, code string) (GetBookingForPaymentRow, error) {
 	row := q.db.QueryRow(ctx, getBookingForPayment, code)
 	var i GetBookingForPaymentRow
@@ -129,6 +141,8 @@ func (q *Queries) GetBookingForPayment(ctx context.Context, code string) (GetBoo
 		&i.AmountPaidCents,
 		&i.BalanceChargeAt,
 		&i.PaymentIntentID,
+		&i.GuestEmail,
+		&i.GuestName,
 	)
 	return i, err
 }
@@ -475,6 +489,30 @@ func (q *Queries) ReleaseBookingOccupancy(ctx context.Context, bookingID *int64)
 		return 0, err
 	}
 	return result.RowsAffected(), nil
+}
+
+const saveBookingCard = `-- name: SaveBookingCard :exec
+UPDATE bookings
+SET stripe_customer_id       = $1,
+    stripe_payment_method_id = $2,
+    updated_at               = now()
+WHERE id = $3
+`
+
+type SaveBookingCardParams struct {
+	StripeCustomerID      string
+	StripePaymentMethodID string
+	ID                    int64
+}
+
+// Keep the card the processor saved, so the T-7 charge has something to bill.
+//
+// Written in the same transaction as the payment that produced it. A stay that
+// reached confirmed without these is one whose balance can never be collected,
+// and the guest would find out at the door.
+func (q *Queries) SaveBookingCard(ctx context.Context, arg SaveBookingCardParams) error {
+	_, err := q.db.Exec(ctx, saveBookingCard, arg.StripeCustomerID, arg.StripePaymentMethodID, arg.ID)
+	return err
 }
 
 const startPayment = `-- name: StartPayment :exec

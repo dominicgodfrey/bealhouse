@@ -28,6 +28,14 @@ const (
 	// already more than any real guest does.
 	bookingRate  = 6 * time.Minute
 	bookingBurst = 5
+
+	// paymentRate covers opening a payment. Looser than booking because it
+	// takes nothing off sale and the processor deduplicates the calls anyway,
+	// tighter than a read because each one is a round trip to somebody else's
+	// API on our account. A guest reloading the pay page a few times, or
+	// retrying after a declined card, stays well inside it.
+	paymentRate  = 30 * time.Second
+	paymentBurst = 10
 )
 
 // idleBucketTTL is how long an unused bucket is kept before the sweeper drops

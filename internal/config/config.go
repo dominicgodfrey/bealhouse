@@ -35,6 +35,15 @@ type Config struct {
 	// chiefly the ones in emails, which cannot be relative.
 	SiteURL string
 
+	// OwnerEmail gets the inn's own copy of every confirmed booking. Empty
+	// sends none, which is today's state.
+	//
+	// Environment rather than a settings column, for now: every other email
+	// setting here is, and the admin console that would edit it is build-order
+	// step 6. It belongs in settings once that exists — an owner should not
+	// need a deploy to change where their notifications go.
+	OwnerEmail string
+
 	// EmailLogoURL is the letterhead image. Absolute and publicly reachable, or
 	// empty: mail clients do not resolve relative paths, and an <img> pointing
 	// at nothing is worse than the inn's name in text, which is what the
@@ -69,6 +78,7 @@ func Load() Config {
 		StripeFake:           env("STRIPE_FAKE", "") == "true",
 
 		SiteURL:      env("SITE_URL", ""),
+		OwnerEmail:   env("OWNER_EMAIL", ""),
 		EmailLogoURL: env("EMAIL_LOGO_URL", ""),
 
 		BehindProxy: env("BEHIND_PROXY", "") == "true",

@@ -18,6 +18,7 @@ import (
 	"bealhouse/internal/config"
 	db "bealhouse/internal/db/gen"
 	"bealhouse/internal/email"
+	"bealhouse/internal/gateway"
 	"bealhouse/internal/httpx"
 	"bealhouse/internal/jobs"
 	"bealhouse/internal/payments"
@@ -84,7 +85,14 @@ func run() error {
 		go runner.Run(ctx)
 	}
 
-	if !cfg.StripeConfigured() {
+	// Refuses rather than guessing when the settings contradict each other —
+	// notably STRIPE_FAKE anywhere it has no business being. A server that
+	// cannot say for certain which processor it has must not start.
+	processor, webhookSecret, err := gateway.New(cfg)
+	if err != nil {
+		return err
+	}
+	if !cfg.StripeConfigured() && !cfg.StripeFake {
 		slog.Warn("Stripe is not configured; rooms can be held but not paid for")
 	}
 	// Said plainly rather than left to be discovered: the queue will accept and
@@ -94,9 +102,13 @@ func run() error {
 	srv := &http.Server{
 		Addr: cfg.Addr,
 		Handler: httpx.NewRouter(httpx.Deps{
-			Pool:        pool,
-			SPA:         web.Dist(),
-			BehindProxy: cfg.BehindProxy,
+			Pool:                 pool,
+			SPA:                  web.Dist(),
+			BehindProxy:          cfg.BehindProxy,
+			Gateway:              processor,
+			StripePublishableKey: cfg.StripePublishableKey,
+			StripeWebhookSecret:  webhookSecret,
+			OwnerEmail:           cfg.OwnerEmail,
 		}),
 		ReadHeaderTimeout: 10 * time.Second,
 		WriteTimeout:      30 * time.Second,

@@ -82,23 +82,33 @@ UPDATE room_occupancy
 SET kind = 'booking', expires_at = NULL
 WHERE booking_id = sqlc.arg(booking_id) AND kind = 'hold';
 
--- What the payment path needs to know about a booking. Deliberately narrower
--- than GetBookingByCode: no guest join, because nothing here emails anybody.
+-- What the payment path needs to know about a booking.
+--
+-- The guest comes with it. Opening a payment names them to the processor for
+-- its receipt, and confirming one queues the inn's own confirmation inside the
+-- same transaction that recorded the money -- so a second lookup would be a
+-- second thing that can fail after the money has moved.
+--
+-- Still narrower than GetBookingByCode: no rooms, no nightly prices. Nothing on
+-- this path renders a stay.
 -- name: GetBookingForPayment :one
 SELECT
-  id,
-  code,
-  status,
-  checkin,
-  checkout,
-  total_cents,
-  deposit_cents,
-  balance_due_cents,
-  amount_paid_cents,
-  balance_charge_at,
-  payment_intent_id
-FROM bookings
-WHERE code = sqlc.arg(code);
+  b.id,
+  b.code,
+  b.status,
+  b.checkin,
+  b.checkout,
+  b.total_cents,
+  b.deposit_cents,
+  b.balance_due_cents,
+  b.amount_paid_cents,
+  b.balance_charge_at,
+  b.payment_intent_id,
+  g.email AS guest_email,
+  g.name  AS guest_name
+FROM bookings b
+JOIN guests g ON g.id = b.guest_id
+WHERE b.code = sqlc.arg(code);
 
 -- Note that a PaymentIntent now exists for this booking, which is what stops
 -- the sweeper expiring it out from under a guest who is mid-payment.
@@ -107,6 +117,18 @@ UPDATE bookings
 SET payment_intent_id  = sqlc.arg(payment_intent_id),
     payment_started_at = now(),
     updated_at         = now()
+WHERE id = sqlc.arg(id);
+
+-- Keep the card the processor saved, so the T-7 charge has something to bill.
+--
+-- Written in the same transaction as the payment that produced it. A stay that
+-- reached confirmed without these is one whose balance can never be collected,
+-- and the guest would find out at the door.
+-- name: SaveBookingCard :exec
+UPDATE bookings
+SET stripe_customer_id       = sqlc.arg(stripe_customer_id),
+    stripe_payment_method_id = sqlc.arg(stripe_payment_method_id),
+    updated_at               = now()
 WHERE id = sqlc.arg(id);
 
 -- The T-7 charge was declined. The stay stays confirmed — the guest is still

@@ -24,6 +24,51 @@ import (
 // The json tags match the field names on purpose, so `{{.Data.Code}}` reads the
 // same before the round trip and after it.
 
+// BookingConfirmationData follows a successful payment. The stay is confirmed,
+// the room is the guest's, and this is the message they keep.
+type BookingConfirmationData struct {
+	Code      string `json:"Code"`
+	GuestName string `json:"GuestName"`
+
+	// Rooms is what was booked, by name. A slice because the schema has carried
+	// booking_rooms since day one (decision #10) even though the v1 UI books
+	// one at a time.
+	Rooms []string `json:"Rooms"`
+
+	Checkin  string `json:"Checkin"`
+	Checkout string `json:"Checkout"`
+
+	// Nights is a string like everything else here. A number would come back
+	// from the queue as a float64 and start a habit this system does not want.
+	Nights string `json:"Nights"`
+
+	// PaidNow is what has just been taken, and Total what the stay costs.
+	PaidNow string `json:"PaidNow"`
+	Total   string `json:"Total"`
+
+	// BalanceDue and BalanceChargeOn are empty on a stay paid in full at
+	// booking (decision #7), which is how a template tells the two apart
+	// without being told which kind of booking it is rendering.
+	BalanceDue      string `json:"BalanceDue"`
+	BalanceChargeOn string `json:"BalanceChargeOn"`
+}
+
+// OwnerNotificationData is the inn's own copy of a new booking.
+//
+// It carries the guest's contact details, which the guest's own confirmation
+// does not need and the public booking API deliberately never returns.
+type OwnerNotificationData struct {
+	Code       string   `json:"Code"`
+	GuestName  string   `json:"GuestName"`
+	GuestEmail string   `json:"GuestEmail"`
+	Rooms      []string `json:"Rooms"`
+	Checkin    string   `json:"Checkin"`
+	Checkout   string   `json:"Checkout"`
+	Nights     string   `json:"Nights"`
+	PaidNow    string   `json:"PaidNow"`
+	Total      string   `json:"Total"`
+}
+
 // BalanceWarningData is the T-8 heads-up: decision #6's promise that the T-7
 // charge is never a surprise.
 type BalanceWarningData struct {

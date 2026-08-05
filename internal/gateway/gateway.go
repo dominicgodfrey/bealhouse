@@ -50,24 +50,30 @@ const (
 //  3. ENV is dev.
 //
 // Anything else with no keys is Disabled, which fails loudly and takes no money.
-func New(cfg config.Config) (payments.Gateway, error) {
+//
+// The webhook secret comes back with the processor rather than being read from
+// the config separately, because the two have to agree: the fake signs its own
+// deliveries with FakeWebhookSecret, and a caller that picked a processor here
+// and a secret somewhere else would eventually pick a mismatched pair. Empty
+// means the webhook route is not registered at all.
+func New(cfg config.Config) (payments.Gateway, string, error) {
 	if cfg.StripeConfigured() {
-		return NewStripe(cfg.StripeSecretKey), nil
+		return NewStripe(cfg.StripeSecretKey), cfg.StripeWebhookSecret, nil
 	}
 
 	if !cfg.StripeFake {
-		return Disabled{}, nil
+		return Disabled{}, "", nil
 	}
 
 	if cfg.StripeSecretKey != "" || cfg.StripeWebhookSecret != "" {
-		return nil, fmt.Errorf(
+		return nil, "", fmt.Errorf(
 			"gateway: STRIPE_FAKE is set alongside real Stripe settings; " +
 				"remove one — a half-configured processor must not be replaced by a fake")
 	}
 	if !cfg.IsDev() {
-		return nil, fmt.Errorf("gateway: STRIPE_FAKE is set with ENV=%q; the fake is for development only", cfg.Env)
+		return nil, "", fmt.Errorf("gateway: STRIPE_FAKE is set with ENV=%q; the fake is for development only", cfg.Env)
 	}
-	return NewFake(), nil
+	return NewFake(), FakeWebhookSecret, nil
 }
 
 // Disabled is the processor when there is none.
