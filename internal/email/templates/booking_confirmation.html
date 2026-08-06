@@ -8,12 +8,46 @@
 
     Should eventually carry: the booking reference, room, dates, the per-night
     breakdown with tax, what was charged today, and what will be charged at T-7
-    (or that the stay is paid in full). Plus the signed manage-booking link from
-    decision #19 and the PDF.
+    (or that the stay is paid in full). Plus the PDF.
+
+    The manage link below is structure rather than copy and is already wired —
+    it is the only way a guest reaches their booking (decision #19), so it is
+    here rather than waiting on the sentences around it. Its wording is still
+    the owner's to settle.
   */}}
   <p style="margin:0 0 12px 0;"><strong>Booking confirmation</strong></p>
   <p style="margin:0;color:#57534e;">
     This template is not written yet. It confirms a paid booking and gives the
     guest their reference, dates, and payment summary.
   </p>
+
+  {{/*
+    Empty on a deploy with no signing secret or no site URL, and then omitted
+    entirely: a button going nowhere is worse than no button.
+
+    `with` before `if` because Names() renders every template against nil data
+    as a smoke test, and reaching through a nil interface for a field is an
+    execution error rather than an empty string.
+
+    A table and inline styles because this is the one element a guest is meant
+    to press, and Outlook does not lay out a styled <a> as a block. The href is
+    also written out underneath, for the clients that strip the link and for a
+    guest reading on a machine that is not the one their mail is on.
+  */}}
+  {{with .Data}}{{if .ManageURL}}
+    <table role="presentation" cellpadding="0" cellspacing="0" border="0"
+           style="margin:20px 0 8px 0;">
+      <tr>
+        <td align="center" style="border-radius:6px;background-color:#1c1917;">
+          <a href="{{.ManageURL}}"
+             style="display:inline-block;padding:11px 20px;font-family:-apple-system,
+                    BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;font-size:15px;
+                    color:#ffffff;text-decoration:none;">View or cancel your booking</a>
+        </td>
+      </tr>
+    </table>
+    <p style="margin:0;font-size:12px;line-height:1.5;color:#78716c;word-break:break-all;">
+      {{.ManageURL}}
+    </p>
+  {{end}}{{end}}
 {{end}}

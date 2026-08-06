@@ -10,6 +10,12 @@ import (
 	"bealhouse/internal/email"
 )
 
+// manageLinkGraceDays is how long after checkout the manage link keeps working.
+//
+// Long enough to be useful to a guest looking something up on the way home,
+// short enough that the capability in a years-old email has lapsed.
+const manageLinkGraceDays = 30
+
 // confirmationMail queues the guest's confirmation and the owner's copy.
 //
 // Called from inside RecordCharge's transaction, so the messages and the
@@ -56,6 +62,14 @@ func confirmationMail(ctx context.Context, q *db.Queries, b db.GetBookingForPaym
 	if b.BalanceChargeAt.Valid {
 		confirmation.BalanceDue = email.Money(b.TotalCents - paidSoFar)
 		confirmation.BalanceChargeOn = email.Day(b.BalanceChargeAt.Time)
+	}
+
+	// The link a guest uses to look at the stay and, if they must, cancel it. It
+	// stops working a month after they leave: its whole job is done by then, and
+	// a confirmation email is forwarded, backed up and searchable forever, so a
+	// capability inside one should not be.
+	if in.ManageURL != nil {
+		confirmation.ManageURL = in.ManageURL(b.Code, civil.AddDays(b.Checkout.Time, manageLinkGraceDays))
 	}
 
 	if err := email.Queue(ctx, q, email.Envelope{

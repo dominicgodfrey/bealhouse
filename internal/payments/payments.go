@@ -167,6 +167,16 @@ type Charge struct {
 	// transaction and a package-level setting would be one more thing that can
 	// be wrong in one process and right in another.
 	OwnerEmail string
+
+	// ManageURL builds the guest's signed manage-booking link (decision #19),
+	// given the code and when the link should stop working.
+	//
+	// A function rather than a signer, for the same reason OwnerEmail is a
+	// string: what a link looks like, what it is signed with and which origin it
+	// points at are all the HTTP layer's business, and this package's job is
+	// only to put the result in the message at the moment the stay is confirmed.
+	// Nil leaves the link out, which is what an unconfigured deploy gets.
+	ManageURL func(code string, expires time.Time) string
 }
 
 // Result is what happened, and what the caller still has to do about it.
@@ -522,12 +532,11 @@ func RecordRefund(ctx context.Context, beginner Beginner, in Charge) (Result, er
 		return Result{}, fmt.Errorf("payments: cancelling the booking: %w", err)
 	}
 
-	// In the same transaction as the refund row, so a guest is never told money
-	// is coming back without a record of it, or left with a refund nobody
-	// mentioned.
-	if err := cancellationMail(ctx, q, found, in.AmountCents); err != nil {
-		return Result{}, err
-	}
+	// No mail here, deliberately. This runs once per intent being refunded, so a
+	// stay that paid a deposit and then a balance would get two "your stay is
+	// cancelled" messages, each naming a fraction of the money. The guest is told
+	// once, by whichever transaction decided to cancel — refundDue below, or
+	// Cancel — and both know the whole figure.
 
 	if err := tx.Commit(ctx); err != nil {
 		return Result{}, fmt.Errorf("payments: committing: %w", err)
@@ -669,7 +678,17 @@ func refundDue(
 	// — the inn could not honour the stay (decision #24).
 	owed := b.AmountPaidCents + justPaid
 
-	if err := QueueRefund(ctx, q, b.Code); err != nil {
+	// Zero: this path returns everything, so the job works the figure out from
+	// the ledger when it runs and cannot be wrong about a payment that landed in
+	// between.
+	if err := QueueRefund(ctx, q, b.Code, 0); err != nil {
+		return Result{}, err
+	}
+
+	// The one message for this cancellation, naming the whole amount. Queued in
+	// the transaction that cancelled the stay, so a guest is never told money is
+	// coming back without a record of it, or left with a refund nobody mentioned.
+	if err := cancellationMail(ctx, q, b, owed); err != nil {
 		return Result{}, err
 	}
 

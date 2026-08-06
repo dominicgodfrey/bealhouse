@@ -43,7 +43,7 @@ Stack constraint: **TypeScript/React + Go**. No launch deadline — one complete
 | 16 | Media | Owner uploads in admin → VPS disk, Go generates AVIF/WebP variants, Cloudflare free CDN |
 | 17 | Email | Resend. SPF/DKIM/DMARC at Bluehost DNS (SPF must include Resend *and* the mailbox host) |
 | 18 | Launch | Placeholder site today → clean cutover. Google Business Profile + Search Console on day one |
-| 19 | Guest self-service | Signed expiring link in confirmation email → view booking + **cancel**, refund executes automatically. Date changes go through the owner |
+| 19 | Guest self-service | Signed expiring link in confirmation email → view booking + **cancel**, refund executes automatically. Date changes go through the owner. **Built:** an HMAC over the code and an expiry (`BOOKING_LINK_SECRET`), not a stored token — stateless, valid for bookings made before the feature existed, and expiring thirty days after checkout. Cancelling is refused once the stay has begun, because decision #9's arithmetic does not describe a visit in progress |
 | 20 | **Minimum stay** | **Global default 2 nights**, stored in `settings` (not hardcoded). A season may override it upward (e.g. 3 on holiday weekends) |
 | 21 | **Rate administration** | Seasons are **owner-editable in admin** as a room × season price grid; saving regenerates the nightly calendar for **future dates only** |
 | 22 | **Accessibility** | **Filter switched off.** Every room requires stairs, including the two the owner considers most accessible, so no room sets `is_accessible`. The schema and its constraint remain; `settings.accessibility_notice` carries a stairs disclaimer shown with every search *(revised)* |
@@ -384,13 +384,32 @@ Dependency-ordered, not deadline-driven (single launch).
    made Stripe stop retrying a payment that was never recorded; a panicking job handler took the
    whole binary down; and the T-8 warning was skipped permanently if the server missed that exact
    day. The unmetered hold endpoint (decision #29) was the fourth.*
-5. **Comms** — Resend, email templates, PDF generation, signed manage-booking link + self-service
-   cancel. *`internal/email` exists and renders: the shared letterhead layout and one file per
-   message, all six deliberately **blank** — a line saying what each is for and nothing else. The
-   copy is the owner's to write, like room descriptions and photos. The letterhead now carries
-   the inn's mark: `web/public/logo.svg` and its favicon and PNG derivatives, with
-   `EMAIL_LOGO_URL` defaulting to `SITE_URL` + `/logo-email.png` so the absolute-URL rule holds
-   without anyone retyping their own origin.*
+5. **Comms** ← **IN PROGRESS.** Built:
+
+   - **The provider.** `email.Resend` implements `Sender` over plain `net/http` — one endpoint,
+     one JSON body, one bearer token, no SDK — and takes over the moment `RESEND_API_KEY` and
+     `EMAIL_FROM` are both set. Like `gateway.Stripe` it is written and has never made a request;
+     its tests hold the far end with an `httptest` server. Half a configuration is an error in
+     the log and is treated as none, but does not stop the binary booting: the whole reason mail
+     is queued is that email must never fail a booking.
+   - **The letterhead.** The inn's mark now ships in the repo — `web/public/logo.svg`, its square
+     reversed favicon and a PNG for mail clients — and `EMAIL_LOGO_URL` defaults to `SITE_URL` +
+     `/logo-email.png`, so the absolute-URL rule holds without anyone retyping their own origin.
+   - **The manage-booking link and self-service cancel** (decision #19). An HMAC over the code and
+     an expiry, signed with `BOOKING_LINK_SECRET`: stateless, works for every booking there has
+     ever been, and expires thirty days after checkout so a capability in a forwarded email does
+     not outlive the stay by years. Behind it, `GET /api/bookings/{code}/manage` quotes what
+     cancelling would return today and `POST .../cancel` does it — cancelling the stay, putting
+     the room back on sale and queueing the refund in one transaction, with the amount settled
+     there rather than recomputed by the job.
+
+   *The six templates are still deliberately **blank** — a line saying what each is for and
+   nothing else. The copy is the owner's to write, like room descriptions and photos. The manage
+   link is wired into the confirmation as structure rather than copy, because it is the only way
+   a guest reaches their booking.*
+
+   **Still to do:** the PDF confirmation, and the Resend account itself — DNS for SPF/DKIM/DMARC
+   (decision #17) and a first real send.
 6. **Admin** — auth, upcoming/paid-vs-owed view, calendar, list, manual CRUD, rate editor, blocking,
    guest search.
 7. **Content & marketing** — home, restaurant + menu editor, events + inquiry form, about, image
@@ -451,6 +470,21 @@ Dependency-ordered, not deadline-driven (single launch).
 - **Confirmed once:** a redelivered webhook must not send a second confirmation, and the T-7 charge
   landing on a stay confirmed weeks earlier must send a receipt rather than a second "you're
   booked". *(Done — the second was a real bug, caught by its own test.)*
+- **Cancelled once, and told once:** a stay that paid a deposit and then a balance must produce one
+  cancellation email naming the whole refund, not one per intent refunded. *(Done — this was a
+  real bug. The message was queued inside `RecordRefund`, which the refund job calls once per
+  payment; it now belongs to the transaction that cancels the stay.)*
+- **The link is the authenticator:** the manage and cancel endpoints must refuse a missing, forged,
+  expired or foreign-signed token, must not distinguish any of those from a booking that does not
+  exist, and must leave the booking untouched in every case. *(Done, and with no account: an HMAC
+  is a secret the tests hold both ends of, exactly like the webhook signature.)*
+- **Refund policy at the boundary:** cancelling exactly seven days out is in time; three days out
+  forfeits the deposit and returns nothing when only the deposit was collected; and a cancellation
+  on or after the arrival date is refused rather than run through arithmetic that does not
+  describe it. *(Done.)*
+- **Refunding twice:** the refund job re-run must send the money once. The division of a partial
+  refund over several intents has to be reproducible, or a retry asks Stripe for amounts it has
+  not seen and each is a fresh refund. *(Done.)*
 
 ### What the concurrency tests actually found
 

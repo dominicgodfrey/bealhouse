@@ -111,7 +111,7 @@ func TestSignedDeliveryConfirmsAHeldBooking(t *testing.T) {
 	})
 
 	rec := httptest.NewRecorder()
-	stripeWebhook(tx, hookSecret, "")(rec, req)
+	stripeWebhook(tx, hookSecret, letterhead{})(rec, req)
 
 	if rec.Code != http.StatusOK {
 		t.Fatalf("answered %d, want 200 — Stripe would retry a payment already recorded", rec.Code)
@@ -131,7 +131,7 @@ func TestSignedDeliveryConfirmsAHeldBooking(t *testing.T) {
 	// A redelivery must change nothing and still answer 200. Stripe delivers at
 	// least once and retries on any non-2xx, so both halves matter.
 	repeat := httptest.NewRecorder()
-	stripeWebhook(tx, hookSecret, "")(repeat, signedEvent(t, "evt_confirm", "payment_intent.succeeded", map[string]any{
+	stripeWebhook(tx, hookSecret, letterhead{})(repeat, signedEvent(t, "evt_confirm", "payment_intent.succeeded", map[string]any{
 		"id":              "pi_confirm",
 		"object":          "payment_intent",
 		"amount":          made.Quote.DepositCents,
@@ -167,7 +167,7 @@ func TestUnverifiedDeliveryIsRejectedBeforeAnythingHappens(t *testing.T) {
 	req.Header.Set("Stripe-Signature", "t=1,v1=deadbeef")
 
 	rec := httptest.NewRecorder()
-	stripeWebhook(forbiddenBeginner{t}, hookSecret, "")(rec, req)
+	stripeWebhook(forbiddenBeginner{t}, hookSecret, letterhead{})(rec, req)
 
 	if rec.Code != http.StatusUnauthorized {
 		t.Errorf("answered %d, want 401", rec.Code)
@@ -180,7 +180,7 @@ func TestIgnoredEventIsAnswered200(t *testing.T) {
 	req := signedEvent(t, "evt_1", "customer.created", map[string]any{"id": "cus_1", "object": "customer"})
 
 	rec := httptest.NewRecorder()
-	stripeWebhook(forbiddenBeginner{t}, hookSecret, "")(rec, req)
+	stripeWebhook(forbiddenBeginner{t}, hookSecret, letterhead{})(rec, req)
 
 	if rec.Code != http.StatusOK {
 		t.Errorf("answered %d, want 200", rec.Code)
@@ -199,7 +199,7 @@ func TestAFailureToRecordAsksStripeToRetry(t *testing.T) {
 	})
 
 	rec := httptest.NewRecorder()
-	stripeWebhook(stubbornBeginner{}, hookSecret, "")(rec, req)
+	stripeWebhook(stubbornBeginner{}, hookSecret, letterhead{})(rec, req)
 
 	if rec.Code != http.StatusInternalServerError {
 		t.Errorf("answered %d, want 500 so the delivery is retried", rec.Code)

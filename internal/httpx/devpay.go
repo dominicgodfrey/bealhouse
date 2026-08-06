@@ -30,8 +30,8 @@ import (
 // booking, it builds a properly signed delivery and sends it through the real
 // webhook handler — signature verification, the state machine, the mail queue,
 // all of it. The only thing pretended is that a card was charged.
-func devPay(fake *gateway.Fake, beginner payments.Beginner, secret, ownerEmail string) http.HandlerFunc {
-	hook := stripeWebhook(beginner, secret, ownerEmail)
+func devPay(fake *gateway.Fake, beginner payments.Beginner, secret string, letters letterhead) http.HandlerFunc {
+	hook := stripeWebhook(beginner, secret, letters)
 
 	return func(w http.ResponseWriter, r *http.Request) {
 		tx, err := beginner.Begin(r.Context())

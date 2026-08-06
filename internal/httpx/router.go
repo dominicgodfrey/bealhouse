@@ -12,6 +12,7 @@ import (
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"bealhouse/internal/booking"
 	db "bealhouse/internal/db/gen"
 	"bealhouse/internal/gateway"
 	"bealhouse/internal/payments"
@@ -42,6 +43,17 @@ type Deps struct {
 	// none.
 	OwnerEmail string
 
+	// Links signs the manage-booking capability that reaches a guest in their
+	// confirmation (decision #19). Nil when no secret is configured, which
+	// leaves the routes behind it registered and refusing rather than absent:
+	// a guest clicking an old link is owed "this link is not valid", not a page
+	// of JavaScript that never loads.
+	Links *booking.Links
+
+	// SiteURL is the public origin the manage link is built on. Emails cannot
+	// carry a relative path.
+	SiteURL string
+
 	// BehindProxy says a trusted reverse proxy terminates TLS in front of this
 	// server, which is the deployed shape (Caddy, decision #2). It decides
 	// whether X-Forwarded-For and X-Forwarded-Proto are believed at all: on a
@@ -61,6 +73,10 @@ func NewRouter(d Deps) http.Handler {
 	// the server's WriteTimeout so the handler is the thing that gives up, and
 	// the client gets an answer rather than a dropped socket.
 	r.Use(middleware.Timeout(20 * time.Second))
+
+	// What this layer contributes to the mail payments queues, gathered once so
+	// the webhook and its dev stand-in cannot be given different answers.
+	letters := letterhead{ownerEmail: d.OwnerEmail, links: d.Links, siteURL: d.SiteURL}
 
 	reads := newLimiter(apiRate, apiBurst)
 	bookings := newLimiter(bookingRate, bookingBurst)
@@ -104,8 +120,17 @@ func NewRouter(d Deps) http.Handler {
 		if fake, ok := d.Gateway.(*gateway.Fake); ok && d.Pool != nil {
 			slog.Warn("registering the FAKE payment route at POST /api/dev/pay/{code}")
 			api.With(rateLimit(paying, d.BehindProxy)).
-				Post("/dev/pay/{code}", devPay(fake, d.Pool, d.StripeWebhookSecret, d.OwnerEmail))
+				Post("/dev/pay/{code}", devPay(fake, d.Pool, d.StripeWebhookSecret, letters))
 		}
+
+		// Cancelling moves money, so it shares the payment allowance rather than
+		// the readers' loose one. The signed link is the real gate; the limit is
+		// what stops a leaked one being used to hammer the processor.
+		cancel := databaseRequired
+		if d.Pool != nil {
+			cancel = cancelBooking(d.Pool, db.New(d.Pool), d.Links)
+		}
+		api.With(rateLimit(paying, d.BehindProxy)).Post("/bookings/{code}/cancel", cancel)
 
 		if d.Pool != nil {
 			q := db.New(d.Pool)
@@ -113,12 +138,14 @@ func NewRouter(d Deps) http.Handler {
 			api.Get("/calendar", calendar(q))
 			api.Get("/rooms/{slug}", room(q))
 			api.Get("/bookings/{code}", getBooking(q))
+			api.Get("/bookings/{code}/manage", manageBooking(q, d.Links))
 		} else {
 			// Better an honest 503 than a route that silently does not exist.
 			api.Get("/availability", databaseRequired)
 			api.Get("/calendar", databaseRequired)
 			api.Get("/rooms/{slug}", databaseRequired)
 			api.Get("/bookings/{code}", databaseRequired)
+			api.Get("/bookings/{code}/manage", databaseRequired)
 		}
 
 		// Remaining domain routes land here: admin.
@@ -143,7 +170,7 @@ func NewRouter(d Deps) http.Handler {
 	// path is left to fall through to the 404 below, which is what makes Stripe
 	// retry rather than record every event as delivered.
 	if d.Pool != nil && d.StripeWebhookSecret != "" {
-		r.Post("/webhooks/stripe", stripeWebhook(d.Pool, d.StripeWebhookSecret, d.OwnerEmail))
+		r.Post("/webhooks/stripe", stripeWebhook(d.Pool, d.StripeWebhookSecret, letters))
 	}
 
 	// Everything that is not /api is the SPA. No CORS, no second origin.

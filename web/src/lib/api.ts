@@ -217,6 +217,41 @@ export function devPay(code: string): Promise<{ status: string }> {
   })
 }
 
+/** What cancelling a stay today would return (decisions #9 and #26). */
+export type RefundPreview = {
+  paidCents: number
+  retainedCents: number
+  refundCents: number
+  /** Inside seven days, where the deposit is forfeit. */
+  late: boolean
+}
+
+export type ManagedBooking = {
+  booking: Booking
+  refund: RefundPreview
+  cancellable: boolean
+  /** Why not, in words for the guest. Empty when it is. */
+  reason?: string
+}
+
+/**
+ * The guest's own view of their booking, behind the signed link.
+ *
+ * The token comes from the URL and goes straight back to the server. It is a
+ * capability: it belongs in this request and in no log or analytics call.
+ */
+export function fetchManagedBooking(code: string, token: string): Promise<ManagedBooking> {
+  const query = new URLSearchParams({ t: token })
+  return request<ManagedBooking>(`/api/bookings/${encodeURIComponent(code)}/manage?${query}`)
+}
+
+export function cancelBooking(code: string, token: string): Promise<RefundPreview> {
+  const query = new URLSearchParams({ t: token })
+  return request<RefundPreview>(`/api/bookings/${encodeURIComponent(code)}/cancel?${query}`, {
+    method: 'POST',
+  })
+}
+
 export function createBooking(body: {
   roomSlug: string
   checkin: string

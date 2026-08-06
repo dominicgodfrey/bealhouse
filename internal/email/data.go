@@ -51,6 +51,11 @@ type BookingConfirmationData struct {
 	// without being told which kind of booking it is rendering.
 	BalanceDue      string `json:"BalanceDue"`
 	BalanceChargeOn string `json:"BalanceChargeOn"`
+
+	// ManageURL is the signed link to view and cancel the stay (decision #19).
+	// Absolute, expiring, and empty on a deploy with no signing secret — so the
+	// template has to check before offering it.
+	ManageURL string `json:"ManageURL"`
 }
 
 // OwnerNotificationData is the inn's own copy of a new booking.

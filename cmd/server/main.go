@@ -71,6 +71,15 @@ func run() error {
 	// believes it is emailing guests and is not finds out from a guest.
 	sender := emailSender(cfg)
 
+	// The manage-booking capability (decision #19). Nil without a secret, which
+	// leaves confirmations without the link and its endpoints refusing — said
+	// out loud, because a guest with no way to cancel is one who telephones.
+	links := booking.NewLinks(cfg.BookingLinkSecret)
+	if links == nil {
+		slog.Warn("BOOKING_LINK_SECRET is unset; confirmation emails will carry " +
+			"no manage-booking link and self-service cancellation is off")
+	}
+
 	// Background work. Without the sweep an abandoned checkout holds its room
 	// forever, which is worse than the double-booking the hold exists to
 	// prevent.
@@ -127,6 +136,8 @@ func run() error {
 			StripePublishableKey: cfg.StripePublishableKey,
 			StripeWebhookSecret:  webhookSecret,
 			OwnerEmail:           cfg.OwnerEmail,
+			Links:                links,
+			SiteURL:              cfg.SiteURL,
 		}),
 		ReadHeaderTimeout: 10 * time.Second,
 		WriteTimeout:      30 * time.Second,

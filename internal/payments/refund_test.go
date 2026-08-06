@@ -74,7 +74,7 @@ func TestMoneyForAResoldRoomIsQueuedForRefund(t *testing.T) {
 
 	// Now run it.
 	gw := &refunder{}
-	if err := Refund(ctx, tx, gw, made.Code); err != nil {
+	if err := Refund(ctx, tx, gw, made.Code, 0); err != nil {
 		t.Fatalf("refunding: %v", err)
 	}
 
@@ -127,7 +127,7 @@ func TestRefundingTwiceReturnsTheMoneyOnce(t *testing.T) {
 
 	gw := &refunder{}
 	for i := range 3 {
-		if err := Refund(ctx, tx, gw, made.Code); err != nil {
+		if err := Refund(ctx, tx, gw, made.Code, 0); err != nil {
 			t.Fatalf("refund run %d: %v", i+1, err)
 		}
 	}
@@ -173,11 +173,12 @@ func TestAFailedRefundStaysOwed(t *testing.T) {
 	}
 
 	gw := &refunder{err: errors.New("stripe is unreachable")}
-	if err := Refund(ctx, tx, gw, made.Code); err == nil {
+	if err := Refund(ctx, tx, gw, made.Code, 0); err == nil {
 		t.Fatal("an unreachable processor was reported as a completed refund")
 	}
 
-	// Nothing recorded and nobody told: the money has not moved.
+	// Nothing recorded: the money has not moved, so the ledger must not say it
+	// has. The job stays queued and retries.
 	var refunds int
 	if err := tx.QueryRow(ctx, `
 		SELECT count(*) FROM payments p JOIN bookings b ON b.id = p.booking_id
@@ -188,8 +189,18 @@ func TestAFailedRefundStaysOwed(t *testing.T) {
 	if refunds != 0 {
 		t.Errorf("%d refunds recorded for money that never moved", refunds)
 	}
-	if got := queuedMail(t, ctx, tx, email.CancellationRefund, made.Code); len(got) != 0 {
-		t.Errorf("%d guests told about a refund that failed to send", len(got))
+
+	// The guest has been told once, by the transaction that cancelled their
+	// stay, and is not told again by each attempt to send the money.
+	//
+	// The message belongs to the cancellation rather than to the transfer: the
+	// booking really is cancelled at that point whatever Stripe is doing, and a
+	// guest whose room was resold hearing nothing until the processor recovers
+	// is the worse silence. It also has to be one message — this used to be
+	// queued per refunded intent, so a stay that paid a deposit and then a
+	// balance told the guest twice, each time naming part of the money.
+	if got := queuedMail(t, ctx, tx, email.CancellationRefund, made.Code); len(got) != 1 {
+		t.Errorf("%d cancellation emails queued, want exactly 1", len(got))
 	}
 }
 

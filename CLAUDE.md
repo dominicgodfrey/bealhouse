@@ -145,7 +145,7 @@ them in parallel against one shared database, so:
   | availability — calendar tests | today+120 to +150 |
   | booking | today+200 |
   | payments | today+300 |
-  | httpx — webhook test | today+400 |
+  | httpx — webhook and manage tests | today+400 |
 
   **The today+30 window is the soft spot.** The date picker opens on the current
   month, so clicking through the booking flow by hand lands a real hold right in
@@ -321,6 +321,14 @@ unconditionally but only mails when the status it read at the *start* of the
 transaction was not already confirmed; without that, the T-7 charge sends every
 guest a second "you're booked" a week before arrival.
 
+**The cancellation email belongs to the cancellation, not to the transfer.**
+Queued by whichever transaction cancelled the stay — `refundDue` for a resold
+room, `Cancel` for a guest who changed their mind — and *not* by `RecordRefund`,
+which runs once per intent being refunded and used to tell a deposit-plus-balance
+guest twice, each message naming part of the money. It also has to go out when
+the refund is zero: a late cancellation still happened and the guest is owed the
+confirmation.
+
 **Email payloads carry money and dates already formatted** (`email.Money`,
 `email.Day`). Data crosses the jobs table as JSON and comes back as
 `map[string]any`, which would turn integer cents into a float64. Payload JSON
@@ -367,6 +375,17 @@ Rules that hold whatever gets built on top:
   left to notice it. The job refunds each collected payment against the intent
   that took it, so a deposit-plus-balance stay produces two refunds rather than
   one Stripe would reject.
+- **`QueueRefund` takes an amount, and zero means everything.** Zero is decision
+  #24's penalty-free path, which can work the figure out from the ledger when the
+  job runs and so stays right if another payment landed in between. A guest's own
+  cancellation cannot: what the inn keeps depends on which side of T-7 they
+  cancelled, so that amount is settled in the transaction that cancelled the stay
+  and carried. A partial refund is spread over the intents **in ledger order**,
+  filling each before moving on — reproducibly, because a retry that divided it
+  differently would ask Stripe for amounts it had not seen and every one would be
+  a fresh refund. Allocations already in the ledger are matched off one for one,
+  which is the guard that still holds after Stripe's own idempotency keys age out
+  at twenty-four hours.
 - **The sweeper leaves mid-payment bookings alone** for
   `settings.payment_grace_minutes`. That protects the booking's bookkeeping only —
   the hold is still reclaimed on its own TTL, so the room always goes back on sale.
@@ -388,3 +407,43 @@ Rules that hold whatever gets built on top:
   T-7 charge is not a surprise. Call `payments.MarkWarned` **in the same
   transaction that queues the email**, or the same guest is warned every day
   until they arrive.
+
+## Step 5: the manage-booking link
+
+**A booking code is an identifier, not an authenticator.** Six characters over a
+32-letter alphabet, read out over the phone and printed on paperwork. Anything
+that shows a guest's own details or spends their money asks for the signed token
+as well — `GET /api/bookings/{code}/manage` and `POST /api/bookings/{code}/cancel`
+both do, and `GET /api/bookings/{code}` deliberately still returns no contact
+details.
+
+**The token is an HMAC, not a row** (`booking.Links`). The expiry is inside the
+signed message so it cannot be pushed out by editing the URL, and the code is
+signed uppercase and trimmed so a mail client that lowercased the link does not
+lock a guest out. A stored random token would buy revocation there is nowhere to
+offer yet and cost a migration, a write per booking, and no capability at all for
+any stay booked before the column.
+
+**`BOOKING_LINK_SECRET` has no default and must not get one.** Generated at boot,
+every outstanding link dies on each restart; compiled in, anyone holding this
+source can cancel any guest's stay. Unset means no link in the confirmation and
+403 from both endpoints — closed, and said out loud at startup.
+
+**A missing token, a forged one, an expired one and a booking that does not exist
+all answer the same 403.** Otherwise the endpoint tells anyone willing to try
+which six-character codes are real.
+
+**Cancelling is refused once the stay has begun** (`ErrStayUnderway`). Decision
+#9's arithmetic has no branch for it — `IsLateCancellation` would call it late and
+hand back half the money for a stay being consumed. A no-show is the owner's
+conversation and the admin console's manual refund.
+
+**The cancel endpoint moves no money itself.** It cancels the stay, puts the room
+back on sale and queues `payment.refund`, all in one transaction. A guest whose
+browser gave up waiting on Stripe must never be left with a booking that is
+neither cancelled nor refunded.
+
+**Quote before button.** The manage page shows what cancelling returns *today*
+before offering to do it, and both figures come from the same arithmetic against
+the same civil day (`payments.RefundFor`, then `payments.Cancel`). The browser
+never sends an amount.

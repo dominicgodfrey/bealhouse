@@ -5,9 +5,11 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
+	"time"
 
 	"github.com/go-chi/chi/v5/middleware"
 
+	"bealhouse/internal/booking"
 	"bealhouse/internal/gateway"
 	"bealhouse/internal/payments"
 )
@@ -33,7 +35,7 @@ const maxWebhookBody = 256 << 10
 // The handler is deliberately thin: verify, translate, hand to the state
 // machine, answer. Everything that decides anything lives in internal/payments
 // and is tested against Postgres without any of this.
-func stripeWebhook(beginner payments.Beginner, secret, ownerEmail string) http.HandlerFunc {
+func stripeWebhook(beginner payments.Beginner, secret string, letters letterhead) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Read the raw body before anything else touches it. The signature is
 		// computed over exactly these bytes, so a decode-and-re-encode anywhere
@@ -68,9 +70,9 @@ func stripeWebhook(beginner payments.Beginner, secret, ownerEmail string) http.H
 		case gateway.Charged:
 			// Attached here rather than read inside payments: the confirmation
 			// and the owner's copy are queued in the transaction that records
-			// the money, and where the inn's own address comes from is this
-			// layer's business.
-			delivery.Charge.OwnerEmail = ownerEmail
+			// the money, and where the inn's own address comes from — and what a
+			// signed link looks like — is this layer's business.
+			letters.attach(&delivery.Charge)
 
 			result, err := payments.RecordCharge(ctx, beginner, delivery.Charge)
 			if err != nil {
@@ -96,6 +98,34 @@ func stripeWebhook(beginner payments.Beginner, secret, ownerEmail string) http.H
 		// already done. Asking Stripe to try again would only produce this same
 		// answer, more slowly.
 		writeJSON(w, http.StatusOK, map[string]string{"status": string(delivery.Action)})
+	}
+}
+
+// letterhead is what this layer contributes to the messages payments queues:
+// where the inn's own copy goes, and how to address a guest's manage link.
+//
+// One value rather than two more arguments on every handler that records a
+// payment. Both are configuration, both are only ever read on the way into a
+// Charge, and a webhook that grew a fifth positional string would be one where
+// nobody notices two of them swapped.
+type letterhead struct {
+	ownerEmail string
+	links      *booking.Links
+	siteURL    string
+}
+
+// attach fills in the parts of a Charge that this layer owns.
+func (l letterhead) attach(c *payments.Charge) {
+	c.OwnerEmail = l.ownerEmail
+
+	// Nil when no signing secret is configured, and left nil rather than made
+	// into a function returning "": the template checks one thing, and the
+	// difference between "no link" and "an empty link" is not worth teaching it.
+	if l.links == nil || l.siteURL == "" {
+		return
+	}
+	c.ManageURL = func(code string, expires time.Time) string {
+		return l.links.URL(l.siteURL, code, expires)
 	}
 }
 

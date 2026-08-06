@@ -35,6 +35,15 @@ type Config struct {
 	// chiefly the ones in emails, which cannot be relative.
 	SiteURL string
 
+	// BookingLinkSecret signs the manage-booking capability in decision #19.
+	//
+	// Empty leaves confirmation emails without the link and the endpoints behind
+	// it refusing every request. Deliberately not defaulted to anything: a
+	// generated-at-boot secret would invalidate every outstanding link on each
+	// restart, and a compiled-in one would let anyone holding this source cancel
+	// any guest's stay.
+	BookingLinkSecret string
+
 	// Resend, the mail provider (decision #17). Both halves are required
 	// together and neither is useful alone: the key authenticates and the from
 	// address has to be one Resend will accept for this domain.
@@ -96,7 +105,9 @@ func Load() Config {
 		ResendAPIKey: env("RESEND_API_KEY", ""),
 		EmailFrom:    env("EMAIL_FROM", ""),
 
-		SiteURL:      siteURL,
+		SiteURL:           siteURL,
+		BookingLinkSecret: env("BOOKING_LINK_SECRET", ""),
+
 		OwnerEmail:   env("OWNER_EMAIL", ""),
 		EmailLogoURL: emailLogoURL(env("EMAIL_LOGO_URL", ""), siteURL),
 
