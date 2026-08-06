@@ -297,6 +297,89 @@ func (q *Queries) ListBookingRooms(ctx context.Context, bookingID int64) ([]List
 	return items, nil
 }
 
+const listBookingsDueForCheckoutEmail = `-- name: ListBookingsDueForCheckoutEmail :many
+SELECT
+  b.id,
+  b.code,
+  b.checkin,
+  b.checkout,
+  g.email AS guest_email,
+  g.name  AS guest_name
+FROM bookings b
+JOIN guests g ON g.id = b.guest_id
+WHERE b.status = 'confirmed'
+  AND b.checkout = $1
+  AND b.checkout_email_sent_at IS NULL
+ORDER BY b.id
+`
+
+type ListBookingsDueForCheckoutEmailRow struct {
+	ID         int64
+	Code       string
+	Checkin    pgtype.Date
+	Checkout   pgtype.Date
+	GuestEmail string
+	GuestName  string
+}
+
+// Confirmed stays leaving on a given day that have not had their departure
+// email yet.
+//
+// **Equality on the date, not a threshold.** The T-8 balance warning uses
+// `<=` so a server that was switched off catches up and sends it late, because
+// a late warning still does its job. This message does not survive that: it
+// says the guest is leaving today, and a copy that arrives three days after
+// they got home is a lie the inn told them. A day the server spent entirely off
+// is a departure note that does not go out, which is the honest outcome.
+//
+// The room names are not joined in. The scan wants a row per booking and the
+// message wants a list per booking, and one query cannot be both without
+// either an aggregate here or duplicate bookings to fold up in Go — so the
+// rooms are loaded per guest, in the same transaction that queues the mail.
+func (q *Queries) ListBookingsDueForCheckoutEmail(ctx context.Context, onDate pgtype.Date) ([]ListBookingsDueForCheckoutEmailRow, error) {
+	rows, err := q.db.Query(ctx, listBookingsDueForCheckoutEmail, onDate)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListBookingsDueForCheckoutEmailRow{}
+	for rows.Next() {
+		var i ListBookingsDueForCheckoutEmailRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Code,
+			&i.Checkin,
+			&i.Checkout,
+			&i.GuestEmail,
+			&i.GuestName,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const markCheckoutEmailSent = `-- name: MarkCheckoutEmailSent :exec
+UPDATE bookings
+SET checkout_email_sent_at = now(),
+    updated_at             = now()
+WHERE id = $1
+`
+
+// Note that the departure email has gone out.
+//
+// Belongs in the same transaction as queueing it. The queue is a table, so both
+// writes commit together and a crash between them can neither drop the message
+// nor send it every fifteen minutes until midnight.
+func (q *Queries) MarkCheckoutEmailSent(ctx context.Context, id int64) error {
+	_, err := q.db.Exec(ctx, markCheckoutEmailSent, id)
+	return err
+}
+
 const upsertGuest = `-- name: UpsertGuest :one
 
 INSERT INTO guests (email, name, phone)

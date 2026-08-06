@@ -47,6 +47,11 @@ const (
 
 	// OwnerNotification is the inn's own copy of a new booking.
 	OwnerNotification = "owner_notification"
+
+	// CheckoutReminder reaches the guest at the start of the day they leave:
+	// the checkout time and the inn's goodbye. Sent by the checkout.remind scan
+	// rather than by anything the guest did, and only on the day itself.
+	CheckoutReminder = "checkout_reminder"
 )
 
 // Names lists every template, so a test can render them all without a list that
@@ -59,6 +64,7 @@ func Names() []string {
 		BalanceFailed,
 		CancellationRefund,
 		OwnerNotification,
+		CheckoutReminder,
 	}
 }
 

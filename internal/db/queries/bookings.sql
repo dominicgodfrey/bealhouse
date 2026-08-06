@@ -135,3 +135,43 @@ WHERE b.status = 'pending'
     b.payment_started_at IS NULL
     OR b.payment_started_at <= now() - (s.payment_grace_minutes * interval '1 minute')
   );
+
+-- Confirmed stays leaving on a given day that have not had their departure
+-- email yet.
+--
+-- **Equality on the date, not a threshold.** The T-8 balance warning uses
+-- `<=` so a server that was switched off catches up and sends it late, because
+-- a late warning still does its job. This message does not survive that: it
+-- says the guest is leaving today, and a copy that arrives three days after
+-- they got home is a lie the inn told them. A day the server spent entirely off
+-- is a departure note that does not go out, which is the honest outcome.
+--
+-- The room names are not joined in. The scan wants a row per booking and the
+-- message wants a list per booking, and one query cannot be both without
+-- either an aggregate here or duplicate bookings to fold up in Go — so the
+-- rooms are loaded per guest, in the same transaction that queues the mail.
+-- name: ListBookingsDueForCheckoutEmail :many
+SELECT
+  b.id,
+  b.code,
+  b.checkin,
+  b.checkout,
+  g.email AS guest_email,
+  g.name  AS guest_name
+FROM bookings b
+JOIN guests g ON g.id = b.guest_id
+WHERE b.status = 'confirmed'
+  AND b.checkout = sqlc.arg(on_date)
+  AND b.checkout_email_sent_at IS NULL
+ORDER BY b.id;
+
+-- Note that the departure email has gone out.
+--
+-- Belongs in the same transaction as queueing it. The queue is a table, so both
+-- writes commit together and a crash between them can neither drop the message
+-- nor send it every fifteen minutes until midnight.
+-- name: MarkCheckoutEmailSent :exec
+UPDATE bookings
+SET checkout_email_sent_at = now(),
+    updated_at             = now()
+WHERE id = sqlc.arg(id);

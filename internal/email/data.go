@@ -134,6 +134,28 @@ type BalanceFailedData struct {
 	Checkout string `json:"Checkout"`
 }
 
+// CheckoutReminderData reaches the guest on the morning they leave.
+//
+// It carries no money at all, deliberately. A stay that gets this far has been
+// paid in full — at booking on a short-notice stay, or at T-7 — and a guest
+// whose card was refused has had the balance_failed message instead. Putting a
+// figure here would either repeat that conversation or start a new one on the
+// morning somebody is trying to leave.
+type CheckoutReminderData struct {
+	Code      string   `json:"Code"`
+	GuestName string   `json:"GuestName"`
+	Rooms     []string `json:"Rooms"`
+
+	Checkin  string `json:"Checkin"`
+	Checkout string `json:"Checkout"`
+	Nights   string `json:"Nights"`
+
+	// CheckoutTime is the inn's checkout hour from settings, formatted:
+	// "11:00 AM". Passed rather than written into the copy, so the sentence
+	// about it stays true when the owner changes the setting.
+	CheckoutTime string `json:"CheckoutTime"`
+}
+
 // Money renders integer cents the way a guest reads them: "$1,234.56".
 //
 // The dollars and the remainder are separated with integer division and printed
@@ -167,3 +189,17 @@ func Money(cents int64) string {
 // is read weeks after it arrives and often on a phone in a hurry, and "Oct 1"
 // is the kind of shorthand that has somebody turn up a year late.
 func Day(d time.Time) string { return d.Format("Monday, January 2, 2006") }
+
+// Clock renders a time of day for a guest: "11:00 AM".
+//
+// Takes an offset from midnight rather than a time.Time, because the values it
+// formats are settings.checkin_time and settings.checkout_time — a time of day
+// with no date attached, and attaching an arbitrary one on the way here is how
+// a formatter starts printing the wrong day.
+//
+// Beside Money and Day for the same reason those are here: how the inn writes
+// something to a guest is one rule, not one per call site.
+func Clock(sinceMidnight time.Duration) string {
+	midnight := time.Date(2000, time.January, 1, 0, 0, 0, 0, time.UTC)
+	return midnight.Add(sinceMidnight).Format("3:04 PM")
+}

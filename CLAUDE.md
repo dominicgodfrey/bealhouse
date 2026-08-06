@@ -167,7 +167,7 @@ marked `PLACEHOLDER`, amenities are empty, there is one flat rate season, and
 than seeded rows — a placeholder in the database is one somebody has to remember
 to delete. Do not invent content, and do not seed guesses.
 
-The same goes for **email copy** (`internal/email/templates/`). All six templates
+The same goes for **email copy** (`internal/email/templates/`). All seven templates
 are blank on purpose: a subject marked `PLACEHOLDER` and one line saying what the
 message is for. Write the shared layout, never the sentences a guest reads.
 
@@ -264,7 +264,7 @@ only the last two steps need one.
 - `POST /api/bookings/{code}/payment-intent` and the signature-verified
   `POST /webhooks/stripe`, on the **root** router.
 - `balance.warn` (T-8) and `balance.charge` (T-7), plus `rates.rebuild`.
-- `internal/email` renders the six messages and queues them as `email.send` jobs.
+- `internal/email` renders the seven messages and queues them as `email.send` jobs.
   **Never send inline** — the queue is the outbox, and its retry is why a Resend
   outage delays a confirmation instead of failing the booking that earned it.
   `Resend` implements `Sender` over plain `net/http` — one endpoint, one JSON
@@ -408,7 +408,16 @@ Rules that hold whatever gets built on top:
   is a goroutine, so an unrecovered panic anywhere in a handler takes the binary
   down and the booking API with it. `jobs.run` recovers, records the panic and
   its stack in `last_error`, and backs the job off like any other failure.
-- **The T-8 warning scan catches up and must be marked done.** It looks for
+- **The departure-morning note matches its day exactly** (`booking.SendCheckoutEmails`,
+registered as `checkout.remind`). It runs every fifteen minutes rather than hourly,
+because the message is meant to be in the inbox when the guest wakes up on the day
+they leave, and an hourly job phased by the last restart can be an hour into it.
+It deliberately does **not** catch up the way the T-8 warning does: a late warning
+still works, a "you are leaving today" that arrives after the guest got home does
+not. `checkout_email_sent_at` is set **in the transaction that queues the email**,
+or the same guest hears from the inn ninety-six times that morning.
+
+**The T-8 warning scan catches up and must be marked done.** It looks for
   charges due within a day and not yet warned, so a server that was off for T-8
   still sends it late rather than never — decision #6's whole point is that the
   T-7 charge is not a surprise. Call `payments.MarkWarned` **in the same

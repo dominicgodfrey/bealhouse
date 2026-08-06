@@ -1,0 +1,24 @@
+{{define "checkout_reminder_subject"}}PLACEHOLDER — checking out today{{end}}
+
+{{define "checkout_reminder_body"}}
+  {{/*
+    PLACEHOLDER. Sent by the checkout.remind job in the first minutes of the day
+    the guest leaves, so it is waiting when they wake up rather than arriving
+    while they are packing.
+
+    Should eventually carry: the checkout time and what to do with the key, a
+    thank-you, and whatever the owner wants to say about coming back. It must
+    not read as a demand for money — a stay reaching this message has already
+    been charged in full at T-7, and a guest whose card failed has had the
+    balance_failed message instead.
+
+    `.Data.CheckoutTime` is the inn's checkout hour from settings, already
+    formatted ("11:00 AM"), so the sentence about it stays true when the owner
+    changes the setting.
+  */}}
+  <p style="margin:0 0 12px 0;"><strong>Checking out today</strong></p>
+  <p style="margin:0;color:#57534e;">
+    This template is not written yet. It reaches the guest on the morning they
+    leave with the checkout time and the inn's goodbye.
+  </p>
+{{end}}

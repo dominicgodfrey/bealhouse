@@ -89,6 +89,12 @@ func run() error {
 		runner := jobs.New(q)
 		runner.Every(booking.SweepJobKind, booking.SweepInterval, booking.SweepJob(q))
 
+		// The departure-morning note. It needs the pool for the same reason the
+		// warning does: each message has to be queued and marked sent in one
+		// transaction, or a guest hears from the inn every quarter of an hour.
+		runner.Every(booking.CheckoutJobKind, booking.CheckoutInterval,
+			booking.CheckoutJob(q, pool))
+
 		// Decision #6's T-8 heads-up. It needs the pool rather than the shared
 		// queries handle because each warning has to queue its email and mark
 		// the booking warned in one transaction.
