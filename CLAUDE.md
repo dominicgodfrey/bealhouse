@@ -166,10 +166,21 @@ The same goes for **email copy** (`internal/email/templates/`). All six template
 are blank on purpose: a subject marked `PLACEHOLDER` and one line saying what the
 message is for. Write the shared layout, never the sentences a guest reads.
 
-There is also **no logo asset in the repo.** The letterhead renders
-`EMAIL_LOGO_URL` when set and the inn's name in text when not, which is today's
-state. It must be an absolute URL — mail clients do not resolve relative paths,
-Gmail strips `data:` URIs from `<img>`, and CID attachments hurt deliverability.
+**The logo is the owner's and is now in the repo**, drawn as geometry in
+`web/public/logo.svg` — three connected buildings, ink on nothing. Two derivatives
+sit beside it and must be kept in step by hand if the shape ever changes:
+`favicon.svg` is the same mark reversed out of a black tile, square because the
+mark is nearly three times wider than tall and a browser tab renders that at a
+height nothing can read; `logo-email.png` is it rasterised, because mail clients
+do not render SVG.
+
+The letterhead URL **must be absolute** — mail clients do not resolve relative
+paths, Gmail strips `data:` URIs from `<img>`, and CID attachments hurt
+deliverability. `EMAIL_LOGO_URL` therefore defaults to `SITE_URL` +
+`/logo-email.png` rather than being set by hand, since the asset ships in the
+bundle this same binary serves. Set it only to serve the file from elsewhere. No
+`SITE_URL` means no origin to make it absolute with, and the templates fall back
+to the inn's name in text.
 
 ## The booking flow, as built
 

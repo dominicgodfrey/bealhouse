@@ -73,8 +73,9 @@ type Brand struct {
 	// resolve relative paths, Gmail strips data: URIs from <img>, and CID
 	// attachments trip spam heuristics — so a hosted file it is.
 	//
-	// Empty renders the inn's name as text instead, which is the state today:
-	// no logo has been supplied, and inventing one is not ours to do.
+	// Empty renders the inn's name as text instead, which is what a deploy with
+	// no SITE_URL gets: the asset ships in the bundle, so the only thing that
+	// can be missing is an origin to address it by.
 	LogoURL string
 
 	// SiteURL is the public origin, used to build links back into the site.

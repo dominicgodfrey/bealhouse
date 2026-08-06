@@ -387,9 +387,10 @@ Dependency-ordered, not deadline-driven (single launch).
 5. **Comms** — Resend, email templates, PDF generation, signed manage-booking link + self-service
    cancel. *`internal/email` exists and renders: the shared letterhead layout and one file per
    message, all six deliberately **blank** — a line saying what each is for and nothing else. The
-   copy is the owner's to write, like room descriptions and photos. The letterhead takes a logo
-   from `EMAIL_LOGO_URL` and falls back to the inn's name in text; **no logo asset has been
-   supplied yet**, so the fallback is what renders today.*
+   copy is the owner's to write, like room descriptions and photos. The letterhead now carries
+   the inn's mark: `web/public/logo.svg` and its favicon and PNG derivatives, with
+   `EMAIL_LOGO_URL` defaulting to `SITE_URL` + `/logo-email.png` so the absolute-URL rule holds
+   without anyone retyping their own origin.*
 6. **Admin** — auth, upcoming/paid-vs-owed view, calendar, list, manual CRUD, rate editor, blocking,
    guest search.
 7. **Content & marketing** — home, restaurant + menu editor, events + inquiry form, about, image

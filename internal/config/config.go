@@ -47,7 +47,11 @@ type Config struct {
 	// EmailLogoURL is the letterhead image. Absolute and publicly reachable, or
 	// empty: mail clients do not resolve relative paths, and an <img> pointing
 	// at nothing is worse than the inn's name in text, which is what the
-	// templates fall back to. No logo has been supplied yet.
+	// templates fall back to.
+	//
+	// Defaulted from SiteURL rather than left to be set by hand, because the
+	// asset ships in the bundle this same binary serves — see emailLogoURL. It
+	// stays overridable for the day the logo lives on a CDN.
 	EmailLogoURL string
 
 	// BehindProxy says a trusted reverse proxy sits in front of this server and
@@ -67,6 +71,8 @@ type Config struct {
 func Load() Config {
 	loadDotEnv(".env")
 
+	siteURL := strings.TrimRight(env("SITE_URL", ""), "/")
+
 	return Config{
 		Addr:        env("ADDR", ":8080"),
 		DatabaseURL: env("DATABASE_URL", ""),
@@ -77,9 +83,9 @@ func Load() Config {
 		StripePublishableKey: env("STRIPE_PUBLISHABLE_KEY", ""),
 		StripeFake:           env("STRIPE_FAKE", "") == "true",
 
-		SiteURL:      env("SITE_URL", ""),
+		SiteURL:      siteURL,
 		OwnerEmail:   env("OWNER_EMAIL", ""),
-		EmailLogoURL: env("EMAIL_LOGO_URL", ""),
+		EmailLogoURL: emailLogoURL(env("EMAIL_LOGO_URL", ""), siteURL),
 
 		BehindProxy: env("BEHIND_PROXY", "") == "true",
 	}
@@ -96,6 +102,31 @@ func (c Config) IsDev() bool { return c.Env == "dev" }
 // so it is deliberately all or nothing.
 func (c Config) StripeConfigured() bool {
 	return c.StripeSecretKey != "" && c.StripeWebhookSecret != ""
+}
+
+// EmailLogoPath is where the letterhead image sits in the SPA bundle this
+// binary serves. A PNG rather than the SVG the site uses: mail clients do not
+// render SVG, and several strip the tag rather than showing a broken image.
+const EmailLogoPath = "/logo-email.png"
+
+// emailLogoURL resolves the letterhead image.
+//
+// An explicit EMAIL_LOGO_URL always wins — the logo may one day be served from
+// the CDN rather than from here. Otherwise it is built from SiteURL, because
+// the asset is in the bundle this binary serves and making an operator retype
+// their own origin is a way to get a typo into every email the inn sends.
+//
+// Without a SiteURL there is nothing to make absolute, so it stays empty and
+// the templates fall back to the inn's name in text. A relative path would
+// render as a broken image in every client, which is worse than no image.
+func emailLogoURL(configured, siteURL string) string {
+	if configured != "" {
+		return configured
+	}
+	if siteURL == "" {
+		return ""
+	}
+	return siteURL + EmailLogoPath
 }
 
 func env(key, fallback string) string {

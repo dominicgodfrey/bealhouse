@@ -13,7 +13,15 @@ export function Layout({ children }: { children: ReactNode }) {
     <div className="flex min-h-dvh flex-col bg-white text-neutral-900">
       <header className="border-b border-neutral-200">
         <div className="mx-auto flex max-w-5xl items-center justify-between px-6 py-4">
-          <Link to="/" className="text-lg font-semibold tracking-tight">
+          {/*
+            The mark carries no words, so the name stays beside it and the image
+            takes an empty alt rather than repeating what the link already says.
+          */}
+          <Link
+            to="/"
+            className="flex items-center gap-2.5 text-lg font-semibold tracking-tight"
+          >
+            <img src="/logo.svg" alt="" className="h-6 w-auto" />
             Beal House
           </Link>
           <nav className="text-sm text-neutral-600">
