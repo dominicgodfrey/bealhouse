@@ -3,7 +3,12 @@ import { Link, useParams, useSearchParams } from 'react-router'
 
 import { ErrorNote, Layout, Loading } from '../components/Layout'
 import { PriceBreakdown } from '../components/PriceBreakdown'
-import { cancelBooking, fetchManagedBooking, type RefundPreview } from '../lib/api'
+import {
+  cancelBooking,
+  confirmationPdfUrl,
+  fetchManagedBooking,
+  type RefundPreview,
+} from '../lib/api'
 import { formatLong } from '../lib/dates'
 import { formatCents } from '../lib/money'
 import { useAsync } from '../lib/useAsync'
@@ -76,6 +81,18 @@ export function Manage() {
             }}
           />
         </section>
+
+        {/*
+          A plain anchor, not a fetch: the browser's own download handling is
+          what puts this in a guest's files, and it carries the same token the
+          endpoint behind it asks for.
+        */}
+        <a
+          href={confirmationPdfUrl(code, token)}
+          className="self-start text-sm text-neutral-600 underline underline-offset-4"
+        >
+          Download confirmation (PDF)
+        </a>
 
         {managed.data.cancellable && !cancelled && (
           <CancelPanel

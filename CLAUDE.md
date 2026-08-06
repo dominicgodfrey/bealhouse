@@ -172,7 +172,9 @@ sit beside it and must be kept in step by hand if the shape ever changes:
 `favicon.svg` is the same mark reversed out of a black tile, square because the
 mark is nearly three times wider than tall and a browser tab renders that at a
 height nothing can read; `logo-email.png` is it rasterised, because mail clients
-do not render SVG.
+do not render SVG. `pdf.mark` draws the same geometry a fourth time, in fpdf
+primitives on the same 316 × 108 grid, because a PDF wants vectors and not a
+raster to keep in step.
 
 The letterhead URL **must be absolute** — mail clients do not resolve relative
 paths, Gmail strips `data:` URIs from `<img>`, and CID attachments hurt
@@ -447,3 +449,20 @@ neither cancelled nor refunded.
 before offering to do it, and both figures come from the same arithmetic against
 the same civil day (`payments.RefundFor`, then `payments.Cancel`). The browser
 never sends an amount.
+
+**The confirmation PDF is rendered on demand, not stored.** `internal/pdf` is
+pure — no database, no clock — and does no arithmetic: every figure is the
+booking's snapshot, so the document, the email and the page cannot disagree. It
+sits behind the same token, because it carries the guest's name. A stored file
+would have to be kept in step with a row that still changes, and a stay whose
+balance landed this morning must not hand out a PDF saying it is outstanding.
+
+**fpdf's built-in fonts are single-byte, so every string goes through
+`render.text`,** which runs the cp1252 translator. Without it a `·` renders as
+`Â·` and "Châtelet" is worse. Anything outside cp1252 needs an embedded TrueType
+font; that is a change to make when a guest needs it, not a megabyte carried on
+the chance.
+
+**The mark is drawn, not embedded** (`pdf.mark`) — the same geometry as
+`web/public/logo.svg` on the same 316 × 108 grid. Three files now carry that
+shape; if it ever changes, they move together.

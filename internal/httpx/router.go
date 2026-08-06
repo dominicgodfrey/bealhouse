@@ -139,6 +139,7 @@ func NewRouter(d Deps) http.Handler {
 			api.Get("/rooms/{slug}", room(q))
 			api.Get("/bookings/{code}", getBooking(q))
 			api.Get("/bookings/{code}/manage", manageBooking(q, d.Links))
+			api.Get("/bookings/{code}/confirmation.pdf", confirmationPDF(q, d.Links))
 		} else {
 			// Better an honest 503 than a route that silently does not exist.
 			api.Get("/availability", databaseRequired)
@@ -146,6 +147,7 @@ func NewRouter(d Deps) http.Handler {
 			api.Get("/rooms/{slug}", databaseRequired)
 			api.Get("/bookings/{code}", databaseRequired)
 			api.Get("/bookings/{code}/manage", databaseRequired)
+			api.Get("/bookings/{code}/confirmation.pdf", databaseRequired)
 		}
 
 		// Remaining domain routes land here: admin.

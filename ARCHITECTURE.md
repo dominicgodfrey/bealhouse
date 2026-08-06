@@ -402,14 +402,19 @@ Dependency-ordered, not deadline-driven (single launch).
      cancelling would return today and `POST .../cancel` does it — cancelling the stay, putting
      the room back on sale and queueing the refund in one transaction, with the amount settled
      there rather than recomputed by the job.
+   - **The confirmation PDF** (`internal/pdf`, `go-pdf/fpdf`), rendered on demand from the
+     booking's snapshot and served behind the same token, because it carries the guest's name.
+     Pure and doing no arithmetic, so it cannot disagree with the email beside it — money and
+     dates are formatted by `email.Money` and `email.Day` rather than by a second copy of those
+     rules. The inn's mark is drawn in vector primitives, the same geometry as `logo.svg`.
 
    *The six templates are still deliberately **blank** — a line saying what each is for and
    nothing else. The copy is the owner's to write, like room descriptions and photos. The manage
    link is wired into the confirmation as structure rather than copy, because it is the only way
    a guest reaches their booking.*
 
-   **Still to do:** the PDF confirmation, and the Resend account itself — DNS for SPF/DKIM/DMARC
-   (decision #17) and a first real send.
+   **Still to do:** the Resend account itself — DNS for SPF/DKIM/DMARC (decision #17) and a first
+   real send — and the copy for the six messages, which is the owner's.
 6. **Admin** — auth, upcoming/paid-vs-owed view, calendar, list, manual CRUD, rate editor, blocking,
    guest search.
 7. **Content & marketing** — home, restaurant + menu editor, events + inquiry form, about, image
@@ -482,6 +487,10 @@ Dependency-ordered, not deadline-driven (single launch).
   forfeits the deposit and returns nothing when only the deposit was collected; and a cancellation
   on or after the arrival date is refused rather than run through arithmetic that does not
   describe it. *(Done.)*
+- **The document says what the row says:** the confirmation PDF renders from the booking's own
+  snapshot and computes nothing, so it cannot drift from the email or the page; and a guest whose
+  name is not ASCII must not find it mangled, which the built-in fonts do silently without a
+  cp1252 translation. *(Done.)*
 - **Refunding twice:** the refund job re-run must send the money once. The division of a partial
   refund over several intents has to be reproducible, or a retry asks Stripe for amounts it has
   not seen and each is a fresh refund. *(Done.)*

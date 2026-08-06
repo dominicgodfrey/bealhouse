@@ -245,6 +245,17 @@ export function fetchManagedBooking(code: string, token: string): Promise<Manage
   return request<ManagedBooking>(`/api/bookings/${encodeURIComponent(code)}/manage?${query}`)
 }
 
+/**
+ * Where the confirmation PDF lives.
+ *
+ * A URL rather than a fetch: it is handed to an <a href> so the browser
+ * downloads it the way it downloads anything, filename and all.
+ */
+export function confirmationPdfUrl(code: string, token: string): string {
+  const query = new URLSearchParams({ t: token })
+  return `/api/bookings/${encodeURIComponent(code)}/confirmation.pdf?${query}`
+}
+
 export function cancelBooking(code: string, token: string): Promise<RefundPreview> {
   const query = new URLSearchParams({ t: token })
   return request<RefundPreview>(`/api/bookings/${encodeURIComponent(code)}/cancel?${query}`, {

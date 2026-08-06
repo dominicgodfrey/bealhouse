@@ -1,10 +1,12 @@
 package httpx
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -164,6 +166,32 @@ func TestAnUnknownCodeIsIndistinguishableFromABadToken(t *testing.T) {
 	rec := call(t, manageBooking(q, links), http.MethodGet, "BH-NOSUCH", "nonsense")
 	if rec.Code != http.StatusForbidden {
 		t.Errorf("answered %d for a booking that does not exist, want the same 403", rec.Code)
+	}
+}
+
+func TestTheConfirmationPDFIsBehindTheSameLink(t *testing.T) {
+	_, _, q, made, token := manageable(t)
+	links := booking.NewLinks(linkSecret)
+
+	rec := call(t, confirmationPDF(q, links), http.MethodGet, made.Code, token)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("answered %d, want 200: %s", rec.Code, rec.Body)
+	}
+	if got := rec.Header().Get("Content-Type"); got != "application/pdf" {
+		t.Errorf("Content-Type = %q", got)
+	}
+	// The filename is what a guest searches their downloads for.
+	if got := rec.Header().Get("Content-Disposition"); !strings.Contains(got, made.Code) {
+		t.Errorf("Content-Disposition = %q, want the reference in the filename", got)
+	}
+	if !bytes.HasPrefix(rec.Body.Bytes(), []byte("%PDF-")) {
+		t.Error("the body is not a PDF")
+	}
+
+	// It carries the guest's name, which is the reason it is behind the token at
+	// all: the code alone must not hand that out.
+	if bare := call(t, confirmationPDF(q, links), http.MethodGet, made.Code, ""); bare.Code != http.StatusForbidden {
+		t.Errorf("answered %d without a token, want 403", bare.Code)
 	}
 }
 
