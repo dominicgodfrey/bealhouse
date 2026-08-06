@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/go-pdf/fpdf"
+	"golang.org/x/text/encoding/charmap"
 
 	"bealhouse/internal/email"
 )
@@ -75,16 +76,9 @@ func Render(in Confirmation) ([]byte, error) {
 	doc.SetAutoPageBreak(true, 18)
 	doc.AddPage()
 
-	// The built-in fonts are single-byte, so Go's UTF-8 has to be translated on
-	// the way in or every non-ASCII character arrives as mojibake — which it did,
-	// visibly, on the separator in the footer. cp1252 covers Western European
-	// names, which is what a New Hampshire inn's guest list is; anything outside
-	// it would need an embedded TrueType font, and that is a real change to make
-	// when a guest turns up needing one rather than a megabyte carried on the
-	// chance.
-	d := &render{doc: doc, tr: doc.UnicodeTranslatorFromDescriptor("")}
+	d := &render{doc: doc}
 
-	doc.SetTitle(d.tr(in.InnName+" booking "+in.Code), true)
+	doc.SetTitle(in.InnName+" booking "+in.Code, true)
 
 	d.letterhead(in)
 	d.summary(in)
@@ -99,16 +93,15 @@ func Render(in Confirmation) ([]byte, error) {
 	return out.Bytes(), nil
 }
 
-// render is the document being built and the encoder every string goes through.
+// render is the document being built.
 type render struct {
 	doc *fpdf.Fpdf
-	tr  func(string) string
 }
 
-// text writes one line, translated. Everything that puts a string on the page
-// goes through here, so no call site has to remember the encoding.
+// text writes one line, encoded. Everything that puts a string on the page goes
+// through here or through note, so no call site has to remember the encoding.
 func (d *render) text(width, height float64, s string, ln int, align string) {
-	d.doc.CellFormat(width, height, d.tr(s), "", ln, align, false, 0, "")
+	d.doc.CellFormat(width, height, cp1252(s), "", ln, align, false, 0, "")
 }
 
 // letterhead draws the mark and the reference.
@@ -284,7 +277,7 @@ func (d *render) row(label, amount string, strong bool) {
 func (d *render) note(text string) {
 	d.doc.SetFont("Helvetica", "", 9)
 	d.doc.SetTextColor(faint[0], faint[1], faint[2])
-	d.doc.MultiCell(contentWide, 4.5, d.tr(text), "", "L", false)
+	d.doc.MultiCell(contentWide, 4.5, cp1252(text), "", "L", false)
 }
 
 func (d *render) line() {
@@ -292,6 +285,32 @@ func (d *render) line() {
 	d.doc.SetLineWidth(0.2)
 	y := d.doc.GetY()
 	d.doc.Line(marginX, y, pageWidth-marginX, y)
+}
+
+// cp1252 encodes a Go string for the built-in PDF fonts.
+//
+// Those fonts are single-byte, so UTF-8 handed to them straight through arrives
+// as mojibake — a middot became "Â·" the first time this document was looked at.
+// fpdf ships a translator for exactly this, but it reads its table from a .map
+// file next to the fonts, and with no font directory configured it silently
+// degrades to replacing every non-ASCII character with a full stop. Which is
+// worse than mojibake, because it looks deliberate: "Émilie du Châtelet" came
+// out as ".milie du Ch.telet" in a document with her name at the top of it.
+//
+// So the table comes from x/text, which has it compiled in. cp1252 covers
+// Western European names; a rune outside it becomes "?", and the day a guest
+// needs more than that is the day to embed a TrueType font rather than carry one
+// on the chance.
+func cp1252(s string) string {
+	out := make([]byte, 0, len(s))
+	for _, r := range s {
+		if b, ok := charmap.Windows1252.EncodeRune(r); ok {
+			out = append(out, b)
+			continue
+		}
+		out = append(out, '?')
+	}
+	return string(out)
 }
 
 // money and day are the email package's, not copies of them.

@@ -63,23 +63,49 @@ func TestRenderSurvivesAnEmptyStay(t *testing.T) {
 	}
 }
 
-// Names outside ASCII must not turn into mojibake on the page. The built-in
-// fonts are single-byte, so this only works because Render translates on the way
-// in — and the failure mode without it is silent and visible only to the guest
-// whose name it is.
-func TestAnAccentedNameIsNotMangled(t *testing.T) {
+// Names outside ASCII must reach the page as themselves.
+//
+// This is asserted on the encoder rather than on the rendered bytes, and that is
+// the point of the test rather than a shortcut. The first version checked only
+// that raw UTF-8 did *not* appear in the output — which passed while fpdf's own
+// translator, unable to find its map file, was quietly replacing every accented
+// character with a full stop. "Émilie du Châtelet" printed as ".milie du
+// Ch.telet" on a document with her name at the top, and the test was happy.
+// Asserting the bytes that must come out is the only version that fails.
+func TestAnAccentedNameSurvivesEncoding(t *testing.T) {
+	cases := []struct {
+		in   string
+		want []byte
+	}{
+		{"Émilie du Châtelet", []byte{0xC9, 'm', 'i', 'l', 'i', 'e', ' ', 'd', 'u', ' ', 'C', 'h', 0xE2, 't', 'e', 'l', 'e', 't'}},
+		{"·", []byte{0xB7}},
+		{"Ada Lovelace", []byte("Ada Lovelace")},
+
+		// Outside cp1252 entirely. A visible "?" rather than a full stop, which
+		// reads as a typo, or a dropped character, which reads as a wrong name.
+		{"Ada 日本", []byte("Ada ??")},
+	}
+
+	for _, c := range cases {
+		if got := cp1252(c.in); got != string(c.want) {
+			t.Errorf("cp1252(%q) = % x, want % x", c.in, got, c.want)
+		}
+	}
+}
+
+// And the document still renders with one in it.
+func TestAnAccentedNameDoesNotBreakTheDocument(t *testing.T) {
 	in := stay()
 	in.Guest = "Émilie du Châtelet"
 
 	out := rendered(t, in)
 
-	// The raw UTF-8 bytes must not survive into the content stream: seeing them
-	// there is exactly what "not translated" looks like.
-	if bytes.Contains(out, []byte("Châtelet")) {
-		t.Error("the name reached the page as raw UTF-8 rather than cp1252")
-	}
 	if !bytes.HasPrefix(out, []byte("%PDF-")) {
 		t.Error("an accented name broke the document")
+	}
+	// The raw UTF-8 must not survive: that is the other failure, mojibake.
+	if bytes.Contains(out, []byte("Châtelet")) {
+		t.Error("the name reached the page as raw UTF-8 rather than cp1252")
 	}
 }
 
