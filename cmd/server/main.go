@@ -5,6 +5,7 @@ package main
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"os"
@@ -14,6 +15,7 @@ import (
 
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"bealhouse/internal/admin"
 	"bealhouse/internal/booking"
 	"bealhouse/internal/config"
 	db "bealhouse/internal/db/gen"
@@ -27,6 +29,16 @@ import (
 )
 
 func main() {
+	// One subcommand, and it exists because the admin console has no other way
+	// to admit its first phone. Everything else is the server.
+	if len(os.Args) > 1 && os.Args[1] == "enroll" {
+		if err := enroll(os.Args[2:]); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
+		return
+	}
+
 	if err := run(); err != nil {
 		slog.Error("fatal", "err", err)
 		os.Exit(1)
@@ -78,6 +90,15 @@ func run() error {
 	if links == nil {
 		slog.Warn("BOOKING_LINK_SECRET is unset; confirmation emails will carry " +
 			"no manage-booking link and self-service cancellation is off")
+	}
+
+	// The owner's console (decision #15). Nil when there is no origin to bind a
+	// passkey to, which leaves its endpoints answering 503: a WebAuthn
+	// assertion is verified against an origin, and a server that had to guess
+	// which one would be accepting assertions minted for somewhere else.
+	console, err := adminConsole(cfg, pool)
+	if err != nil {
+		return err
 	}
 
 	// Background work. Without the sweep an abandoned checkout holds its room
@@ -149,6 +170,7 @@ func run() error {
 			OwnerEmail:           cfg.OwnerEmail,
 			Links:                links,
 			SiteURL:              cfg.SiteURL,
+			Console:              console,
 		}),
 		ReadHeaderTimeout: 10 * time.Second,
 		WriteTimeout:      30 * time.Second,
@@ -173,6 +195,42 @@ func run() error {
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
 	return srv.Shutdown(shutdownCtx)
+}
+
+// adminConsole builds admin authentication, or explains why there is none.
+//
+// Three ways to get nothing back, and only one of them is an error:
+//
+//   - No database. The console's whole state — accounts, passkeys, sessions —
+//     is rows, so there is nothing to authenticate against. The binary still
+//     boots, the same way it does for frontend work.
+//   - No SITE_URL outside dev. There is no origin to verify a passkey against
+//     and guessing one would mean accepting assertions minted elsewhere, so the
+//     console stays shut and says so.
+//   - A SITE_URL that is not an origin. That is a typo in a deploy, and
+//     starting anyway would leave a console nobody can open with no clue why.
+func adminConsole(cfg config.Config, pool *pgxpool.Pool) (*admin.Console, error) {
+	if pool == nil {
+		slog.Warn("no database; the admin console is off")
+		return nil, nil
+	}
+
+	rp, err := admin.NewRP(cfg.SiteURL, cfg.IsDev())
+	if errors.Is(err, admin.ErrNotConfigured) {
+		slog.Error("SITE_URL is unset, so the admin console cannot verify a passkey and is off")
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	console, err := admin.New(rp, db.New(pool), pool)
+	if err != nil {
+		return nil, err
+	}
+
+	slog.Info("admin console enabled", "rp_id", rp.ID, "origins", rp.Origins)
+	return console, nil
 }
 
 // emailSender picks the provider, or the one that only pretends to be one.

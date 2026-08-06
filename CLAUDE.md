@@ -437,6 +437,54 @@ or the same guest hears from the inn ninety-six times that morning.
   transaction that queues the email**, or the same guest is warned every day
   until they arrive.
 
+## Step 6: admin auth
+
+**Passkeys, and there is no password column anywhere** (decision #15, revised — it
+used to say password plus TOTP). `internal/admin` holds it; `users`,
+`user_passkeys`, `user_sessions`, `user_enrollments` and `webauthn_ceremonies`
+hold the state. One shared owner account, one credential per phone.
+
+**`bealhouse enroll` is the bootstrap and the only way in when no phone is
+enrolled.** It proves shell access to the server, which is the strongest thing
+available that is not a password. Every enrolment after the first can be minted
+from an already-signed-in console. A console with no passkeys and nobody able to
+reach the box stays shut — that is the correct failure, not a bug to work around.
+
+**The token is printed, never logged**, and travels in the URL **fragment**: a
+fragment is not sent to the server, not written to an access log, and not
+forwarded in a Referer.
+
+Four properties, each because the alternative has a specific hole:
+
+- **Sessions are rows, stored as SHA-256 of the cookie value.** Rolling 365 days
+  from last use, so a phone in weekly use never signs in again and a lost one
+  dies on its own. A stateless token could not be revoked; that is the whole
+  reason this is a table.
+- **An invitation is single use** — `UPDATE ... RETURNING`, so concurrent racers
+  produce exactly one winner. Claimed at the *start* of the ceremony and released
+  if it fails, so a mis-tapped Face ID does not burn it.
+- **A challenge is consumed once** — `DELETE ... RETURNING`. One that can be
+  answered twice is a signature that can be replayed.
+- **Every refusal is `ErrDenied`.** Expired, spent, forged and never-existed
+  answer identically, or the endpoint tells whoever is trying which guesses were
+  close.
+
+**Revoke sessions *before* deleting the passkey.** `user_sessions.passkey_id` is
+`ON DELETE SET NULL`, so deleting first blanks the column and the revocation
+matches nothing — the lost handset then stays signed in for the rest of its year.
+`TestRevokingAPasskeySignsThatPhoneOut` caught exactly this; leave it in place.
+
+**Cookies are `HttpOnly`, `SameSite=Strict`, `Path=/api/admin`,** and `Secure`
+whenever the request arrived over TLS — from the request, not hardcoded, or
+nobody can sign in on a laptop. Writes also require a JSON content type and
+reject a cross-site `Sec-Fetch-Site`; an HTML form can do neither, and it is the
+one cross-origin shape that needs no preflight.
+
+**No SITE_URL outside dev means no console.** A WebAuthn assertion is verified
+against an origin, and a server that guessed one would accept assertions minted
+somewhere else. The routes stay registered and answer 503, so the owner gets a
+sentence rather than the SPA's index.html.
+
 ## Step 5: the manage-booking link
 
 **A booking code is an identifier, not an authenticator.** Six characters over a

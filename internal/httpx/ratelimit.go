@@ -36,6 +36,20 @@ const (
 	// retrying after a declined card, stays well inside it.
 	paymentRate  = 30 * time.Second
 	paymentBurst = 10
+
+	// adminRate covers the console's anonymous surface: starting a sign-in or
+	// accepting an enrolment invitation.
+	//
+	// Not because a passkey can be guessed — it cannot, and this is not a
+	// password field with a dictionary pointed at it. It is because both of
+	// those endpoints *write*, a challenge row each, on a request nobody has
+	// authenticated. An unmetered endpoint that writes is one somebody
+	// eventually points a loop at.
+	//
+	// Generous enough that two owners fumbling Face ID never notice: a burst of
+	// twelve, refilling one every fifteen seconds.
+	adminRate  = 15 * time.Second
+	adminBurst = 12
 )
 
 // idleBucketTTL is how long an unused bucket is kept before the sweeper drops

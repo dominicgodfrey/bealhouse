@@ -12,6 +12,7 @@ import (
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"bealhouse/internal/admin"
 	"bealhouse/internal/booking"
 	db "bealhouse/internal/db/gen"
 	"bealhouse/internal/gateway"
@@ -60,6 +61,13 @@ type Deps struct {
 	// directly exposed port both are attacker-supplied, and believing them
 	// would hand anyone a way around the rate limits below.
 	BehindProxy bool
+
+	// Console is admin authentication (decision #15). Nil when the deployment
+	// has no origin to verify a passkey against, which leaves the routes
+	// registered and answering 503 rather than absent — a console that cannot
+	// be configured should say so, not serve the SPA's index.html to an API
+	// call and let the owner debug a login page that never works.
+	Console *admin.Console
 }
 
 func NewRouter(d Deps) http.Handler {
@@ -150,7 +158,15 @@ func NewRouter(d Deps) http.Handler {
 			api.Get("/bookings/{code}/confirmation.pdf", databaseRequired)
 		}
 
-		// Remaining domain routes land here: admin.
+		// The owner's console. Everything under it that reads or writes real
+		// data sits behind a session; the four sign-in routes are the only
+		// anonymous surface, and they carry their own allowance.
+		mountAdmin(api, adminDeps{
+			console:     d.Console,
+			behindProxy: d.BehindProxy,
+			siteURL:     d.SiteURL,
+		}, rateLimit(newLimiter(adminRate, adminBurst), d.BehindProxy))
+
 		api.NotFound(func(w http.ResponseWriter, r *http.Request) {
 			writeJSON(w, http.StatusNotFound, map[string]string{
 				"error": "no such endpoint",

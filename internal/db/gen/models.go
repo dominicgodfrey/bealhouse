@@ -181,3 +181,49 @@ type StripeEvent struct {
 	Type       string
 	ReceivedAt time.Time
 }
+
+// Admin console accounts (decision #15). One shared owner account today; the table exists so a second is a row rather than a rewrite. No passwords anywhere — sign-in is WebAuthn.
+type User struct {
+	ID        int64
+	Handle    []byte
+	Name      string
+	CreatedAt time.Time
+}
+
+type UserEnrollment struct {
+	TokenHash []byte
+	Label     string
+	UserID    *int64
+	CreatedAt time.Time
+	ExpiresAt time.Time
+	UsedAt    pgtype.Timestamptz
+}
+
+type UserPasskey struct {
+	ID         []byte
+	UserID     int64
+	Label      string
+	Credential []byte
+	CreatedAt  time.Time
+	LastUsedAt pgtype.Timestamptz
+}
+
+type UserSession struct {
+	TokenHash  []byte
+	UserID     int64
+	PasskeyID  []byte
+	CreatedAt  time.Time
+	LastSeenAt time.Time
+	ExpiresAt  time.Time
+	RevokedAt  pgtype.Timestamptz
+	UserAgent  string
+}
+
+type WebauthnCeremony struct {
+	ID         []byte
+	Purpose    string
+	Session    []byte
+	Enrollment []byte
+	CreatedAt  time.Time
+	ExpiresAt  time.Time
+}

@@ -39,7 +39,7 @@ Stack constraint: **TypeScript/React + Go**. No launch deadline — one complete
 | 12 | Menu | Structured admin editor (name, description/ingredients, price + course grouping) → JSON-LD `Menu` |
 | 13 | Tax | NH Meals & Rooms 8.5%, configurable; **each booking snapshots its rate** for audit |
 | 14 | Date picker | No flexible ±1 search. Calendar greys out unselectable dates live |
-| 15 | Admin auth | Single shared login, but a real `users` table behind it. **TOTP strongly recommended** |
+| 15 | Admin auth | **Passkeys (WebAuthn), no password anywhere.** Single shared owner account, a real `users` table behind it, one credential per phone. *(revised; was a password plus TOTP)* The console is opened from the two owners' phones, so the authenticator is the handset itself: a private key it will only use after Face ID or a fingerprint. What that buys over the original plan is that **nothing stored server-side is a credential** — a leaked dump contains public keys — and that it **cannot be phished**, because the browser binds every signature to the origin. There is also no shared secret two people have to hand to each other and rotate. Sessions are **rows**, hashed, rolling **365 days** from last use, so a phone in regular use never signs in again and a lost one can be struck off. Enrolment is a **single-use** invitation, minted by `bealhouse enroll` on the server or from an already-signed-in console. **No step-up auth** on refunds: the owners' call, and the phones are locked |
 | 16 | Media | Owner uploads in admin → VPS disk, Go generates AVIF/WebP variants, Cloudflare free CDN |
 | 17 | Email | Resend. SPF/DKIM/DMARC at Bluehost DNS (SPF must include Resend *and* the mailbox host) |
 | 18 | Launch | Placeholder site today → clean cutover. Google Business Profile + Search Console on day one |
@@ -327,6 +327,35 @@ agree, in both directions.
 
 Same React bundle under `/admin`, responsive-first so it's genuinely usable one-handed on a phone.
 
+### Authentication *(built — decision #15)*
+
+`internal/admin`, five tables, no passwords. Sign-in is one tap: the credential is discoverable, so
+the phone holds the account handle beside the key and the login page has no username field to type
+into. Four things carry the security, and each exists because the alternative has a specific hole:
+
+- **Sessions are hashed rows.** "Stays signed in" is only safe next to a list somebody can strike a
+  line through, and a signed stateless token cannot be revoked when a phone is lost. The cookie
+  holds 32 random bytes; the table holds their SHA-256 — no salt and no work factor, because the
+  value was not chosen by a person and there is no dictionary to run at it.
+- **Enrolment invitations are single use.** Enrolling a passkey creates a permanent way in, so the
+  thing authorising it must be spendable exactly once — which an HMAC link is not. The claim is one
+  `UPDATE ... RETURNING`, so two phones racing produce one winner.
+- **Challenges are rows, deleted on use.** A challenge that can be answered twice is a signature
+  that can be replayed. `DELETE ... RETURNING`, for the same reason.
+- **Every refusal is the same refusal.** Expired, spent, forged and never-existed all answer
+  `ErrDenied` / 401. Anything else is an oracle telling whoever is trying which guesses were close.
+
+Cookies are `HttpOnly`, `SameSite=Strict`, scoped to `/api/admin` so they never ride along on a
+guest's request, and `Secure` whenever the request arrived over TLS. Writes additionally require a
+JSON content type and reject a `Sec-Fetch-Site` that says cross-site — an HTML form, the one
+cross-origin shape needing no preflight, can do neither.
+
+**Bootstrap is `bealhouse enroll` on the server**, which proves shell access, and is deliberately
+the only way in when no phone is enrolled. Every enrolment after the first can be minted from the
+console. Removing the last passkey is refused; revoking one signs out its sessions **first**, before
+the row is deleted, because `ON DELETE SET NULL` would otherwise blank the link and leave the lost
+handset signed in for the rest of its year.
+
 - **Today** — arrivals, departures, in-house.
 - **Upcoming reservations** *(explicit requirement)* — every booking with **paid vs. total**, failed
   charges flagged in unmissable red, one-click "send Stripe payment request."
@@ -435,8 +464,17 @@ Dependency-ordered, not deadline-driven (single launch).
    **Still to do:** the Resend account itself — DNS for SPF/DKIM/DMARC (decision #17) and a first
    real send — and the copy for the seven messages, which is the owner's, and which they will write
    in the console rather than in this repository.
-6. **Admin** — auth, upcoming/paid-vs-owed view, calendar, list, manual CRUD, rate editor, blocking,
-   guest search.
+6. **Admin** ← **IN PROGRESS.** **Auth is built** (decision #15, revised): passkeys, no passwords,
+   `internal/admin` plus the `/api/admin/auth/*` routes and the session middleware everything else
+   will sit behind. `bealhouse enroll` is the bootstrap. The tests are written adversarially rather
+   than happily — single-use invitations and challenges under concurrent racers, a revoked phone's
+   session dying with it, one account unable to touch another's keys, cross-site writes, forged
+   cookies, an unconfigured console answering 503 instead of the SPA. They found the ordering bug in
+   passkey revocation.
+
+   **Still to do:** the console shell under `/admin`, then content editing (rooms, photos,
+   descriptions, and the email copy whose storage landed with step 5), then operations —
+   upcoming/paid-vs-owed, calendar, list, manual CRUD, rate editor, blocking, guest search.
 7. **Content & marketing** — home, restaurant + menu editor, events + inquiry form, about, image
    pipeline, JSON-LD injection.
 8. **Launch** — backups + restore drill, Sentry, uptime monitoring, DNS cutover, Search Console,
