@@ -67,11 +67,12 @@ func dueForWarning(t *testing.T, ctx context.Context, q *db.Queries, tx pgx.Tx) 
 	// The stay sits at today+300, so its own T-8 is months away. Pulling the
 	// charge date back to today is what a booking looks like on the day the
 	// warning is due, without moving the stay into another package's calendar.
-	if _, err := tx.Exec(ctx,
-		"UPDATE bookings SET balance_charge_at = current_date WHERE code = $1", made.Code,
-	); err != nil {
-		t.Fatalf("bringing the charge date forward: %v", err)
-	}
+	//
+	// Today at the inn, not Postgres' current_date: the container is in UTC, so
+	// after 8pm Eastern the two are different days. The warning scan's range is
+	// wide enough to hide that; the charge scan's is not, and there is no reason
+	// for one of these helpers to date differently from the other.
+	dueToday(t, ctx, tx, made.Code)
 	return made.Code, made.Quote.BalanceCents
 }
 
@@ -171,11 +172,7 @@ func TestUnpaidHoldIsNeverWarned(t *testing.T) {
 	ctx, q, tx := setup(t)
 	made := held(t, ctx, tx)
 
-	if _, err := tx.Exec(ctx,
-		"UPDATE bookings SET balance_charge_at = current_date WHERE code = $1", made.Code,
-	); err != nil {
-		t.Fatalf("bringing the charge date forward: %v", err)
-	}
+	dueToday(t, ctx, tx, made.Code)
 
 	if _, err := WarnBalances(ctx, q, tx, day(0)); err != nil {
 		t.Fatalf("warning: %v", err)

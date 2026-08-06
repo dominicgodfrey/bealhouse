@@ -56,11 +56,13 @@ func dueForCharge(t *testing.T, ctx context.Context, tx pgx.Tx) (code string, ba
 	// The stay is at today+300, so its own T-7 is months out. Pulling the charge
 	// date to today is what the booking looks like on the day the money is due,
 	// without moving the stay into another package's calendar.
-	if _, err := tx.Exec(ctx,
-		"UPDATE bookings SET balance_charge_at = current_date WHERE code = $1", made.Code,
-	); err != nil {
-		t.Fatalf("bringing the charge date forward: %v", err)
-	}
+	//
+	// Today at the inn, passed in, and deliberately not Postgres' current_date:
+	// the container runs in UTC, so after 8pm Eastern that is tomorrow, and the
+	// scan these tests then run for today found nothing. The whole system dates
+	// in America/New_York (internal/civil) and a test reaching in with raw SQL
+	// has to as well.
+	dueToday(t, ctx, tx, made.Code)
 	return made.Code, made.Quote.BalanceCents, made.Quote.TotalCents
 }
 
@@ -86,12 +88,19 @@ func bookAnotherRoom(t *testing.T, ctx context.Context, tx pgx.Tx) string {
 	if _, err := RecordCharge(ctx, tx, charge); err != nil {
 		t.Fatalf("recording the second deposit: %v", err)
 	}
+	dueToday(t, ctx, tx, made.Code)
+	return made.Code
+}
+
+// dueToday brings a booking's balance charge forward to today at the inn.
+func dueToday(t *testing.T, ctx context.Context, tx pgx.Tx, code string) {
+	t.Helper()
+
 	if _, err := tx.Exec(ctx,
-		"UPDATE bookings SET balance_charge_at = current_date WHERE code = $1", made.Code,
+		"UPDATE bookings SET balance_charge_at = $2 WHERE code = $1", code, day(0),
 	); err != nil {
 		t.Fatalf("bringing the charge date forward: %v", err)
 	}
-	return made.Code
 }
 
 // The ordinary path, and the one decision #6 is built around.
@@ -300,11 +309,7 @@ func TestAStayWithNoCardOnFileIsFlaggedRatherThanSkipped(t *testing.T) {
 	if _, err := RecordCharge(ctx, tx, deposit(made, "pi_deposit_nocard")); err != nil {
 		t.Fatalf("recording the deposit: %v", err)
 	}
-	if _, err := tx.Exec(ctx,
-		"UPDATE bookings SET balance_charge_at = current_date WHERE code = $1", made.Code,
-	); err != nil {
-		t.Fatalf("bringing the charge date forward: %v", err)
-	}
+	dueToday(t, ctx, tx, made.Code)
 
 	gw := &offSession{}
 	if _, err := ChargeBalances(ctx, q, tx, gw, day(0)); err != nil {
