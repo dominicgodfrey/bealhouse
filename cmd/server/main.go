@@ -65,6 +65,12 @@ func run() error {
 		slog.Warn("Stripe is not configured; rooms can be held but not paid for")
 	}
 
+	// Likewise chosen up front. The queue accepts and drains messages either
+	// way — what changes is whether draining one puts it in front of a guest or
+	// in the log. Said plainly rather than left to be discovered: an inn that
+	// believes it is emailing guests and is not finds out from a guest.
+	sender := emailSender(cfg)
+
 	// Background work. Without the sweep an abandoned checkout holds its room
 	// forever, which is worse than the double-booking the hold exists to
 	// prevent.
@@ -106,14 +112,10 @@ func run() error {
 		if err != nil {
 			return err
 		}
-		runner.Handle(email.JobKind, mail.Handler(email.LogSender{}))
+		runner.Handle(email.JobKind, mail.Handler(sender))
 
 		go runner.Run(ctx)
 	}
-
-	// Said plainly rather than left to be discovered: the queue will accept and
-	// drain messages, and every one of them will be logged instead of delivered.
-	slog.Warn("no email provider configured; queued messages will be logged, not sent")
 
 	srv := &http.Server{
 		Addr: cfg.Addr,
@@ -149,6 +151,28 @@ func run() error {
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
 	return srv.Shutdown(shutdownCtx)
+}
+
+// emailSender picks the provider, or the one that only pretends to be one.
+//
+// Half a configuration is called out at error level and then treated as none.
+// It does not refuse to start, which is where this parts company with
+// gateway.New: the whole reason mail is queued rather than sent inline is that
+// an email problem must never stop the inn taking bookings, and a binary that
+// will not boot over a mistyped from address is that failure in its largest
+// form. So it says so as loudly as a log can and serves guests.
+func emailSender(cfg config.Config) email.Sender {
+	if cfg.EmailConfigured() {
+		slog.Info("email provider configured", "from", cfg.EmailFrom)
+		return email.NewResend(cfg.ResendAPIKey, cfg.EmailFrom)
+	}
+
+	if cfg.ResendAPIKey != "" || cfg.EmailFrom != "" {
+		slog.Error("email is half configured; RESEND_API_KEY and EMAIL_FROM are required together")
+	}
+
+	slog.Warn("no email provider configured; queued messages will be logged, not sent")
+	return email.LogSender{}
 }
 
 // connectDB returns a nil pool when no DATABASE_URL is set, so the binary boots

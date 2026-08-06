@@ -35,6 +35,16 @@ type Config struct {
 	// chiefly the ones in emails, which cannot be relative.
 	SiteURL string
 
+	// Resend, the mail provider (decision #17). Both halves are required
+	// together and neither is useful alone: the key authenticates and the from
+	// address has to be one Resend will accept for this domain.
+	//
+	// Absent rather than invalid when the account is not set up yet, the same
+	// way Stripe is. Messages are still rendered and still queued; they are
+	// logged instead of delivered.
+	ResendAPIKey string
+	EmailFrom    string
+
 	// OwnerEmail gets the inn's own copy of every confirmed booking. Empty
 	// sends none, which is today's state.
 	//
@@ -83,6 +93,9 @@ func Load() Config {
 		StripePublishableKey: env("STRIPE_PUBLISHABLE_KEY", ""),
 		StripeFake:           env("STRIPE_FAKE", "") == "true",
 
+		ResendAPIKey: env("RESEND_API_KEY", ""),
+		EmailFrom:    env("EMAIL_FROM", ""),
+
 		SiteURL:      siteURL,
 		OwnerEmail:   env("OWNER_EMAIL", ""),
 		EmailLogoURL: emailLogoURL(env("EMAIL_LOGO_URL", ""), siteURL),
@@ -102,6 +115,16 @@ func (c Config) IsDev() bool { return c.Env == "dev" }
 // so it is deliberately all or nothing.
 func (c Config) StripeConfigured() bool {
 	return c.StripeSecretKey != "" && c.StripeWebhookSecret != ""
+}
+
+// EmailConfigured reports whether a message can actually leave the building.
+//
+// All or nothing for the same reason Stripe is: a key with no verified from
+// address is rejected on every send, and half a configuration is a mistake to
+// report at boot rather than one to discover from a guest who never got their
+// confirmation.
+func (c Config) EmailConfigured() bool {
+	return c.ResendAPIKey != "" && c.EmailFrom != ""
 }
 
 // EmailLogoPath is where the letterhead image sits in the SPA bundle this

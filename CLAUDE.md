@@ -260,7 +260,12 @@ only the last two steps need one.
 - `internal/email` renders the six messages and queues them as `email.send` jobs.
   **Never send inline** — the queue is the outbox, and its retry is why a Resend
   outage delays a confirmation instead of failing the booking that earned it.
-  Swap `LogSender` for the real client; nothing else moves.
+  `Resend` implements `Sender` over plain `net/http` — one endpoint, one JSON
+  body — and is selected the moment `RESEND_API_KEY` and `EMAIL_FROM` are both
+  set. Like `gateway.Stripe`, it is written and has never made a request. Half a
+  configuration logs an error and is treated as none: the binary still starts,
+  because the reason mail is queued at all is that email must never stop the inn
+  taking bookings.
 - The Payment Element, and the return-polling page behind it.
 
 **What the account is still for:** `gateway.Stripe` is written and has never made
