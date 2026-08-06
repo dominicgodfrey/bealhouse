@@ -171,6 +171,19 @@ The same goes for **email copy** (`internal/email/templates/`). All seven templa
 are blank on purpose: a subject marked `PLACEHOLDER` and one line saying what the
 message is for. Write the shared layout, never the sentences a guest reads.
 
+**And the copy is editable data, not just a file.** A row in `email_templates`
+overrides the shipped template for one message; no row means the shipped one, so
+resetting is a `DELETE` and a message added in a later release appears in the
+editor with its own words already in it. `Renderer` reads the override **on every
+send** — no cache, so a save applies to the next message rather than the next
+deploy. Two things stay out of the editor: the **layout**, because one bad edit
+there breaks every message rather than the one on screen, and the **payload**,
+because what a template can say about a booking is fixed by the structs in
+`email/data.go`. **Anything that saves copy must call `email.Parse` first** —
+copy that will not compile fails at send time, which is after the guest's card
+has been charged and with nothing in front of the owner to connect it to the
+sentence they typed.
+
 **The logo is the owner's and is now in the repo**, drawn as geometry in
 `web/public/logo.svg` — three connected buildings, ink on nothing. Two derivatives
 sit beside it and must be kept in step by hand if the shape ever changes:

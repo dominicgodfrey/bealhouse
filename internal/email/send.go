@@ -84,7 +84,7 @@ func (r *Renderer) Handler(sender Sender) func(context.Context, []byte) error {
 			return fmt.Errorf("email: decoding the envelope: %w", err)
 		}
 
-		msg, err := r.Render(env.Template, env.Data)
+		msg, err := r.Render(ctx, env.Template, env.Data)
 		if err != nil {
 			return err
 		}

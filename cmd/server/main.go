@@ -120,10 +120,15 @@ func run() error {
 
 		// Email is queued, never sent inline, so a provider outage delays a
 		// confirmation rather than failing the booking that earned it.
+		//
+		// `q` is where the owner's edited copy is read from: a message with a
+		// row in email_templates renders from that instead of the blank file it
+		// ships with. Nothing is cached, so an edit saved in admin applies to
+		// the next message rather than the next deploy.
 		mail, err := email.New(email.Brand{
 			LogoURL: cfg.EmailLogoURL,
 			SiteURL: cfg.SiteURL,
-		})
+		}, q)
 		if err != nil {
 			return err
 		}

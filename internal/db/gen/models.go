@@ -36,6 +36,8 @@ type Booking struct {
 	PaymentStartedAt      pgtype.Timestamptz
 	BalanceChargeFailedAt pgtype.Timestamptz
 	BalanceWarnedAt       pgtype.Timestamptz
+	// Set in the transaction that queues the departure-morning email. NULL means it has not gone out; the scan reads nothing else to decide.
+	CheckoutEmailSentAt pgtype.Timestamptz
 }
 
 type BookingRoom struct {
@@ -45,6 +47,14 @@ type BookingRoom struct {
 	Checkin       pgtype.Date
 	Checkout      pgtype.Date
 	NightlyPrices []byte
+}
+
+// Owner-edited email copy. A row overrides the file shipped in internal/email/templates; no row means the shipped one is used. Deleting a row resets that message to what ships.
+type EmailTemplate struct {
+	Name      string
+	Subject   string
+	Body      string
+	UpdatedAt time.Time
 }
 
 type Guest struct {

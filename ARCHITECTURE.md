@@ -340,6 +340,14 @@ Same React bundle under `/admin`, responsive-first so it's genuinely usable one-
 - **Guests** — searchable by name, email, room, date, length of stay; notes with author and history.
 - **Content** — menu editor, room photos/descriptions + accessibility features, events gallery,
   inquiry inbox.
+- **Email copy** *(storage built)* — the seven messages the inn sends, each with a subject and a
+  body the owner edits. A row in `email_templates` overrides the file that ships; no row means the
+  shipped one, so "reset to the original" is a delete and a message added in a later release turns
+  up in the editor on its own. Nothing is cached, so a save applies to the next message rather than
+  the next deploy. The **layout is not editable** — it carries the letterhead and the table
+  scaffolding that survives Outlook, and one bad edit there would break every message at once. The
+  save path **must** call `email.Parse` first: copy that will not compile fails at send time, which
+  is after the guest's card has been charged.
 - **Settings** — tax rate, default minimum stay, hold TTL, check-in/out times.
 
 ---
@@ -409,13 +417,24 @@ Dependency-ordered, not deadline-driven (single launch).
      dates are formatted by `email.Money` and `email.Day` rather than by a second copy of those
      rules. The inn's mark is drawn in vector primitives, the same geometry as `logo.svg`.
 
-   *The six templates are still deliberately **blank** — a line saying what each is for and
+   - **The departure-morning note** (`checkout.remind`), the seventh message. It goes out in the
+     first minutes of the day a guest leaves, carrying the checkout hour from `settings` rather
+     than baked into the words, so the sentence about it stays true when the owner changes the
+     setting. It carries no money at all: a stay reaching it has been paid in full, and a guest
+     whose card was refused has had the `balance_failed` message instead.
+   - **The copy is data now.** `email_templates` holds a subject and a body per message the owner
+     has actually written, and the shipped file stands in for every message they have not — so the
+     admin console's editor is one authenticated endpoint away rather than a schema change. See the
+     Admin console section for where the lines are drawn.
+
+   *The seven templates are still deliberately **blank** — a line saying what each is for and
    nothing else. The copy is the owner's to write, like room descriptions and photos. The manage
    link is wired into the confirmation as structure rather than copy, because it is the only way
    a guest reaches their booking.*
 
    **Still to do:** the Resend account itself — DNS for SPF/DKIM/DMARC (decision #17) and a first
-   real send — and the copy for the six messages, which is the owner's.
+   real send — and the copy for the seven messages, which is the owner's, and which they will write
+   in the console rather than in this repository.
 6. **Admin** — auth, upcoming/paid-vs-owed view, calendar, list, manual CRUD, rate editor, blocking,
    guest search.
 7. **Content & marketing** — home, restaurant + menu editor, events + inquiry form, about, image

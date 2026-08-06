@@ -1,13 +1,14 @@
 package email
 
 import (
+	"context"
 	"strings"
 	"testing"
 )
 
 func renderer(t *testing.T, brand Brand) *Renderer {
 	t.Helper()
-	r, err := New(brand)
+	r, err := New(brand, nil)
 	if err != nil {
 		t.Fatalf("parsing templates: %v", err)
 	}
@@ -21,7 +22,7 @@ func TestEveryTemplateRenders(t *testing.T) {
 
 	for _, name := range Names() {
 		t.Run(name, func(t *testing.T) {
-			msg, err := r.Render(name, nil)
+			msg, err := r.Render(context.Background(), name, nil)
 			if err != nil {
 				t.Fatalf("rendering: %v", err)
 			}
@@ -44,7 +45,7 @@ func TestEveryTemplateRenders(t *testing.T) {
 func TestLetterheadFallsBackToTextWithoutALogo(t *testing.T) {
 	r := renderer(t, Brand{})
 
-	msg, err := r.Render(BookingConfirmation, nil)
+	msg, err := r.Render(context.Background(), BookingConfirmation, nil)
 	if err != nil {
 		t.Fatalf("rendering: %v", err)
 	}
@@ -60,7 +61,7 @@ func TestLogoIsUsedWhenConfigured(t *testing.T) {
 	const logo = "https://example.test/brand/logo.png"
 	r := renderer(t, Brand{LogoURL: logo, SiteURL: "https://example.test"})
 
-	msg, err := r.Render(BookingConfirmation, nil)
+	msg, err := r.Render(context.Background(), BookingConfirmation, nil)
 	if err != nil {
 		t.Fatalf("rendering: %v", err)
 	}
@@ -77,7 +78,7 @@ func TestLogoIsUsedWhenConfigured(t *testing.T) {
 func TestUnknownTemplateIsAnError(t *testing.T) {
 	r := renderer(t, Brand{})
 
-	if _, err := r.Render("nonexistent", nil); err == nil {
+	if _, err := r.Render(context.Background(), "nonexistent", nil); err == nil {
 		t.Error("rendering an unknown template succeeded")
 	}
 }

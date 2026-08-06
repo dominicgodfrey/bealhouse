@@ -14,6 +14,7 @@ package email
 
 import (
 	"bytes"
+	"context"
 	"embed"
 	"fmt"
 	"html/template"
@@ -98,12 +99,20 @@ type Message struct {
 type Renderer struct {
 	brand     Brand
 	templates *template.Template
+
+	// store is where the owner's edits live, and is optional. Nil renders the
+	// copy that shipped with the binary and nothing else, which is what a
+	// deploy with no database gets.
+	store Store
 }
 
-// New parses the templates once. A parse failure is a programming error and is
-// returned rather than panicking, so the server can report it and start without
-// the ability to send instead of dying at boot.
-func New(brand Brand) (*Renderer, error) {
+// New parses the shipped templates once. A parse failure is a programming error
+// and is returned rather than panicking, so the server can report it and start
+// without the ability to send instead of dying at boot.
+//
+// `store` may be nil. When it is not, an owner's edit for a message wins over
+// the file for it — see custom.go for where that line is drawn.
+func New(brand Brand, store Store) (*Renderer, error) {
 	if brand.InnName == "" {
 		brand.InnName = "Beal House"
 	}
@@ -112,7 +121,7 @@ func New(brand Brand) (*Renderer, error) {
 	if err != nil {
 		return nil, fmt.Errorf("email: parsing templates: %w", err)
 	}
-	return &Renderer{brand: brand, templates: tmpl}, nil
+	return &Renderer{brand: brand, templates: tmpl, store: store}, nil
 }
 
 // data is what every template is rendered against: the caller's own values
@@ -126,21 +135,39 @@ type data struct {
 //
 // Each template file defines two blocks: `<name>_subject` and `<name>_body`.
 // Keeping the subject beside the body is what stops the two describing
-// different emails after somebody edits one of them.
-func (r *Renderer) Render(name string, payload any) (Message, error) {
+// different emails after somebody edits one of them, and it is why an owner's
+// edit saves both halves or neither.
+//
+// The context is here for the lookup of that edit. A Renderer with no store
+// never touches it.
+func (r *Renderer) Render(ctx context.Context, name string, payload any) (Message, error) {
 	in := data{Brand: r.brand, Data: payload}
 
-	subject, err := r.render(name+"_subject", in)
+	// The owner's copy when they have written some, the shipped file when they
+	// have not. Everything downstream of this is identical either way.
+	set, err := r.custom(ctx, name)
+	if err != nil {
+		return Message{}, err
+	}
+	if set == nil {
+		set = r.templates
+	}
+
+	subject, err := render(set, name+"_subject", in)
 	if err != nil {
 		return Message{}, err
 	}
 
-	body, err := r.render(name+"_body", in)
+	body, err := render(set, name+"_body", in)
 	if err != nil {
 		return Message{}, err
 	}
 
-	html, err := r.render("layout", data{Brand: r.brand, Data: template.HTML(body)})
+	// The layout always comes from the shipped set, never from an edit. It
+	// carries the letterhead and the table scaffolding that survives Outlook,
+	// and one mistake in it would break every message the inn sends rather than
+	// the one being edited.
+	html, err := render(r.templates, "layout", data{Brand: r.brand, Data: template.HTML(body)})
 	if err != nil {
 		return Message{}, err
 	}
@@ -148,9 +175,9 @@ func (r *Renderer) Render(name string, payload any) (Message, error) {
 	return Message{Subject: strings.TrimSpace(subject), HTML: html}, nil
 }
 
-func (r *Renderer) render(block string, in data) (string, error) {
+func render(set *template.Template, block string, in data) (string, error) {
 	var buf bytes.Buffer
-	if err := r.templates.ExecuteTemplate(&buf, block, in); err != nil {
+	if err := set.ExecuteTemplate(&buf, block, in); err != nil {
 		return "", fmt.Errorf("email: rendering %q: %w", block, err)
 	}
 	return buf.String(), nil
