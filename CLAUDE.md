@@ -49,6 +49,11 @@ it the server still boots and reports `db: not_configured`.
   `C:\Program Files\Docker\Docker\resources\bin` if a command is not found.
 - **`go test -race` does not work** — it needs cgo and there is no C compiler here.
   Stress concurrency with `-count=N` instead.
+- **`go build -o bin/bealhouse` writes `bin/bealhouse`, with no `.exe`.** If a
+  `bin/bealhouse.exe` is lying around from some earlier build, `./bin/bealhouse.exe`
+  starts *that* one and it can be days old — a route added an hour ago 404s and
+  everything else looks fine, which is a long way to chase. Run the extensionless
+  file, or check the timestamps in `bin/` before believing a smoke test.
 - **Docker Desktop can fail to start after an unclean shutdown**, crashing with
   "remove …engine.sock: The file cannot be accessed by the system." It leaves
   orphaned AF_UNIX socket reparse points that nothing — not Docker, not
