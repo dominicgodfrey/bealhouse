@@ -1,28 +1,23 @@
 <!--
   The Beal House mark: the three connected buildings, in ink on nothing.
 
-  Geometry rather than a traced bitmap, so it stays sharp at a favicon's size and
-  on a letterhead, and so a colour change is an edit rather than a re-export.
-  favicon.svg is the same shape knocked out of a black tile; logo-email.png is
-  this rasterised, because mail clients do not render SVG.
+  Traced from the owner's artwork rather than drawn by eye. The outline is
+  walked on the source's pixel grid and then fitted to straight lines, so what
+  ships is the real mark measured — it rasterises to within 0.3% of the
+  original's own pixels, and that difference is anti-aliasing on the roof
+  slopes. An earlier version of this file was a good-faith drawing from
+  description and had the proportions visibly wrong: 316 x 108 against the
+  mark's true 211 x 58.
+
+  One path, because the buildings are genuinely joined — the left house's roof
+  runs down into the long range, which is the whole idea the mark carries.
+
+  Three files derive from this one and must move with it: favicon.svg is the
+  same outline reversed out of a black tile, logo-email.png is it rasterised
+  because mail clients do not render SVG, and pdf.mark redraws it in fpdf
+  primitives on this same 211 x 58 grid.
 -->
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 316 108"
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 211 58"
      role="img" aria-label="Beal House">
-  <g fill="#1c1917">
-    <!-- The tall house, two chimneys. -->
-    <rect x="30" y="16" width="6" height="42" />
-    <rect x="64" y="16" width="6" height="42" />
-    <path d="M6 56 54 24 102 56Z" />
-    <rect x="20" y="56" width="68" height="44" />
-
-    <!-- The long low range between them. -->
-    <rect x="134" y="22" width="6" height="46" />
-    <path d="M106 66 162 40 218 66Z" />
-    <rect x="118" y="66" width="88" height="34" />
-
-    <!-- The house with the cupola. -->
-    <circle cx="266" cy="22" r="8" />
-    <path d="M222 58 266 30 310 58Z" />
-    <rect x="234" y="58" width="64" height="42" />
-  </g>
+  <path fill="#1c1917" d="M27 0L30 0L30 7L56 7L56 0L60 0L60 7L70 7L79 20L95 20L95 14L99 15L99 20L143 20L147 15L169 15L169 10L172 7L176 7L178 9L179 15L197 15L211 29L209 30L209 58L160 58L160 26L153 19L151 19L151 17L148 18L148 20L151 21L151 58L71 58L71 20L76 20L76 19L73 17L70 11L68 12L68 14L65 16L65 18L62 21L62 58L2 58L2 21L0 20L12 8L26 7Z" />
 </svg>

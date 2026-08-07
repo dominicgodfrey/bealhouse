@@ -129,41 +129,45 @@ func (d *render) letterhead(in Confirmation) {
 	d.doc.Ln(6)
 }
 
+// markOutline is the inn's mark: three connected buildings, as one closed ring
+// on a 211 x 58 grid.
+//
+// The same outline as web/public/logo.svg, and it has to stay the same one —
+// this is the fourth place the shape is drawn, after the logo, the favicon and
+// the rasterised letterhead. It was traced from the owner's artwork rather than
+// drawn from a description, so the numbers are measurements and not a reading
+// of what the buildings look like; do not tidy them by eye.
+//
+// One ring rather than a pile of rectangles and triangles because the buildings
+// genuinely join: the tall house's roof runs down into the long range.
+var markOutline = [...][2]float64{
+	{27, 0}, {30, 0}, {30, 7}, {56, 7}, {56, 0}, {60, 0}, {60, 7}, {70, 7},
+	{79, 20}, {95, 20}, {95, 14}, {99, 15}, {99, 20}, {143, 20}, {147, 15},
+	{169, 15}, {169, 10}, {172, 7}, {176, 7}, {178, 9}, {179, 15}, {197, 15},
+	{211, 29}, {209, 30}, {209, 58}, {160, 58}, {160, 26}, {153, 19},
+	{151, 19}, {151, 17}, {148, 18}, {148, 20}, {151, 21}, {151, 58},
+	{71, 58}, {71, 20}, {76, 20}, {76, 19}, {73, 17}, {70, 11}, {68, 12},
+	{68, 14}, {65, 16}, {65, 18}, {62, 21}, {62, 58}, {2, 58}, {2, 21},
+	{0, 20}, {12, 8}, {26, 7},
+}
+
+// markAspect is the mark's width over its height, so a caller sizing by width
+// does not have to know the grid.
+const markAspect = 211.0 / 58.0
+
 // mark draws the inn's three buildings, in ink.
 //
-// Drawn rather than embedded: the shape is a dozen rectangles and triangles, so
-// vector primitives here beat shipping a raster and keeping it in step with
-// web/public/logo.svg — which is the same geometry, on the same 316 x 108 grid.
+// Drawn rather than embedded: a PDF wants vectors, and shipping a raster here
+// would be one more copy of the shape to keep in step with the other three.
 func mark(doc *fpdf.Fpdf, x, y, width float64) {
-	s := width / 316
+	s := width / 211
 	doc.SetFillColor(ink[0], ink[1], ink[2])
 
-	rect := func(rx, ry, rw, rh float64) {
-		doc.Rect(x+rx*s, y+ry*s, rw*s, rh*s, "F")
+	points := make([]fpdf.PointType, 0, len(markOutline))
+	for _, p := range markOutline {
+		points = append(points, fpdf.PointType{X: x + p[0]*s, Y: y + p[1]*s})
 	}
-	roof := func(x1, y1, x2, y2, x3, y3 float64) {
-		doc.Polygon([]fpdf.PointType{
-			{X: x + x1*s, Y: y + y1*s},
-			{X: x + x2*s, Y: y + y2*s},
-			{X: x + x3*s, Y: y + y3*s},
-		}, "F")
-	}
-
-	// The tall house, two chimneys.
-	rect(30, 16, 6, 42)
-	rect(64, 16, 6, 42)
-	roof(6, 56, 54, 24, 102, 56)
-	rect(20, 55, 68, 45)
-
-	// The long low range.
-	rect(134, 22, 6, 46)
-	roof(106, 66, 162, 40, 218, 66)
-	rect(118, 65, 88, 35)
-
-	// The house with the cupola.
-	doc.Circle(x+266*s, y+22*s, 8*s, "F")
-	roof(222, 58, 266, 30, 310, 58)
-	rect(234, 57, 64, 43)
+	doc.Polygon(points, "F")
 }
 
 // summary is who the stay is for and when.

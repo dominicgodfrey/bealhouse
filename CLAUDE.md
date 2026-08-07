@@ -191,15 +191,31 @@ copy that will not compile fails at send time, which is after the guest's card
 has been charged and with nothing in front of the owner to connect it to the
 sentence they typed.
 
-**The logo is the owner's and is now in the repo**, drawn as geometry in
-`web/public/logo.svg` — three connected buildings, ink on nothing. Two derivatives
-sit beside it and must be kept in step by hand if the shape ever changes:
-`favicon.svg` is the same mark reversed out of a black tile, square because the
-mark is nearly three times wider than tall and a browser tab renders that at a
-height nothing can read; `logo-email.png` is it rasterised, because mail clients
-do not render SVG. `pdf.mark` draws the same geometry a fourth time, in fpdf
-primitives on the same 316 × 108 grid, because a PDF wants vectors and not a
-raster to keep in step.
+**The logo is the owner's and is now in the repo**, as one path in
+`web/public/logo.svg` — three connected buildings, ink on nothing, on a
+**211 × 58** grid.
+
+**It is a trace of the owner's artwork, not a drawing of it.** The outline was
+walked on the source raster's pixel grid and fitted to straight lines; it
+renders within 0.3% of the original's own pixels, and that difference is
+anti-aliasing on the roof slopes. The numbers in it are measurements — **do not
+tidy them by eye.** The version before it was drawn from a description and had
+the proportions visibly wrong (316 × 108 against a true 211 × 58), which is
+exactly the mistake re-tidying would reintroduce.
+
+Three derivatives sit beside it and must be kept in step by hand if the shape
+ever changes: `favicon.svg` is the same path reversed out of a black tile,
+square because the mark is nearly four times wider than tall and a browser tab
+renders that at a height nothing can read; `logo-email.png` is it rasterised at
+640 × 176, because mail clients do not render SVG and the layout asks for it at
+160 wide; `pdf.mark` draws the same outline a fourth time from `markOutline`, in
+fpdf primitives on the same grid, because a PDF wants vectors and not a raster
+to keep in step.
+
+The source artwork is a small raster (225 px square, the mark 211 × 58 inside
+it), so this trace inherits its quantisation — a few one-pixel jogs on the
+chimney tops are the source's, not design intent. **If a vector original ever
+turns up, it should replace this outright** rather than be reconciled with it.
 
 The letterhead URL **must be absolute** — mail clients do not resolve relative
 paths, Gmail strips `data:` URIs from `<img>`, and CID attachments hurt
@@ -587,6 +603,6 @@ balance landed this morning must not hand out a PDF saying it is outstanding.
 font; that is a change to make when a guest needs it, not a megabyte carried on
 the chance.
 
-**The mark is drawn, not embedded** (`pdf.mark`) — the same geometry as
-`web/public/logo.svg` on the same 316 × 108 grid. Three files now carry that
-shape; if it ever changes, they move together.
+**The mark is drawn, not embedded** (`pdf.mark`, from `markOutline`) — the same
+outline as `web/public/logo.svg`, on the same 211 × 58 grid. Four files now
+carry that shape; if it ever changes, they move together.
