@@ -60,7 +60,14 @@ it the server still boots and reports `db: not_configured`.
   `Remove-Item`, not `del` — can delete. **Rename the parent directory aside**
   and it starts clean; Docker recreates it. The two seen so far are
   `%LOCALAPPDATA%\docker-secrets-engine\` and `%LOCALAPPDATA%\Docker\run\`, and
-  the error names whichever it hit first, so expect to do it more than once.
+  the error names whichever it hit first.
+  **Rename both in the same stop, before starting Docker again.** Fixing the one
+  in the message and restarting does not converge: the failed startup recreates
+  the directory you just renamed and leaves a fresh orphan in it, so the next
+  attempt fails on the other one, and the one after that on the first again.
+  Watched from the log it looks like the same bug reappearing, and it is really
+  two of them taking turns. `%LOCALAPPDATA%\Docker\log\host\com.docker.backend.exe.log`
+  is where the real error is; the GUI only offers Quit.
   The dialog's "Reset to factory defaults" would also fix it and would destroy
   every container and volume, including this project's Postgres data. Do not.
 - **Do not rewrite Go or SQL files with PowerShell string replacement.** It mangles
