@@ -334,6 +334,108 @@ func TestAMintedInvitationCarriesItsTokenInTheFragment(t *testing.T) {
 	}
 }
 
+// The id the list hands out must be the id the revoke route takes.
+//
+// Passkey.ID was a []byte, which encoding/json writes as *standard* base64 —
+// padded, and with + and / in it — while DELETE /api/admin/passkeys/{id}
+// decodes base64url unpadded. A 32-byte credential id always carries padding,
+// so every id the console read back came straight back as "that is not a
+// passkey id" and no phone could be removed from the console at all. The only
+// remaining way to strike off a lost handset was shell access to the server,
+// which is the thing enrolling a second phone exists to avoid needing.
+//
+// Asserted as a round trip rather than against a literal, because a literal is
+// exactly what let the two encodings disagree unnoticed.
+func TestAPasskeyIsRevokedByTheIdTheListGaveOut(t *testing.T) {
+	h, pool, q := adminRouter(t)
+	token := signedIn(t, pool, q)
+	enrolAnotherPhone(t, q, token)
+
+	before := listPasskeys(t, h, token)
+	if len(before) != 2 {
+		t.Fatalf("the account has %d passkeys, want 2", len(before))
+	}
+
+	// The spare, so the last-passkey rule is not what answers.
+	var spare string
+	for _, p := range before {
+		if p.Label == "Spare phone" {
+			spare = p.ID
+		}
+	}
+	if spare == "" {
+		t.Fatal("the spare phone is not in the list")
+	}
+
+	rec := adminRequest(t, h, http.MethodDelete, "/api/admin/passkeys/"+spare, token,
+		map[string]string{"Sec-Fetch-Site": "same-origin"})
+	if rec.Code != http.StatusNoContent {
+		t.Fatalf("revoking %q answered %d (%s), want 204",
+			spare, rec.Code, strings.TrimSpace(rec.Body.String()))
+	}
+
+	after := listPasskeys(t, h, token)
+	if len(after) != 1 {
+		t.Fatalf("%d passkeys remain, want 1", len(after))
+	}
+	if after[0].ID == spare {
+		t.Error("the revoked phone is still on the list")
+	}
+}
+
+type listedPasskey struct {
+	ID    string `json:"id"`
+	Label string `json:"label"`
+}
+
+func listPasskeys(t *testing.T, h http.Handler, token string) []listedPasskey {
+	t.Helper()
+
+	rec := adminRequest(t, h, http.MethodGet, "/api/admin/passkeys", token, nil)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("listing passkeys answered %d, want 200", rec.Code)
+	}
+
+	var out []listedPasskey
+	if err := json.Unmarshal(rec.Body.Bytes(), &out); err != nil {
+		t.Fatalf("decoding the passkey list: %v", err)
+	}
+	return out
+}
+
+// enrolAnotherPhone adds a second passkey to the account behind a session.
+//
+// The account is found through the session rather than passed in, so the tests
+// that do not care about a second phone keep signedIn's one return value.
+func enrolAnotherPhone(t *testing.T, q *db.Queries, token string) {
+	t.Helper()
+
+	raw, err := base64.RawURLEncoding.DecodeString(token)
+	if err != nil {
+		t.Fatalf("decoding the session token: %v", err)
+	}
+	sum := sha256.Sum256(raw)
+
+	session, err := q.GetLiveSession(context.Background(), sum[:])
+	if err != nil {
+		t.Fatalf("loading the session: %v", err)
+	}
+
+	credID := make([]byte, 32)
+	if _, err := rand.Read(credID); err != nil {
+		t.Fatalf("generating a credential id: %v", err)
+	}
+	encoded, err := json.Marshal(webauthn.Credential{ID: credID})
+	if err != nil {
+		t.Fatalf("encoding: %v", err)
+	}
+	if err := q.CreatePasskey(context.Background(), db.CreatePasskeyParams{
+		ID: credID, UserID: session.UserID, Label: "Spare phone", Credential: encoded,
+	}); err != nil {
+		t.Fatalf("creating the second passkey: %v", err)
+	}
+}
+
 // A console that is not configured must say so rather than let the SPA answer
 // an API call with a page.
 func TestAnUnconfiguredConsoleAnswers503(t *testing.T) {

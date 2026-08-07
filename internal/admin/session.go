@@ -2,6 +2,7 @@ package admin
 
 import (
 	"context"
+	"encoding/base64"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -98,11 +99,26 @@ func (c *Console) SignOut(ctx context.Context, token string) error {
 	return nil
 }
 
+// credentialID is how a passkey's id crosses the wire.
+//
+// base64url and unpadded, which is what WebAuthn itself uses for a credential
+// id and what DELETE /api/admin/passkeys/{id} decodes. A []byte field would be
+// marshalled by encoding/json as *standard* base64 — padded, and containing +
+// and / — which is neither a thing that survives a URL path segment nor a thing
+// that route accepts. The list would then be handing out ids that can revoke
+// nothing.
+func credentialID(id []byte) string {
+	if len(id) == 0 {
+		return ""
+	}
+	return base64.RawURLEncoding.EncodeToString(id)
+}
+
 // Device is one signed-in phone, as the console lists them.
 type Device struct {
 	// PasskeyID identifies the phone. Empty when the passkey behind the session
 	// has been revoked but the session row is still inside its expiry.
-	PasskeyID []byte `json:"passkeyId,omitempty"`
+	PasskeyID string `json:"passkeyId,omitempty"`
 
 	Label      string    `json:"label"`
 	UserAgent  string    `json:"userAgent"`
@@ -131,7 +147,7 @@ func (c *Console) Devices(ctx context.Context, userID int64, currentToken string
 			label = *row.Label
 		}
 		out = append(out, Device{
-			PasskeyID:  row.PasskeyID,
+			PasskeyID:  credentialID(row.PasskeyID),
 			Label:      label,
 			UserAgent:  row.UserAgent,
 			SignedInAt: row.CreatedAt,
@@ -144,7 +160,7 @@ func (c *Console) Devices(ctx context.Context, userID int64, currentToken string
 
 // Passkey is one enrolled phone, as the console lists them.
 type Passkey struct {
-	ID         []byte     `json:"id"`
+	ID         string     `json:"id"`
 	Label      string     `json:"label"`
 	CreatedAt  time.Time  `json:"createdAt"`
 	LastUsedAt *time.Time `json:"lastUsedAt,omitempty"`
@@ -159,7 +175,7 @@ func (c *Console) Passkeys(ctx context.Context, userID int64) ([]Passkey, error)
 
 	out := make([]Passkey, 0, len(rows))
 	for _, row := range rows {
-		p := Passkey{ID: row.ID, Label: row.Label, CreatedAt: row.CreatedAt}
+		p := Passkey{ID: credentialID(row.ID), Label: row.Label, CreatedAt: row.CreatedAt}
 		if row.LastUsedAt.Valid {
 			used := row.LastUsedAt.Time
 			p.LastUsedAt = &used
