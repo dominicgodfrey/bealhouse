@@ -31,10 +31,23 @@ import (
 )
 
 func main() {
-	// One subcommand, and it exists because the admin console has no other way
-	// to admit its first phone. Everything else is the server.
-	if len(os.Args) > 1 && os.Args[1] == "enroll" {
-		if err := enroll(os.Args[2:]); err != nil {
+	// Two subcommands, and both exist because a deploy is one file on a server
+	// with no repository beside it: `enroll` because the admin console has no
+	// other way to admit its first phone, and `migrate` because the schema this
+	// binary expects has to be applied by something, and the binary itself is
+	// the one thing guaranteed to be the right version. Everything else is the
+	// server.
+	if len(os.Args) > 1 {
+		var err error
+		switch os.Args[1] {
+		case "enroll":
+			err = enroll(os.Args[2:])
+		case "migrate":
+			err = migrate(os.Args[2:])
+		default:
+			err = fmt.Errorf("unknown command %q; want enroll or migrate", os.Args[1])
+		}
+		if err != nil {
 			fmt.Fprintln(os.Stderr, err)
 			os.Exit(1)
 		}

@@ -1,0 +1,68 @@
+# Caddy in front of the single binary (decision #2).
+#
+# Copy to /etc/caddy/Caddyfile on the VPS. The domain is the owner's, so it is
+# read from the environment rather than written here — set it in
+# /etc/default/caddy:
+#
+#     BEAL_DOMAIN=bealhouse.com
+#
+# `caddy validate --config /etc/caddy/Caddyfile` checks this file before a
+# reload; `systemctl reload caddy` applies it without dropping connections.
+
+{
+	# Where Let's Encrypt sends expiry warnings. Set it, or the first anybody
+	# hears about a certificate problem is the browser warning.
+	email {$BEAL_ADMIN_EMAIL}
+}
+
+www.{$BEAL_DOMAIN} {
+	# One canonical origin. The server-rendered canonical links all point at
+	# the apex (they are built from SITE_URL), so www has to actually go there
+	# rather than serve a second copy of the site that competes with it.
+	redir https://{$BEAL_DOMAIN}{uri} permanent
+}
+
+{$BEAL_DOMAIN} {
+	encode zstd gzip
+
+	# The photographs and the console's uploads. media.MaxUpload is 25 MiB and
+	# this has to clear it plus multipart framing, or a large photo fails at the
+	# proxy — where the console sees a bare 413 with no message of ours in it.
+	request_body {
+		max_size 30MB
+	}
+
+	reverse_proxy 127.0.0.1:8080 {
+		# Caddy *appends* to X-Forwarded-For rather than replacing it, which is
+		# why clientIP reads the last hop. The pairing that makes that safe is
+		# BEHIND_PROXY=true in the unit's environment file: without it the app
+		# ignores the header entirely and every guest shares one rate-limit
+		# bucket; with it and no proxy, anyone invents an address and walks
+		# around the booking limit. Both halves or neither.
+		header_up X-Forwarded-Proto {scheme}
+
+		# The app's own handler timeout is 20s and its WriteTimeout is longer,
+		# so this only has to be longer still — it exists to stop a hung backend
+		# holding a connection, not to second-guess the handler.
+		transport http {
+			read_timeout 60s
+			write_timeout 60s
+		}
+	}
+
+	# No security headers here on purpose.
+	#
+	# The binary sets CSP, HSTS, X-Frame-Options, Referrer-Policy and nosniff
+	# itself, and asserts HSTS only on a request that actually arrived over TLS.
+	# Setting any of them here as well gives two sources for one header that
+	# drift apart, and the CSP in particular has to change in step with what the
+	# app loads (Stripe's iframes) — which is knowable in the Go source and not
+	# here.
+
+	log {
+		output file /var/log/caddy/bealhouse.log {
+			roll_size 20MiB
+			roll_keep 10
+		}
+	}
+}

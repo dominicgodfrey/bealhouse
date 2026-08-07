@@ -1,0 +1,143 @@
+# What this repository already checks by hand, run on every push.
+name: CI
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+  schedule:
+    # 05:00 UTC, for the stress job below.
+    - cron: "0 5 * * *"
+
+# A second push to the same branch makes the first run's answer irrelevant.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  DATABASE_URL: postgres://bealhouse:bealhouse@localhost:5432/bealhouse?sslmode=disable
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    # A real Postgres, because that is what the suite tests against. The
+    # guarantees this project rests on — the exclusion constraint, the GiST
+    # index, MVCC — are properties of Postgres, so there is nothing worth
+    # faking. testdb *skips* when it cannot reach one, which is right on a
+    # laptop and would be silently useless here; the seed check below is what
+    # turns a broken service container into a failure rather than a green run
+    # with nothing in it.
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: bealhouse
+          POSTGRES_PASSWORD: bealhouse
+          POSTGRES_DB: bealhouse
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U bealhouse -d bealhouse"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache-dependency-path: go.sum
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: Build the SPA
+        # Before the Go steps: web/embed.go embeds dist/, and `npm run build`
+        # is `tsc --noEmit && vite build`, so this is the type check as well.
+        run: cd web && npm ci --no-fund --no-audit && npm run build
+
+      - name: gofmt
+        # -l lists what is not formatted and exits 0 either way, so the output
+        # is the assertion.
+        run: |
+          unformatted=$(gofmt -l ./cmd ./internal ./web)
+          if [ -n "$unformatted" ]; then
+            echo "not gofmt'd:"; echo "$unformatted"; exit 1
+          fi
+
+      - name: go vet
+        run: go vet ./...
+
+      - name: Generated code matches the SQL
+        # Queries live in internal/db/queries and the Go in internal/db/gen is
+        # generated and never edited by hand. Changing the SQL and forgetting to
+        # regenerate compiles perfectly well and is found much later, so it is
+        # found here instead.
+        run: |
+          go tool sqlc generate
+          git diff --exit-code internal/db/gen \
+            || { echo "internal/db/gen is stale; run 'go tool sqlc generate'"; exit 1; }
+
+      - name: Migrate
+        # Through the binary's own subcommand rather than `go tool goose`, so
+        # the path a deploy takes is exercised on every push and the embedded
+        # migrations are proven to be the ones on disk.
+        run: go run ./cmd/server migrate up
+
+      - name: Seed
+        # The seven real rooms and the placeholder rate season. The suite
+        # asserts against them, so it fails without this — and the count below
+        # is what stops it passing *vacuously* if the seed silently did not run.
+        run: |
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f internal/db/seed/rooms.sql
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f internal/db/seed/rates.sql
+          psql "$DATABASE_URL" -tAc 'SELECT count(*) FROM rooms' | grep -qx 7 \
+            || { echo "the seed did not load; the suite would skip and pass"; exit 1; }
+
+      - name: go test
+        # -race needs cgo and a C compiler. The development machine has neither,
+        # so this runner is the only place the suite can be run under the
+        # detector at all — which is worth the slower run on a project whose
+        # hardest properties are about concurrency.
+        run: go test -race -count=1 ./...
+
+  # The concurrency suite, hard. Minutes rather than seconds, so it does not
+  # gate every push: CLAUDE.md's rule is to run it whenever room_occupancy,
+  # occupancy.Create or booking.Create is touched, and nightly catches the rest.
+  stress:
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: bealhouse
+          POSTGRES_PASSWORD: bealhouse
+          POSTGRES_DB: bealhouse
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U bealhouse -d bealhouse"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache-dependency-path: go.sum
+
+      - run: go run ./cmd/server migrate up
+      - run: |
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f internal/db/seed/rooms.sql
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f internal/db/seed/rates.sql
+
+      - name: Concurrency, 100 times
+        # These found the real deadlock that shaped occupancy.Create. Firing 16
+        # simultaneous bookings at the last room gave the clean exclusion
+        # violation most of the time and something else roughly once in 25 runs,
+        # which is why the count is 100 and not 5.
+        run: go test ./internal/occupancy/ ./internal/booking/ ./internal/console/ -count=100 -timeout 30m

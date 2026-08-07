@@ -1,0 +1,30 @@
+[Unit]
+Description=Beal House nightly backup (database and photographs)
+Documentation=file:///usr/local/share/bealhouse/backup.sh
+After=postgresql.service
+
+[Service]
+Type=oneshot
+User=bealhouse
+Group=bealhouse
+
+# DATABASE_URL and MEDIA_DIR come from the same file the server reads, so the
+# backup cannot end up pointed at a different database than the one in use.
+EnvironmentFile=/etc/bealhouse/env
+
+# BACKUP_REMOTE and any rclone credentials. Separate file because the backup
+# destination is not the application's business and its token should not be
+# readable by the process serving the public internet.
+EnvironmentFile=-/etc/bealhouse/backup.env
+
+ExecStart=/usr/local/share/bealhouse/backup.sh
+
+# ProtectSystem=strict leaves everything read-only, which is right for a job
+# that only reads the database and MEDIA_DIR. This is the one place it writes.
+# Created during provisioning; see deploy/README.md.
+ReadWritePaths=/var/backups/bealhouse
+
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=yes

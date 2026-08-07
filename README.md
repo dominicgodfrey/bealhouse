@@ -4,19 +4,25 @@ Booking engine, marketing site, and admin console for a 7-room inn. One Go binar
 serves the JSON API and an embedded React SPA. See [ARCHITECTURE.md](ARCHITECTURE.md)
 for the design and the build order this repo follows.
 
-**Status:** build-order steps 1–3 complete — foundation, the domain core, and
-the booking flow end to end: search, results, room page, confirm, and a real
-hold on the room. No payment yet, so none of it needs a Stripe account.
+**Status:** steps 1–3 are done and 4–7 are built. What is left is not code:
+a Stripe account and the verification matrix that needs one, a Resend account
+and its DNS, and the owner's own words and photographs. `STRIPE_FAKE=true`
+walks the whole booking journey today without either account.
 
 | Working today | Where |
 |---|---|
-| The booking flow, search → hold | [web/src/routes](web/src/routes) |
-| `GET /api/availability` · `/calendar` · `/rooms/{slug}` | [internal/httpx](internal/httpx) |
-| `POST /api/bookings` — books and holds, revalidating server-side | [internal/booking](internal/booking/booking.go) |
+| The booking flow, search → hold → pay → confirmed | [web/src/routes](web/src/routes) |
 | Double-booking prevention | [internal/occupancy](internal/occupancy/occupancy.go) |
+| `POST /api/bookings` — books and holds, revalidating server-side | [internal/booking](internal/booking/booking.go) |
 | Sellable spans per room, for the date picker | [internal/availability](internal/availability/calendar.go) |
-| Seasons → nightly calendar | [internal/rates](internal/rates/rates.go) |
 | Deposits, tax, pet fee, refunds | [internal/pricing](internal/pricing/pricing.go) |
+| Payments, the ledger and the webhook | [internal/payments](internal/payments) · [internal/gateway](internal/gateway) |
+| The eight emails, queued not sent inline | [internal/email](internal/email) |
+| Passkey sign-in, no password anywhere | [internal/admin](internal/admin) |
+| Everything the owner does once signed in | [internal/console](internal/console) |
+| Photograph upload and serving | [internal/media](internal/media) |
+| Per-route `<head>`, JSON-LD, sitemap | [internal/httpx/meta.go](internal/httpx/meta.go) |
+| Deploying, backups and the restore drill | [deploy/](deploy/README.md) |
 
 ## Prerequisites
 
@@ -72,7 +78,20 @@ header it enables is only trustworthy when something trusted sets it.
 | Full binary | `make dev` |
 | Go tests | `go test ./...` |
 | New migration | `go tool goose -dir internal/db/migrations -s create <name> sql` |
-| Regenerate queries | `go tool sqlc generate` — errors until step 2 adds the first `.sql` query |
+| Apply migrations | `go tool goose … up`, or `./bin/bealhouse migrate up` — same files |
+| Regenerate queries | `go tool sqlc generate` |
+| Concurrency, hard | `go test ./internal/occupancy/ ./internal/booking/ ./internal/console/ -count=100` |
+| Deploy | `BEAL_HOST=inn@… ./deploy/deploy.sh` — see [deploy/README.md](deploy/README.md) |
+
+The binary carries the migrations as well as the SPA, so `bealhouse migrate up`
+brings a database up to the shape that exact binary expects with nothing else
+installed beside it. `go tool goose` reads the same files and stays the
+convenient thing locally; there is one history, not two.
+
+CI ([.github/workflows/ci.yml](.github/workflows/ci.yml)) runs gofmt, vet, the
+generated-code check, and the full suite against a real Postgres on every push —
+under `-race`, which is the one place it can run, since the development machine
+has no C compiler. The 100× concurrency suite runs nightly.
 
 For frontend work, run the Go binary and `npm run dev` side by side. For anything
 touching the API, rebuild the binary — the SPA it serves is the one embedded at
@@ -123,10 +142,20 @@ None of it should be edited in SQL once admin exists.
 
 ## Not yet built
 
-Steps 4–8 of the build order: Stripe, email and PDFs, the admin console,
-marketing content, and launch.
+Step 8, launch, and most of what is left there is an account or a decision
+rather than code — see the checklist at the end of
+[deploy/README.md](deploy/README.md). The deploy layer itself is written and the
+restore drill has been run.
 
-The booking flow stops at a held room. The hold is real — the exclusion
-constraint enforces it against everyone else, and an in-process sweeper
-reclaims it a minute after it lapses — but there is no way to pay for it yet,
-which is exactly where step 4 begins.
+What genuinely needs an account: `gateway.Stripe` and `email.Resend` are both
+written and neither has ever made a request. Add the keys and they are used
+automatically, and then the Stripe verification matrix in ARCHITECTURE.md —
+test cards, 3-D Secure, `stripe listen`, Test Clocks — which cannot be faked.
+
+What needs the owner: the eight email templates, room descriptions, photographs,
+the menu, and the page prose. All of it is editable in the console and all of it
+renders as *nothing* until written, rather than as a placeholder somebody has to
+remember to delete.
+
+Also outstanding: the AVIF and WebP variants from decision #16, which need an
+image encoder Go's standard library does not ship.

@@ -575,8 +575,38 @@ Dependency-ordered, not deadline-driven (single launch).
 
    **Still to do:** the AVIF and WebP variants, which need an encoder Go does not ship (see
    decision #16).
-8. **Launch** — backups + restore drill, Sentry, uptime monitoring, DNS cutover, Search Console,
-   Google Business Profile, Stripe live keys.
+8. **Launch** ← **IN PROGRESS.** The machinery is written and lives in [`deploy/`](deploy/):
+   the hardened systemd unit, the Caddyfile, a deploy script, the nightly backup and its timer,
+   and the restore drill. `.github/workflows/ci.yml` runs gofmt, vet, a generated-code check and
+   the full suite against a real Postgres on every push — **under `-race`**, which is the one
+   place it can run at all, since the development machine has no C compiler.
+
+   *Four things there were worth getting right.* **The binary carries its own migrations**, so a
+   deploy is one file and `bealhouse migrate up`, and the code on the box and the schema applied
+   to the database cannot come from different commits. The deploy **migrates with the new binary
+   before installing it**, so a failed migration leaves the old one serving guests, and rolls the
+   binary back — not the database — if health does not come up; `/api/health` answers 200 with
+   `"db":"down"` rather than failing, so the check reads the field. The **backup takes the
+   database and `MEDIA_DIR` as one set under one timestamp**, because `pg_dump` does not contain
+   the photographs and a restore that brings back the paths and not the files is a site of broken
+   images with nothing in any log to say so (decision #16) — `restore.sh drill` proves the pair
+   into a scratch database and throws it away, which is what the weekly `backup.verify` job should
+   call, and `verify` runs the same check against what is live. And **Caddy sets no security
+   headers**, because the binary sets them all and two sources for one header drift apart.
+
+   *Writing the CI found a pre-existing flake in the suite itself*, which had been failing roughly
+   one full parallel run in four: `availability` and `console` each claim **several rooms inside
+   one transaction**, `occupancy.Create` takes a per-room advisory lock held to the end of it, and
+   two packages doing that in different orders is an AB-BA deadlock. Nothing in the application
+   does this — a booking claims exactly one room, which is what makes that lock sufficient — so
+   the fix is `testdb.Exclusive` in the two fixtures. It also exposed something worth knowing
+   about `occupancy.Create`: its deadlock retry is a no-op when the caller owns the transaction,
+   because the deadlock has already aborted it, and the retry then returns `25P02` in place of the
+   real error. Left alone deliberately; it is a money path and the retry is right for the
+   single-room case it was written for.
+
+   **Still to do:** Sentry (a DSN and an `slog` handler), uptime monitoring from outside the box,
+   DNS cutover, Search Console, the Google Business Profile, and Stripe live keys.
 
 ---
 

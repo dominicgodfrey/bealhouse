@@ -1,0 +1,19 @@
+[Unit]
+Description=Nightly Beal House backup
+
+[Timer]
+# 04:00 local, which is the quietest hour for an inn: the departure notes went
+# out at midnight and the T-7 charges run on their own schedule.
+#
+# "Local" means whatever the box is set to, so provisioning sets it to
+# America/New_York — the same zone internal/civil resolves in, which keeps the
+# backup's own name in step with the day the bookings inside it belong to.
+OnCalendar=*-*-* 04:00:00
+Persistent=true
+
+# A fixed minute across a fleet is a thundering herd; on one box it just means
+# the dump always contends with whatever else fires at exactly 04:00.
+RandomizedDelaySec=15m
+
+[Install]
+WantedBy=timers.target

@@ -104,6 +104,42 @@ it the server still boots and reports `db: not_configured`.
   translates `23P01` into `ErrRoomTaken`. See the concurrency section in
   ARCHITECTURE.md for why this is not optional.
 
+## Deploying
+
+Everything lives in [`deploy/`](deploy/) and the runbook is
+[`deploy/README.md`](deploy/README.md). `BEAL_HOST=… ./deploy/deploy.sh`.
+
+- **The binary carries its own migrations** (`internal/db/migrations/embed.go`,
+  `bealhouse migrate up`) as well as the SPA. `go tool goose` reads the same
+  files, so there is one history — what embedding buys is that the code on the
+  server and the schema applied to its database cannot come from different
+  commits.
+- **The deploy migrates with the new binary before installing it.** A failed
+  migration then leaves the old one serving guests. The consequence is that the
+  old binary runs against the new schema for a second or two, so migrations
+  should be additive: add a column and backfill in one deploy, require it in the
+  next.
+- **A rollback restores the binary, not the database**, and the script says so
+  when it happens.
+- **`/api/health` answers 200 with `"db":"down"`** rather than failing, because
+  the binary has to be diagnosable when Postgres is not. Anything checking it —
+  the deploy, an uptime monitor — must read the field and not the status code.
+- **The backup takes the database and `MEDIA_DIR` as one set**, under one
+  timestamp. `pg_dump` does not contain the photographs, so the two are only a
+  backup together. `restore.sh drill` restores a set into a scratch database and
+  a temporary directory, checks every photo row against a real file, and throws
+  both away; `restore.sh verify` runs that check against what is live. Run the
+  drill — a backup nobody has restored is a hypothesis.
+- **Caddy sets no security headers.** The binary sets CSP, HSTS and the rest,
+  and the CSP in particular has to change in step with what the app loads.
+- **`BEHIND_PROXY=true` is not optional behind Caddy** and must not be set
+  without it. See the note in `deploy/Caddyfile`; both halves or neither.
+
+CI is `.github/workflows/ci.yml`: gofmt, vet, a check that `internal/db/gen`
+matches the SQL, and the full suite against a real Postgres on every push —
+**under `-race`**, which is the one place it runs, since this machine has no C
+compiler. The 100× concurrency suite is nightly, or `workflow_dispatch`.
+
 ## After editing SQL
 
 ```bash

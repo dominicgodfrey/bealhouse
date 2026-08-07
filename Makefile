@@ -27,6 +27,14 @@ run:
 test:
 	go test ./...
 
+## stress: the concurrency suite, hard — run this after touching occupancy or booking
+stress:
+	go test ./internal/occupancy/ ./internal/booking/ ./internal/console/ -count=100 -timeout 20m
+
+## deploy: build, ship, migrate and restart on BEAL_HOST
+deploy:
+	./deploy/deploy.sh
+
 ## db-up: start local Postgres
 db-up:
 	docker compose up -d postgres
@@ -68,4 +76,4 @@ gen:
 tidy:
 	go mod tidy
 
-.PHONY: help dev web build run test db-up db-down db-reset migrate migrate-down migrate-status migration seed gen tidy
+.PHONY: help dev web build run test stress deploy db-up db-down db-reset migrate migrate-down migrate-status migration seed gen tidy

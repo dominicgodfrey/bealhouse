@@ -1,0 +1,77 @@
+# The inn's binary, as a service. Install to /etc/systemd/system/.
+#
+#     sudo cp deploy/bealhouse.service /etc/systemd/system/
+#     sudo systemctl daemon-reload && sudo systemctl enable --now bealhouse
+#
+# See deploy/README.md for the rest of the provisioning.
+
+[Unit]
+Description=Beal House booking engine, marketing site and admin console
+Documentation=https://github.com/dominicgodfrey/bealhouse
+After=network-online.target postgresql.service
+Wants=network-online.target
+
+# Wants, not Requires. Requires would take this down whenever Postgres is
+# restarted for an upgrade, and the binary is designed to survive a database it
+# cannot reach — Restart=always plus RestartSec brings it back once Postgres is
+# up, which is a shorter outage than a stopped unit somebody has to notice.
+Wants=postgresql.service
+
+[Service]
+Type=exec
+User=bealhouse
+Group=bealhouse
+
+# Secrets: STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET, BOOKING_LINK_SECRET,
+# RESEND_API_KEY, DATABASE_URL. Owned by root and mode 0600 — systemd reads it
+# before dropping privileges, so the service user never needs to.
+#
+# BEHIND_PROXY=true belongs in here and is not optional behind Caddy. See the
+# note in deploy/Caddyfile: without it every guest shares one rate-limit bucket.
+EnvironmentFile=/etc/bealhouse/env
+
+ExecStart=/usr/local/bin/bealhouse
+
+# The binary handles SIGTERM and shuts the HTTP server down gracefully, so give
+# in-flight requests time to finish rather than cutting a checkout in half.
+KillSignal=SIGTERM
+TimeoutStopSec=30
+
+Restart=always
+RestartSec=2s
+
+# /var/lib/bealhouse, created and chowned by systemd. MEDIA_DIR lives under it:
+# the photographs are in neither the binary nor pg_dump, so they need somewhere
+# a deploy does not overwrite and the nightly backup does reach (decision #16).
+StateDirectory=bealhouse
+WorkingDirectory=/var/lib/bealhouse
+
+# Hardening. The binary listens on 8080 — unprivileged, so it needs no
+# capabilities at all and Caddy does the port 443 half.
+NoNewPrivileges=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectSystem=strict
+ProtectHome=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+ProtectClock=yes
+ProtectHostname=yes
+RestrictNamespaces=yes
+RestrictRealtime=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+# Go does not generate code at runtime, so this costs nothing here.
+MemoryDenyWriteExecute=yes
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+SystemCallArchitectures=native
+SystemCallFilter=@system-service
+CapabilityBoundingSet=
+
+# ProtectSystem=strict makes everything read-only; this is the one exception,
+# and it is the uploads directory.
+ReadWritePaths=/var/lib/bealhouse
+
+[Install]
+WantedBy=multi-user.target
