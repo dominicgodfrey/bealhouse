@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"html/template"
+	"reflect"
 
 	"github.com/jackc/pgx/v5"
 
@@ -139,6 +140,79 @@ type Copy struct {
 	// what guests are currently receiving. The console needs to say that out
 	// loud rather than presenting a placeholder as though it were finished.
 	Edited bool `json:"edited"`
+
+	// Fields is what this message can say about the booking, and it is the
+	// whole of it: a name that is not in here renders as nothing, silently.
+	//
+	// Derived from the payload struct rather than written down beside the
+	// editor, because a hand-kept list is one that drifts from the struct and
+	// then tells the owner a field exists that does not. Somebody writing a
+	// sentence needs this to be true, not approximately true.
+	Fields []Field `json:"fields"`
+}
+
+// Field is one thing a template can mention.
+type Field struct {
+	Name string `json:"name"`
+
+	// List is true for a field holding several values — the rooms on a booking.
+	// A template has to range over it; printing it directly renders Go's own
+	// idea of a slice, which is not a sentence anybody wants in an email.
+	List bool `json:"list"`
+}
+
+// payload is the struct each message renders against.
+//
+// A switch rather than a map so adding a template without adding its payload
+// here is a compile-time hole somebody notices, and so the zero values it
+// returns cost nothing.
+func payload(name string) any {
+	switch name {
+	case BookingConfirmation:
+		return BookingConfirmationData{}
+	case BalanceWarning:
+		return BalanceWarningData{}
+	case BalanceReceipt:
+		return BalanceReceiptData{}
+	case BalanceFailed:
+		return BalanceFailedData{}
+	case CancellationRefund:
+		return CancellationRefundData{}
+	case OwnerNotification:
+		return OwnerNotificationData{}
+	case CheckoutReminder:
+		return CheckoutReminderData{}
+	case PaymentRequest:
+		return PaymentRequestData{}
+	default:
+		return nil
+	}
+}
+
+// Fields lists what one message's copy can refer to.
+//
+// Read off the JSON tags rather than the Go field names, because the tags are
+// what the payload actually carries: data crosses the jobs table as JSON and
+// comes back as a map, so the name a template writes is the tag. They are the
+// same string today by design, and reading the tag is what keeps that true if
+// one ever changes.
+func Fields(name string) []Field {
+	p := payload(name)
+	if p == nil {
+		return nil
+	}
+
+	t := reflect.TypeOf(p)
+	out := make([]Field, 0, t.NumField())
+	for i := range t.NumField() {
+		f := t.Field(i)
+		key := f.Tag.Get("json")
+		if key == "" || key == "-" {
+			key = f.Name
+		}
+		out = append(out, Field{Name: key, List: f.Type.Kind() == reflect.Slice})
+	}
+	return out
 }
 
 // Current returns the copy in force for every message, edited or not.
@@ -154,7 +228,7 @@ func (r *Renderer) Current(ctx context.Context) ([]Copy, error) {
 		if err != nil {
 			return nil, err
 		}
-		c := Copy{Name: name, Subject: subject, Body: body}
+		c := Copy{Name: name, Subject: subject, Body: body, Fields: Fields(name)}
 
 		if r.store != nil {
 			row, err := r.store.GetEmailTemplate(ctx, name)

@@ -81,6 +81,31 @@ func (s *Stripe) CreateIntent(ctx context.Context, in payments.IntentRequest) (p
 		params.SetupFutureUsage = stripe.String("off_session")
 	}
 
+	// A card the owner is keying in from what a guest is reading out over the
+	// telephone (decision: the console's manual collection).
+	//
+	// AutomaticPaymentMethods is replaced by cards alone, because the wallets and
+	// bank redirects it would otherwise offer need the person paying to be at the
+	// browser — and here the browser is at the inn's end of the call. MOTO then
+	// tells the bank there is nobody to answer a 3-D Secure challenge, which is
+	// what stops the card being declined mid-conversation.
+	if in.MOTO {
+		params.AutomaticPaymentMethods = nil
+		params.PaymentMethodTypes = stripe.StringSlice([]string{"card"})
+		params.PaymentMethodOptions = &stripe.PaymentIntentCreatePaymentMethodOptionsParams{
+			Card: &stripe.PaymentIntentCreatePaymentMethodOptionsCardParams{
+				MOTO: stripe.Bool(true),
+			},
+		}
+
+		// The idempotency key has to differ from the guest-facing one for the
+		// same booking and amount, or an owner reaching for the card after
+		// emailing a link gets handed the payment built for the browser — one
+		// with wallets enabled and no MOTO on it, which is the decline this
+		// branch exists to avoid.
+		params.SetIdempotencyKey(fmt.Sprintf("intent:moto:%s:%d", in.BookingCode, in.AmountCents))
+	}
+
 	intent, err := s.client.V1PaymentIntents.Create(ctx, params)
 	if err != nil {
 		return payments.Intent{}, declined(err, fmt.Errorf("gateway: creating a payment for %s: %w", in.BookingCode, err))

@@ -156,6 +156,34 @@ type CheckoutReminderData struct {
 	CheckoutTime string `json:"CheckoutTime"`
 }
 
+// PaymentRequestData asks a guest to pay for a stay the owner took on the
+// telephone.
+//
+// It carries no deadline and no expiry, deliberately. Every other message about
+// money in this system is attached to something running out — a hold, a T-7
+// date — and this one is not: the room is already the guest's, the booking is
+// confirmed, and what is outstanding stays outstanding until somebody settles
+// it. Copy written as though it were a countdown would be false.
+type PaymentRequestData struct {
+	Code      string   `json:"Code"`
+	GuestName string   `json:"GuestName"`
+	Rooms     []string `json:"Rooms"`
+
+	Checkin  string `json:"Checkin"`
+	Checkout string `json:"Checkout"`
+	Nights   string `json:"Nights"`
+
+	// Amount is what is outstanding, and Total what the stay costs. They differ
+	// once a part payment has landed, which is why both are here.
+	Amount string `json:"Amount"`
+	Total  string `json:"Total"`
+
+	// PayURL is where the guest pays. Empty on a deployment with no public
+	// address configured, so the template has to check before offering a button
+	// that would go nowhere — the same shape as ManageURL on the confirmation.
+	PayURL string `json:"PayURL"`
+}
+
 // Money renders integer cents the way a guest reads them: "$1,234.56".
 //
 // The dollars and the remainder are separated with integer division and printed

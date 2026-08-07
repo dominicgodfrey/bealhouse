@@ -1,0 +1,22 @@
+{{define "payment_request_subject"}}PLACEHOLDER — how to pay for your stay{{end}}
+
+{{define "payment_request_body"}}
+  {{/*
+    PLACEHOLDER. Sent when the owner takes a reservation over the telephone and
+    asks the guest to pay for it themselves, rather than reading a card out or
+    settling some other way.
+
+    The room is already theirs — this is not a hold and nothing expires — so the
+    tone is an invoice rather than a countdown. What it has to carry is the
+    amount, the link, and the fact that the booking is confirmed either way, so
+    that a guest who pays a week later has not been worrying about losing it.
+
+    .Data.PayURL is empty on a deployment with no public address configured. The
+    copy has to check before offering a button to nowhere.
+  */}}
+  <p style="margin:0 0 12px 0;"><strong>Payment for your stay</strong></p>
+  <p style="margin:0;color:#57534e;">
+    This template is not written yet. It gives a guest whose booking was taken
+    over the telephone the amount outstanding and a link to pay it.
+  </p>
+{{end}}

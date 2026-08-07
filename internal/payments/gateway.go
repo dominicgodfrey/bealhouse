@@ -60,6 +60,22 @@ type IntentRequest struct {
 	// stored — the less of a guest's payment detail this system is attached to,
 	// the better.
 	SaveCard bool
+
+	// MOTO says the card is being keyed in by somebody at the inn from details a
+	// guest is reading out — mail order / telephone order, in the processor's
+	// vocabulary.
+	//
+	// It is not a convenience flag. A guest on the phone cannot complete a 3-D
+	// Secure challenge, because the challenge goes to *them* and there is nobody
+	// at a browser to answer it; declaring the payment as MOTO is what tells the
+	// bank so and exempts it. Left off, the same card that would have worked at
+	// the front desk is declined halfway through with an owner and a guest both
+	// on the line.
+	//
+	// It moves liability for a fraudulent transaction to the inn, which is the
+	// honest trade for taking a card nobody has seen and is exactly what taking
+	// a booking over the telephone has always meant.
+	MOTO bool
 }
 
 // Intent is a payment the processor has opened or completed.

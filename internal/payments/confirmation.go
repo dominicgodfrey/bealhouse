@@ -2,8 +2,13 @@ package payments
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strconv"
+	"strings"
+	"time"
+
+	"github.com/jackc/pgx/v5"
 
 	"bealhouse/internal/civil"
 	db "bealhouse/internal/db/gen"
@@ -15,6 +20,46 @@ import (
 // Long enough to be useful to a guest looking something up on the way home,
 // short enough that the capability in a years-old email has lapsed.
 const manageLinkGraceDays = 30
+
+// QueueConfirmation queues the confirmation and the owner's copy for a booking
+// that was confirmed without a payment going through this package.
+//
+// That is the console taking a reservation on the phone: the stay is real, the
+// guest is owed the same message a guest booking on the website gets, and the
+// money is being collected outside this system. Exported rather than copied
+// into the console because the payload is the thing worth having one of — a
+// second construction of it would drift, and the symptom would be two guests
+// with the same booking reading different accounts of what they owe.
+//
+// `paidNowCents` is what this act collected, which for a phone booking is
+// nothing. Call it inside the transaction that created the booking, so the
+// message and the stay commit together.
+func QueueConfirmation(
+	ctx context.Context,
+	q *db.Queries,
+	code string,
+	paidNowCents int64,
+	ownerEmail string,
+	manageURL func(code string, expires time.Time) string,
+) error {
+	b, err := q.GetBookingForPayment(ctx, strings.ToUpper(strings.TrimSpace(code)))
+	if errors.Is(err, pgx.ErrNoRows) {
+		return ErrBookingNotFound
+	}
+	if err != nil {
+		return fmt.Errorf("payments: loading booking %q for its confirmation: %w", code, err)
+	}
+
+	// AmountPaidCents is read back off the row and confirmationMail adds
+	// paidNowCents to it, exactly as it does on the payment path — so a booking
+	// that collected nothing reports nothing paid rather than a figure this
+	// function had to invent.
+	return confirmationMail(ctx, q, b, Charge{
+		AmountCents: paidNowCents,
+		OwnerEmail:  ownerEmail,
+		ManageURL:   manageURL,
+	})
+}
 
 // confirmationMail queues the guest's confirmation and the owner's copy.
 //
@@ -57,10 +102,22 @@ func confirmationMail(ctx context.Context, q *db.Queries, b db.GetBookingForPaym
 		Total:     email.Money(b.TotalCents),
 	}
 
-	// Left empty on a stay paid in full at booking, which is how the template
-	// tells the two cases apart without being told which it is rendering.
+	// What is still owed, and — separately — whether anything is scheduled to
+	// collect it. Both empty on a stay paid in full at booking, which is how the
+	// template tells the cases apart without being told which it is rendering.
+	//
+	// Two conditions rather than one, because they came apart when the console
+	// started taking bookings by phone: those are confirmed with nothing paid
+	// and no card saved, so there is a balance outstanding and no date on which
+	// it will be taken. Tying both to balance_charge_at would send that guest a
+	// confirmation shaped like "paid in full", which is the one thing it must
+	// not say. Nothing changes for a stay booked on the website: a deposit
+	// leaves an outstanding balance and a charge date, and a short-notice stay
+	// leaves neither.
+	if outstanding := b.TotalCents - paidSoFar; outstanding > 0 {
+		confirmation.BalanceDue = email.Money(outstanding)
+	}
 	if b.BalanceChargeAt.Valid {
-		confirmation.BalanceDue = email.Money(b.TotalCents - paidSoFar)
 		confirmation.BalanceChargeOn = email.Day(b.BalanceChargeAt.Time)
 	}
 

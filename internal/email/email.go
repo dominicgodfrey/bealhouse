@@ -53,6 +53,12 @@ const (
 	// the checkout time and the inn's goodbye. Sent by the checkout.remind scan
 	// rather than by anything the guest did, and only on the day itself.
 	CheckoutReminder = "checkout_reminder"
+
+	// PaymentRequest asks a guest to pay for a booking the owner took over the
+	// telephone. The room is already theirs and nothing about it expires, so it
+	// is an invoice rather than a countdown — unlike everything the booking flow
+	// sends, which is all attached to a hold.
+	PaymentRequest = "payment_request"
 )
 
 // Names lists every template, so a test can render them all without a list that
@@ -66,6 +72,7 @@ func Names() []string {
 		CancellationRefund,
 		OwnerNotification,
 		CheckoutReminder,
+		PaymentRequest,
 	}
 }
 
