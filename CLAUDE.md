@@ -158,6 +158,7 @@ them in parallel against one shared database, so:
   | booking | today+200 |
   | payments | today+300 |
   | httpx — webhook and manage tests | today+400 |
+  | console | today+500 |
 
   **The today+30 window is the soft spot.** The date picker opens on the current
   month, so clicking through the booking flow by hand lands a real hold right in
@@ -174,7 +175,7 @@ marked `PLACEHOLDER`, amenities are empty, there is one flat rate season, and
 than seeded rows — a placeholder in the database is one somebody has to remember
 to delete. Do not invent content, and do not seed guesses.
 
-The same goes for **email copy** (`internal/email/templates/`). All seven templates
+The same goes for **email copy** (`internal/email/templates/`). All eight templates
 are blank on purpose: a subject marked `PLACEHOLDER` and one line saying what the
 message is for. Write the shared layout, never the sentences a guest reads.
 
@@ -224,6 +225,55 @@ deliverability. `EMAIL_LOGO_URL` therefore defaults to `SITE_URL` +
 bundle this same binary serves. Set it only to serve the file from elsewhere. No
 `SITE_URL` means no origin to make it absolute with, and the templates fall back
 to the inn's name in text.
+
+**The marketing pages ship as structure with the owner's content in it.** Home,
+rooms, restaurant, events and about all read live data — the seven rooms, the
+menu, what is on — plus an optional prose slot from `page_copy`. **A page with
+nothing written renders no paragraph at all**, not a placeholder: the restaurant
+says the menu is not up and to ring the inn, the events page shows only its
+form. That is honest and looks deliberate, where an invented sentence about the
+food would sit on the public internet until somebody remembered it. The one
+place a page speaks for itself is the About fallback, and it says only what is
+already true elsewhere in this repository — seven rooms, Littleton, New
+Hampshire.
+
+**Photographs upload from the console** (`internal/media`, decision #16). An
+image arrives, is decoded, scaled so its longest side is at most 2400px,
+re-encoded as JPEG and written to `MEDIA_DIR` under a name that is the SHA-256
+of its own bytes. `/media/*` serves it.
+
+- **Re-encoding is not polish.** A phone photograph is 4000px and several
+  megabytes, and serving that to somebody on mountain mobile data fails the one
+  job the page has. Decoding is also the *only* real check that a file is an
+  image — its name and its content type are both the caller's to invent.
+- **Content addressing buys three things**: the same photograph uploaded twice
+  is one file, two uploads cannot collide, and the URL can be `immutable`
+  because the bytes at a name can never change. The corollary is that
+  **removing a photo from a room does not delete the file** — two rooms may
+  point at the same bytes, and an orphan costs kilobytes where a wrong delete
+  costs a photograph off somebody else's page.
+- **`/media/*` is registered before the SPA fallback**, which is the whole point
+  of it being on the root router. The fallback answers unknown GETs with
+  index.html and a 200; for an `<img>` that is a broken picture with no error
+  anywhere. A missing photograph 404s.
+- **`media.Name` is the only way a stored path becomes a filename.** It refuses
+  separators, dot-files and anything not under the prefix, so whatever ends up
+  in the database cannot address a file outside the directory.
+- **`MEDIA_DIR` is not in the binary and not in `pg_dump`.** On the VPS it
+  belongs somewhere a deploy does not overwrite and the nightly backup does
+  reach — a restore that brings back the paths and not the files is a site of
+  broken images.
+- **Alt text is required on every one** — the column is NOT NULL, the save
+  refuses a blank, and the editor marks the box amber until it has one. A room
+  with no photo falls back to `availability.PlaceholderPhoto(slug)`.
+
+**What is still missing from decision #16 is AVIF and WebP.** Go encodes JPEG,
+PNG and GIF in the standard library, decodes WebP through `x/image`, and encodes
+neither WebP nor AVIF. Producing them needs cgo and libvips — unbuildable on this
+machine, which has no C compiler — or a third-party pure-Go encoder, which is a
+dependency worth choosing deliberately. One well-sized JPEG per photograph ships
+instead. Since the paths are stored and not the variants, adding them later is a
+job that walks the directory rather than a schema change.
 
 ## The booking flow, as built
 
@@ -300,7 +350,7 @@ only the last two steps need one.
 - `POST /api/bookings/{code}/payment-intent` and the signature-verified
   `POST /webhooks/stripe`, on the **root** router.
 - `balance.warn` (T-8) and `balance.charge` (T-7), plus `rates.rebuild`.
-- `internal/email` renders the seven messages and queues them as `email.send` jobs.
+- `internal/email` renders the eight messages and queues them as `email.send` jobs.
   **Never send inline** — the queue is the outbox, and its retry is why a Resend
   outage delays a confirmation instead of failing the booking that earned it.
   `Resend` implements `Sender` over plain `net/http` — one endpoint, one JSON
@@ -549,6 +599,116 @@ page, and the account screen. `web/src/lib/admin.ts` is its API and
   to see both to be sure they have done both.
 - **A 401 from any console action re-checks the session rather than showing an
   error.** It is not a failure to report; it is a sign-in to ask for.
+
+### What the console does — `internal/console`
+
+**Everything the owner does once signed in lives in one package, and it
+reimplements no rule.** Claiming a room is `occupancy.Create`, pricing a stay is
+`availability.Search`, refunding is `payments.Cancel` / `QueueRefund`,
+regenerating the calendar is the SQL function, and saving email copy is
+`email.Parse`. What the package adds is the read models — one query per screen,
+in `internal/db/queries/console.sql` — and the transactions holding a multi-row
+save together. `internal/httpx/console.go` above it only decodes and encodes.
+
+The console is where the invariants can be walked around *by accident*, because
+there is a person on the other end who is allowed to do things a guest cannot.
+"Allowed to" is not "unconstrained":
+
+- **A manual booking is `booking.Create` with `Manual` set**, not a second write
+  path. Same availability re-check, same pricing, same claim through the
+  exclusion constraint — an owner taking a booking by phone must not be able to
+  double-book a room a guest on the website could not. The flag changes exactly
+  three things: confirmed rather than pending, an occupancy row of kind
+  `booking` rather than an expiring `hold`, and `balance_charge_at` left NULL
+  because there is no saved card for a T-7 job to charge.
+- **A manual booking sends the same mail a website booking does.** The
+  confirmation and the owner's copy are queued by `payments.QueueConfirmation` —
+  the *same* payload builder the payment path uses, not a second construction of
+  it, because two guests with the same booking must not be able to read different
+  accounts of what they owe. The departure-morning note follows on its own, since
+  that scan matches confirmed stays by checkout date and this is one. The two
+  balance messages do not and must not: they announce and then take money from a
+  saved card, and there is none.
+- **There are three ways a phone booking gets paid for**, chosen on the form and
+  changing nothing about the stay itself: settled offline, an emailed link
+  (`payment_request`, the eighth template), or a card keyed in on the spot.
+  Offline is the default, so an owner who does not read that section has not
+  silently invoiced anybody.
+  **`payments.Open` therefore accepts a confirmed booking** — but only one with
+  `balance_charge_at` NULL and money outstanding, which is exactly this case. A
+  confirmed booking that *does* have a charge date is a website booking whose
+  card is on file and whose balance the T-7 job will take; letting a page collect
+  it early is how a guest pays twice. `RequestPayment` refuses that booking for
+  the same reason.
+  Money landing on an already-confirmed stay is labelled `KindBalance`, so
+  `RecordCharge` sends a receipt rather than a second "you're booked" — without
+  it a guest paying an emailed link would be charged and told nothing at all.
+- **Keying in a card is `payments.OpenKeyedIn`, and no card number touches this
+  server.** The console mounts Stripe's own Payment Element against a client
+  secret and the digits go from that iframe to Stripe, exactly as on the guest's
+  pay page. **There is no endpoint here that accepts a card number and there must
+  never be** — that is the whole of PCI SAQ-A for this inn.
+  The intent carries `MOTO`, which is not a convenience flag: a guest on the
+  telephone cannot answer a 3-D Secure challenge, because the challenge goes to
+  *them*. Declaring the payment as mail-order/telephone-order exempts it, and
+  moves fraud liability to the inn — the honest trade for taking a card nobody
+  has seen, and what a telephone booking has always meant. It also has its own
+  Stripe idempotency key, or an owner reaching for the card after emailing a link
+  is handed the browser's intent, wallets and all, and watches it decline.
+
+  **`BalanceDue` and `BalanceChargeOn` are set by two separate conditions** for
+  exactly this reason. They came apart when the console started taking phone
+  bookings — money outstanding, no date it will be collected on — and tying both
+  to `balance_charge_at` sends that guest a confirmation shaped like *paid in
+  full*, which is the one thing it must not say. Nothing changed for the website
+  path: a deposit still leaves both set, a short-notice stay still leaves neither.
+- **`booking.Request.AfterCreate` is what queues it**, inside the transaction
+  that wrote the booking and *after* the room is claimed. A hook rather than
+  `booking` doing the mailing itself, because the payload is built in `payments`
+  and `booking` cannot import it — `payments` already imports `booking`. The
+  console imports both and is where the two are joined.
+  `TestARefusedManualBookingQueuesNoMail` is the property that matters: a booking
+  that loses the race for its room must not have told anybody it happened.
+- **Blocking goes through `occupancy.Create`** for the same reason, so an owner
+  blocking nights a guest is halfway through paying for is refused rather than
+  overriding them. **Unblocking filters on `kind = 'block'` in the SQL**, not in
+  Go: an id naming a booking's occupancy row must match nothing, or a paid stay's
+  room goes back on sale with the guest still arriving.
+  `TestUnblockingWillNotReleaseABooking` is that property.
+- **The rate preview applies the edit, takes the diff, and rolls back.** That is
+  what makes the number the real season-resolution rule rather than an estimate
+  from a second copy of it — nothing else could account for a lower-priority
+  season underneath the one being edited. `rate_calendar_changes()` and
+  `generated_rate_calendar()` in migration 00015 are that resolution lifted out
+  of `rebuild_rate_calendar`, which now calls it, so there is one copy and not
+  two. **If the preview ever commits, an owner asking "what would this do" has
+  already done it** — `TestPreviewingASeasonLeavesTheCalendarAlone` guards it.
+- **A manual refund refuses zero.** `payments.QueueRefund` reads zero as "the
+  whole ledger" on purpose (decision #24's penalty-free path), but an owner
+  leaving the amount box empty means *nothing*, and the gap between the two
+  readings is a whole stay's money.
+- **The menu, the events list and a room's photos save as whole documents** in
+  one transaction. That is how they are edited — reordered, moved between
+  sections, repriced across a whole course in one sitting — and reconciling it as
+  a stream of per-row edits would be a diff algorithm on the client whose failure
+  mode is a half-applied menu on the public site. This way the failure mode is
+  the previous menu, unchanged. `sort_order` is the array index at save time and
+  never a number anybody types.
+- **`Ops` takes a `Store`, not a pool** — `db.DBTX` plus `Begin` — so tests pass
+  an open transaction whose nested `Begin` is a savepoint and roll back like the
+  rest of the suite. Same arrangement as `booking.Beginner`.
+- **What a template can say is served, not listed in the bundle.**
+  `email.Fields(name)` reflects over the payload struct's JSON tags, so the
+  editor's field list cannot drift from what the message actually carries. A
+  name that is not in it renders as nothing, silently — which is exactly the
+  mistake a hand-kept list causes.
+
+**Page prose is `page_copy`, on the same terms as `email_templates`:** a row is
+an override, no row means the page renders its structure with nothing in that
+slot, and emptying both fields is a DELETE rather than a row of empty strings.
+Plain text, not markdown — blank lines are paragraphs — because the alternative
+is a parser in the bundle or a way to put a `<script>` on the public site from a
+phone. The four pages are `console.PageSlugs()`, a property of the binary.
 
 ## Step 5: the manage-booking link
 

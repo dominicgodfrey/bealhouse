@@ -40,7 +40,7 @@ Stack constraint: **TypeScript/React + Go**. No launch deadline — one complete
 | 13 | Tax | NH Meals & Rooms 8.5%, configurable; **each booking snapshots its rate** for audit |
 | 14 | Date picker | No flexible ±1 search. Calendar greys out unselectable dates live |
 | 15 | Admin auth | **Passkeys (WebAuthn), no password anywhere.** Single shared owner account, a real `users` table behind it, one credential per phone. *(revised; was a password plus TOTP)* The console is opened from the two owners' phones, so the authenticator is the handset itself: a private key it will only use after Face ID or a fingerprint. What that buys over the original plan is that **nothing stored server-side is a credential** — a leaked dump contains public keys — and that it **cannot be phished**, because the browser binds every signature to the origin. There is also no shared secret two people have to hand to each other and rotate. Sessions are **rows**, hashed, rolling **365 days** from last use, so a phone in regular use never signs in again and a lost one can be struck off. Enrolment is a **single-use** invitation, minted by `bealhouse enroll` on the server or from an already-signed-in console. **No step-up auth** on refunds: the owners' call, and the phones are locked |
-| 16 | Media | Owner uploads in admin → VPS disk, Go generates AVIF/WebP variants, Cloudflare free CDN |
+| 16 | Media | Owner uploads in admin → VPS disk, Go generates AVIF/WebP variants, Cloudflare free CDN. **Built, less the variants:** `internal/media` decodes an upload — which is also the only real check that it is an image — scales it to 2400px on the longest side, re-encodes it as JPEG, and stores it under the SHA-256 of its own bytes in `MEDIA_DIR`. Content addressing means the same photograph uploaded twice is one file and the URL can be served `immutable`; it also means **removing a photo does not delete the file**, since two rooms may point at the same bytes. `/media/*` is registered ahead of the SPA fallback, or a missing photograph would answer index.html with a 200 and render as a broken image with no error anywhere. **AVIF and WebP are what remain:** Go's standard library encodes neither, and producing them needs cgo with libvips or a third-party pure-Go encoder — a dependency to choose deliberately rather than in passing. `MEDIA_DIR` is in neither the binary nor `pg_dump`, so it needs its own place on the VPS and its own line in the backup |
 | 17 | Email | Resend. SPF/DKIM/DMARC at Bluehost DNS (SPF must include Resend *and* the mailbox host) |
 | 18 | Launch | Placeholder site today → clean cutover. Google Business Profile + Search Console on day one |
 | 19 | Guest self-service | Signed expiring link in confirmation email → view booking + **cancel**, refund executes automatically. Date changes go through the owner. **Built:** an HMAC over the code and an expiry (`BOOKING_LINK_SECRET`), not a stored token — stateless, valid for bookings made before the feature existed, and expiring thirty days after checkout. Cancelling is refused once the stay has begun, because decision #9's arithmetic does not describe a visit in progress |
@@ -387,7 +387,7 @@ pasted in.
 - **Guests** — searchable by name, email, room, date, length of stay; notes with author and history.
 - **Content** — menu editor, room photos/descriptions + accessibility features, events gallery,
   inquiry inbox.
-- **Email copy** *(storage built)* — the seven messages the inn sends, each with a subject and a
+- **Email copy** *(storage built)* — the eight messages the inn sends, each with a subject and a
   body the owner edits. A row in `email_templates` overrides the file that ships; no row means the
   shipped one, so "reset to the original" is a delete and a message added in a later release turns
   up in the editor on its own. Nothing is cached, so a save applies to the next message rather than
@@ -474,13 +474,13 @@ Dependency-ordered, not deadline-driven (single launch).
      admin console's editor is one authenticated endpoint away rather than a schema change. See the
      Admin console section for where the lines are drawn.
 
-   *The seven templates are still deliberately **blank** — a line saying what each is for and
+   *The eight templates are still deliberately **blank** — a line saying what each is for and
    nothing else. The copy is the owner's to write, like room descriptions and photos. The manage
    link is wired into the confirmation as structure rather than copy, because it is the only way
    a guest reaches their booking.*
 
    **Still to do:** the Resend account itself — DNS for SPF/DKIM/DMARC (decision #17) and a first
-   real send — and the copy for the seven messages, which is the owner's, and which they will write
+   real send — and the copy for the eight messages, which is the owner's, and which they will write
    in the console rather than in this repository.
 6. **Admin** ← **IN PROGRESS.** **Auth is built** (decision #15, revised): passkeys, no passwords,
    `internal/admin` plus the `/api/admin/auth/*` routes and the session middleware everything else
@@ -512,11 +512,50 @@ Dependency-ordered, not deadline-driven (single launch).
    base64url on the wire now and the regression asserts the round trip rather than a literal,
    since a literal on each side is what let the two drift.*
 
-   **Still to do:** content editing (rooms, photos, descriptions, and the email copy whose
-   storage landed with step 5), then operations — upcoming/paid-vs-owed, calendar, list, manual
-   CRUD, rate editor, blocking, guest search.
-7. **Content & marketing** — home, restaurant + menu editor, events + inquiry form, about, image
-   pipeline, JSON-LD injection.
+   **The screens are built too.** `internal/console` holds them — one package, one read model
+   per screen, and no rule reimplemented: claiming a room is still `occupancy.Create`, pricing a
+   stay is still `availability.Search`, refunding is still `payments.Cancel`, and regenerating
+   the calendar is still the SQL function the monthly job calls. Today's board; the reservations
+   list with paid against total and refused cards in red; the booking editor with its refund
+   quote and its manual refund; the 7-row calendar and blocking; the rate grid; guest search and
+   notes; the room, menu, events and inquiry content editors; the email copy editor; the page
+   prose; and settings.
+
+   *Three things there were worth getting right rather than merely working.* A **manual
+   booking** is `booking.Create` with a flag, not a second write path, so an owner taking a
+   reservation by phone goes through the same exclusion constraint a guest does and cannot
+   double-book a room the website would have refused — and it earns the guest the same
+   confirmation, from the same payload builder, queued in the same transaction that wrote the
+   stay. What it does not earn them is the two balance messages, which announce and then take
+   money from a saved card there is none of. That distinction exposed a real defect in the
+   confirmation itself: `BalanceDue` was tied to `balance_charge_at`, so a stay with money
+   outstanding and no scheduled date to collect it would have read as *paid in full*.
+   **Unblocking filters on `kind = 'block'`
+   in SQL**, so an id naming a confirmed booking's occupancy row matches nothing instead of
+   putting a paid stay's room back on sale. And the **rate preview applies the edit inside a
+   transaction and rolls back** — the only way a diff can account for a lower-priority season
+   sitting underneath the one being edited, which is why the season resolution was lifted out of
+   `rebuild_rate_calendar` into `generated_rate_calendar()` and both now share one copy of it.
+
+   **Still to do:** driving the authenticated screens on a real handset, which is the manual
+   verification below and needs an enrolled phone rather than more code.
+7. **Content & marketing** ← **IN PROGRESS.** The pages are built: home anchored on the search,
+   a rooms index, the restaurant with its live menu and `Menu` JSON-LD, events with a gallery and
+   the inquiry form, and the owner's story. Each renders live data plus an optional prose slot
+   from `page_copy`, and each **renders no paragraph at all** where nothing has been written —
+   the words are the owner's, and an invented sentence about the food would sit on the public
+   internet until somebody remembered it was invented.
+
+   **Photographs upload from the console** (decision #16, `internal/media`): straight off a phone,
+   scaled and re-encoded on the way in, stored content-addressed and served `immutable` from
+   `/media/*` ahead of the SPA fallback. Alt text is required on every one, and remove and reorder
+   are the same list the page renders from.
+
+   **Still to do:** the AVIF and WebP variants, which need an encoder Go does not ship (see
+   decision #16), and server-injected per-route meta and JSON-LD (decision #3), which is what a
+   crawler that does not run JavaScript needs. The restaurant's `Menu` JSON-LD is emitted from the
+   client in the meantime, built from the same rows the page just rendered so the two cannot
+   disagree.
 8. **Launch** — backups + restore drill, Sentry, uptime monitoring, DNS cutover, Search Console,
    Google Business Profile, Stripe live keys.
 
@@ -544,6 +583,31 @@ Dependency-ordered, not deadline-driven (single launch).
 - **Accessibility filter:** *(deferred — the filter is off; see Accessibility above)*
 - **Rate rebuild safety:** confirm a booking, edit the season covering its dates, rebuild, and assert
   the booking's total, nightly prices, and balance are **unchanged**.
+- **The preview changes nothing:** previewing a season that would reprice a month must report the
+  change and leave both `rate_seasons` and `rate_calendar` exactly as they were. If it ever
+  commits, an owner asking what a save would do has already done it. *(Done.)*
+- **The console cannot double-book:** a manual booking overlapping a stay the console itself just
+  took must be refused, by the exclusion constraint rather than by the form. *(Done.)*
+- **Unblocking is not a release:** removing a "block" by the id of a confirmed booking's occupancy
+  row must affect nothing and leave the room off sale. *(Done — the alternative is a paid stay's
+  room back on sale with the guest still arriving.)*
+- **A manual booking schedules no charge:** it is confirmed, its occupancy row never expires, and
+  `balance_charge_at` is NULL — otherwise the T-7 job tries a card that was never saved, flags a
+  failure, and mails the guest about a payment they were always making by cheque. *(Done.)*
+- **A manual booking is still confirmed to the guest:** the confirmation and the owner's copy are
+  queued, the confirmation reports nothing collected and the whole total outstanding, and it
+  carries no charge date. A stay with money owed must never read as paid in full. *(Done.)*
+- **A refused manual booking tells nobody:** the confirmation is queued inside the transaction and
+  after the room is claimed, so a booking that lost the race for its room leaves no message behind
+  about a stay that does not exist. *(Done.)*
+- **A payment link is never sent to a booking with a card on file:** a confirmed stay whose balance
+  is already scheduled for T-7, or one with nothing outstanding, is refused. Both are how a guest
+  pays twice. *(Done.)*
+- **An uploaded photograph is decoded, not trusted:** a renamed PDF is refused and nothing is
+  written; a 3600px photograph comes back at 2400 with its aspect ratio kept; the same file uploaded
+  twice occupies one path. *(Done.)*
+- **A stored path cannot escape the media directory:** `..`, a nested path, and a dot-file all
+  resolve to nothing and answer 404, whatever ends up in the database. *(Done.)*
 - **Hold expiry:** create a hold, advance past TTL, confirm the sweeper frees the room. *(Done — and
   the booking behind it is marked `expired`, so a guest returning to their link is told what
   happened.)*
