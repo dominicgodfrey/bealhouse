@@ -113,7 +113,7 @@ export class ApiError extends Error {
   }
 }
 
-async function request<T>(path: string, init?: RequestInit): Promise<T> {
+export async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(path, {
     ...init,
     headers: { 'Content-Type': 'application/json', ...init?.headers },
@@ -123,6 +123,12 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     const body = await response.json().catch(() => null)
     throw new ApiError(response.status, body?.error ?? `Request failed (${response.status})`)
   }
+
+  // Signing out and revoking a passkey answer 204, and parsing an empty body as
+  // JSON throws — which would turn a request that did exactly what was asked
+  // into an error on screen.
+  if (response.status === 204) return undefined as T
+
   return response.json() as Promise<T>
 }
 

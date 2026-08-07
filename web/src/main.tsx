@@ -1,8 +1,11 @@
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
-import { BrowserRouter, Route, Routes } from 'react-router'
+import { BrowserRouter, Navigate, Route, Routes } from 'react-router'
 
 import './index.css'
+import { Account } from './routes/admin/Account'
+import { Console } from './routes/admin/Console'
+import { Enroll } from './routes/admin/Enroll'
 import { Confirm } from './routes/Confirm'
 import { Health } from './routes/Health'
 import { Held } from './routes/Held'
@@ -41,6 +44,24 @@ createRoot(root).render(
           one is a capability the token in the URL has to authorise.
         */}
         <Route path="/booking/:code" element={<Manage />} />
+
+        {/*
+          The owner's console (decision #15).
+
+          /admin/enroll sits outside the gate on purpose: a phone accepting an
+          invitation is by definition not signed in yet, and the single-use
+          token in the fragment is what authorises it.
+
+          Everything else is nested under <Console>, which gates on the session
+          and renders the sign-in in place of the screen that was asked for
+          rather than redirecting — so signing in lands where you were going.
+        */}
+        <Route path="/admin/enroll" element={<Enroll />} />
+        <Route path="/admin" element={<Console />}>
+          {/* Becomes Today once there is a today to show. */}
+          <Route index element={<Navigate to="/admin/account" replace />} />
+          <Route path="account" element={<Account />} />
+        </Route>
 
         <Route path="/health" element={<Health />} />
       </Routes>

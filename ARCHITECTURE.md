@@ -356,6 +356,24 @@ console. Removing the last passkey is refused; revoking one signs out its sessio
 the row is deleted, because `ON DELETE SET NULL` would otherwise blank the link and leave the lost
 handset signed in for the rest of its year.
 
+### The shell *(built)*
+
+`/admin` is a gate and a frame. The gate is the session cookie and nothing else — no route hides a
+screen, because every endpoint under `/api/admin` is already closed, so a forged front end reaches
+empty boxes. A 401 renders the sign-in **in place of** the screen that was asked for rather than
+redirecting to a login address: the URL survives, so signing in lands where the owner was going, and
+a session expiring under an open console is a prompt rather than a page that navigated out from
+under them.
+
+`/admin/enroll` sits **outside** the gate, because a phone accepting an invitation is by definition
+not signed in yet — the single-use token in the fragment is what authorises it. The page takes that
+token out of the address bar the moment it has read it. A fragment never reaches the server, so it
+is in no access log, but it is still a one-shot key to the console sitting in plain sight and in
+this browser's history. It is captured in an effect and not only at mount, because a fragment
+arriving on a page already open is a *same-document* navigation: nothing re-mounts, so a mount-time
+read would miss it and the clearing step would then destroy an invitation the owner had just
+pasted in.
+
 - **Today** — arrivals, departures, in-house.
 - **Upcoming reservations** *(explicit requirement)* — every booking with **paid vs. total**, failed
   charges flagged in unmissable red, one-click "send Stripe payment request."
@@ -472,9 +490,31 @@ Dependency-ordered, not deadline-driven (single launch).
    cookies, an unconfigured console answering 503 instead of the SPA. They found the ordering bug in
    passkey revocation.
 
-   **Still to do:** the console shell under `/admin`, then content editing (rooms, photos,
-   descriptions, and the email copy whose storage landed with step 5), then operations —
-   upcoming/paid-vs-owed, calendar, list, manual CRUD, rate editor, blocking, guest search.
+   **The shell is built too.** `/admin` is the frame every later screen hangs off: the session
+   gate, the one-tap sign-in, the enrolment page a phone accepts an invitation on, and the one
+   screen whose backend already existed — the phones that can sign in, the phones currently
+   signed in, and the buttons that mint an invitation, strike a handset off, or end every
+   session at once. Nothing on it is a placeholder; every panel is wired to a real endpoint,
+   which is why it stops there.
+
+   The browser half of a passkey ceremony is the platform's own `parse*OptionsFromJSON()` and
+   `credential.toJSON()`, which are exactly the encoding go-webauthn writes and reads — so
+   there is no WebAuthn library in the bundle, and no second implementation of base64url to
+   disagree with the first. A browser too old for them is told so instead of being shown a
+   button that cannot work.
+
+   *Building it found the encoding bug the Go tests could not: `Passkey.ID` was a `[]byte`,
+   which `encoding/json` writes as standard padded base64, while `DELETE /api/admin/passkeys/{id}`
+   decodes base64url. Every id the console read back was unusable — and because standard base64
+   contains `/`, the request did not even reach the handler. No phone could be revoked from the
+   console at all, leaving shell access to the server as the only way to strike off a lost
+   handset, which is the thing a second enrolled phone exists to avoid needing. The ids are
+   base64url on the wire now and the regression asserts the round trip rather than a literal,
+   since a literal on each side is what let the two drift.*
+
+   **Still to do:** content editing (rooms, photos, descriptions, and the email copy whose
+   storage landed with step 5), then operations — upcoming/paid-vs-owed, calendar, list, manual
+   CRUD, rate editor, blocking, guest search.
 7. **Content & marketing** — home, restaurant + menu editor, events + inquiry form, about, image
    pipeline, JSON-LD injection.
 8. **Launch** — backups + restore drill, Sentry, uptime monitoring, DNS cutover, Search Console,

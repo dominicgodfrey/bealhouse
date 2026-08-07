@@ -492,6 +492,48 @@ against an origin, and a server that guessed one would accept assertions minted
 somewhere else. The routes stay registered and answer 503, so the owner gets a
 sentence rather than the SPA's index.html.
 
+**A passkey id crosses the wire as base64url, unpadded** — `admin.credentialID`,
+never a raw `[]byte` field. `encoding/json` writes a `[]byte` as *standard*
+base64: padded, and containing `+` and `/`. `DELETE /api/admin/passkeys/{id}`
+decodes base64url, and a `/` in the value splits the path, so the request 404s
+before any handler sees it. While that mismatch stood, the console listed
+passkeys with ids that could revoke nothing.
+`TestAPasskeyIsRevokedByTheIdTheListGaveOut` asserts the **round trip** — list,
+then delete that exact string — because a literal on each side is what let the
+two encodings drift apart in the first place.
+
+**Enrolment refuses with its own sentence** (`deniedEnrollment`), not
+`forbiddenAdmin`'s "not signed in", which is true of everybody on that page and
+says nothing about the link in their hand. It is still one message for expired,
+spent, forged and never-existed alike: the wording changes, not what it
+distinguishes.
+
+### The console's front end
+
+`web/src/routes/admin/` — the gate and frame in `Console.tsx`, the enrolment
+page, and the account screen. `web/src/lib/admin.ts` is its API and
+`web/src/lib/webauthn.ts` the browser half of a ceremony.
+
+- **No WebAuthn library.** `PublicKeyCredential.parseCreationOptionsFromJSON()`,
+  `parseRequestOptionsFromJSON()` and `credential.toJSON()` are the platform's
+  own, and they produce exactly the encoding go-webauthn already writes and
+  reads. A second base64url implementation in the bundle would be a thing to
+  keep in step with the first for no gain. A browser without them is told so;
+  it is not offered a button that fails.
+- **Both halves of a ceremony run inside the click.** Browsers require a user
+  gesture, so anything begun on mount is refused before a prompt is ever shown.
+- **The enrolment token comes out of the address bar as soon as it is read**,
+  and is captured in an effect rather than only at mount. A fragment arriving on
+  a page already open is a *same-document* navigation: nothing re-mounts, so a
+  mount-time read misses it and the clearing step then destroys an invitation
+  the owner had just pasted in.
+- **The account screen shows two lists, not one** — phones that *can* sign in
+  and phones that *are* signed in. They come apart in the case that matters: a
+  lost handset is a session to end and a key to strike off, and the owner needs
+  to see both to be sure they have done both.
+- **A 401 from any console action re-checks the session rather than showing an
+  error.** It is not a failure to report; it is a sign-in to ask for.
+
 ## Step 5: the manage-booking link
 
 **A booking code is an identifier, not an authenticator.** Six characters over a
