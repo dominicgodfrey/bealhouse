@@ -14,8 +14,10 @@ import (
 
 	"bealhouse/internal/admin"
 	"bealhouse/internal/booking"
+	"bealhouse/internal/console"
 	db "bealhouse/internal/db/gen"
 	"bealhouse/internal/gateway"
+	"bealhouse/internal/media"
 	"bealhouse/internal/payments"
 )
 
@@ -68,6 +70,22 @@ type Deps struct {
 	// be configured should say so, not serve the SPA's index.html to an API
 	// call and let the owner debug a login page that never works.
 	Console *admin.Console
+
+	// Ops is everything the console does once somebody is signed in, and the
+	// source of the marketing site's owner-managed content besides. Nil with no
+	// database, which leaves both sets of routes answering 503.
+	//
+	// Separate from Console because they fail independently: a deployment with
+	// a database and no SITE_URL can serve the restaurant menu perfectly well
+	// while refusing every sign-in, and one with neither should say so twice
+	// rather than once.
+	Ops *console.Ops
+
+	// Media stores and serves the photographs the owner uploads (decision #16).
+	// Nil when no directory could be prepared, which leaves both the upload
+	// route and /media/* answering 503 with a sentence rather than 404 — a
+	// photograph that fails should say why.
+	Media *media.Store
 }
 
 func NewRouter(d Deps) http.Handler {
@@ -144,18 +162,33 @@ func NewRouter(d Deps) http.Handler {
 			q := db.New(d.Pool)
 			api.Get("/availability", searchAvailability(q))
 			api.Get("/calendar", calendar(q))
+			api.Get("/rooms", rooms(q))
 			api.Get("/rooms/{slug}", room(q))
 			api.Get("/bookings/{code}", getBooking(q))
 			api.Get("/bookings/{code}/manage", manageBooking(q, d.Links))
 			api.Get("/bookings/{code}/confirmation.pdf", confirmationPDF(q, d.Links))
+
+			// The marketing site's owner-managed content. Reads, and the one
+			// anonymous write that is not a booking — an events inquiry, which
+			// takes no inventory off sale and spends nothing, so it shares the
+			// readers' allowance rather than needing the booking endpoint's.
+			api.Get("/menu", menu(d.Ops))
+			api.Get("/events", events(d.Ops))
+			api.Get("/copy/{slug}", pageCopy(d.Ops))
+			api.Post("/inquiries", submitInquiry(d.Ops))
 		} else {
 			// Better an honest 503 than a route that silently does not exist.
 			api.Get("/availability", databaseRequired)
 			api.Get("/calendar", databaseRequired)
+			api.Get("/rooms", databaseRequired)
 			api.Get("/rooms/{slug}", databaseRequired)
 			api.Get("/bookings/{code}", databaseRequired)
 			api.Get("/bookings/{code}/manage", databaseRequired)
 			api.Get("/bookings/{code}/confirmation.pdf", databaseRequired)
+			api.Get("/menu", databaseRequired)
+			api.Get("/events", databaseRequired)
+			api.Get("/copy/{slug}", databaseRequired)
+			api.Post("/inquiries", databaseRequired)
 		}
 
 		// The owner's console. Everything under it that reads or writes real
@@ -165,6 +198,8 @@ func NewRouter(d Deps) http.Handler {
 			console:     d.Console,
 			behindProxy: d.BehindProxy,
 			siteURL:     d.SiteURL,
+			ops:         d.Ops,
+			media:       d.Media,
 		}, rateLimit(newLimiter(adminRate, adminBurst), d.BehindProxy))
 
 		api.NotFound(func(w http.ResponseWriter, r *http.Request) {
@@ -189,6 +224,24 @@ func NewRouter(d Deps) http.Handler {
 	// retry rather than record every event as delivered.
 	if d.Pool != nil && d.StripeWebhookSecret != "" {
 		r.Post("/webhooks/stripe", stripeWebhook(d.Pool, d.StripeWebhookSecret, letters))
+	}
+
+	// The owner's photographs, on the root router and *before* the SPA fallback
+	// below (decision #16).
+	//
+	// Ahead of it because the fallback answers any GET it does not recognise
+	// with index.html and a 200 — which for an <img> is a broken picture and no
+	// error anywhere to say why. A missing photograph has to 404 and look like a
+	// missing photograph.
+	//
+	// Outside /api because it is not one: no JSON, no rate limit, no session.
+	// These are pictures of an inn on a public marketing page, and the CDN in
+	// front of them (decision #16) should be able to serve them without ever
+	// asking this process.
+	if d.Media != nil {
+		r.Get(media.URLPrefix+"*", serveMedia(d.Media))
+	} else {
+		r.Get(media.URLPrefix+"*", mediaUnavailable)
 	}
 
 	// Everything that is not /api is the SPA. No CORS, no second origin.

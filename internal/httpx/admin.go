@@ -13,6 +13,8 @@ import (
 	"github.com/go-chi/chi/v5"
 
 	"bealhouse/internal/admin"
+	"bealhouse/internal/console"
+	"bealhouse/internal/media"
 )
 
 // The cookies the console runs on.
@@ -41,6 +43,16 @@ type adminDeps struct {
 	console     *admin.Console
 	behindProxy bool
 	siteURL     string
+
+	// ops is everything the console does once somebody is signed in. Nil with
+	// no database, which leaves the operational routes answering 503 while the
+	// sign-in above them still works — so the owner gets a console that says
+	// what is wrong rather than a screen of empty boxes.
+	ops *console.Ops
+
+	// media stores uploaded photographs. Nil when no directory could be
+	// prepared, which leaves the upload route answering 503 with a sentence.
+	media *media.Store
 }
 
 // setCookie writes one of the console's cookies with the whole policy in one
@@ -190,11 +202,18 @@ func adminUnavailable(w http.ResponseWriter, _ *http.Request) {
 }
 
 // mountAdmin registers the console's API.
+//
+// **Every group below applies one of the two cross-site rules, and which one is
+// the only thing that differs.** sameSiteOnly is the default and covers
+// everything that sends JSON; uploadsAreSameSite covers the single route that
+// sends a file and therefore cannot. They are applied per group rather than once
+// at the top so that adding a route without one is a visible omission in this
+// function rather than an invisible inheritance — and so the upload's weaker
+// rule cannot leak onto a neighbour by being installed above it.
 func mountAdmin(api chi.Router, d adminDeps, limit func(http.Handler) http.Handler) {
 	api.Route("/admin", func(ad chi.Router) {
-		ad.Use(sameSiteOnly)
-
 		if d.console == nil {
+			ad.Use(sameSiteOnly)
 			ad.HandleFunc("/*", adminUnavailable)
 			return
 		}
@@ -205,6 +224,7 @@ func mountAdmin(api chi.Router, d adminDeps, limit func(http.Handler) http.Handl
 		// writes on an unauthenticated request is one somebody will point a
 		// loop at.
 		ad.Group(func(auth chi.Router) {
+			auth.Use(sameSiteOnly)
 			auth.Use(limit)
 
 			auth.Post("/auth/login/begin", adminLoginBegin(d))
@@ -216,9 +236,28 @@ func mountAdmin(api chi.Router, d adminDeps, limit func(http.Handler) http.Handl
 		// Signing out needs no session: a caller holding a cookie that has
 		// already expired still wants it cleared, and answering 401 would leave
 		// a dead cookie in the browser forever.
-		ad.Post("/auth/logout", adminLogout(d))
+		ad.Group(func(out chi.Router) {
+			out.Use(sameSiteOnly)
+			out.Post("/auth/logout", adminLogout(d))
+		})
+
+		// Uploading a photograph, which is the one write here that sends a file
+		// rather than JSON. Behind the session like everything else; the rule
+		// above it is the one difference, and uploadsAreSameSite says what that
+		// costs.
+		ad.Group(func(up chi.Router) {
+			up.Use(uploadsAreSameSite)
+			up.Use(requireAdmin(d.console))
+
+			if d.media == nil {
+				up.Post("/photos", mediaUnavailable)
+			} else {
+				up.Post("/photos", uploadPhoto(d.media))
+			}
+		})
 
 		ad.Group(func(in chi.Router) {
+			in.Use(sameSiteOnly)
 			in.Use(requireAdmin(d.console))
 
 			in.Get("/me", adminMe(d))
@@ -227,6 +266,11 @@ func mountAdmin(api chi.Router, d adminDeps, limit func(http.Handler) http.Handl
 			in.Post("/passkeys/invite", adminInvite(d))
 			in.Delete("/passkeys/{id}", adminRevokePasskey(d))
 			in.Post("/sessions/revoke-all", adminRevokeAllSessions(d))
+
+			// Everything the console actually does, mounted inside this group
+			// so being behind the session is a property of where it sits rather
+			// than of each of forty handlers remembering to check.
+			mountConsole(in, d.ops)
 		})
 	})
 }

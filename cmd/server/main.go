@@ -18,11 +18,13 @@ import (
 	"bealhouse/internal/admin"
 	"bealhouse/internal/booking"
 	"bealhouse/internal/config"
+	"bealhouse/internal/console"
 	db "bealhouse/internal/db/gen"
 	"bealhouse/internal/email"
 	"bealhouse/internal/gateway"
 	"bealhouse/internal/httpx"
 	"bealhouse/internal/jobs"
+	"bealhouse/internal/media"
 	"bealhouse/internal/payments"
 	"bealhouse/internal/rates"
 	"bealhouse/web"
@@ -96,9 +98,68 @@ func run() error {
 	// passkey to, which leaves its endpoints answering 503: a WebAuthn
 	// assertion is verified against an origin, and a server that had to guess
 	// which one would be accepting assertions minted for somewhere else.
-	console, err := adminConsole(cfg, pool)
+	adminAuth, err := adminConsole(cfg, pool)
 	if err != nil {
 		return err
+	}
+
+	// The renderer, hoisted above the job wiring because two things need it now:
+	// the email.send handler that puts a message in front of a guest, and the
+	// console's copy editor, which reads the words currently in force and has to
+	// see exactly what the sender would.
+	//
+	// It reads the owner's overrides from the database on every render, so a
+	// save in the console applies to the next message rather than the next
+	// deploy — which is only true if these two share one renderer rather than
+	// each building its own view of the templates.
+	var mail *email.Renderer
+	if pool != nil {
+		mail, err = email.New(email.Brand{
+			LogoURL: cfg.EmailLogoURL,
+			SiteURL: cfg.SiteURL,
+		}, db.New(pool))
+		if err != nil {
+			return err
+		}
+	}
+
+	// Everything the owner's console does once somebody is signed in, and the
+	// source of the marketing site's owner-managed content. Nil without a
+	// database, which leaves both answering 503 rather than 500.
+	var ops *console.Ops
+	if pool != nil {
+		// The same two things httpx attaches to a Charge, for the same reason:
+		// a booking the owner takes on the phone earns the guest the same
+		// confirmation — with the same manage link — as one taken on the
+		// website. Both are allowed to be absent and both fail softly.
+		letterhead := console.Letterhead{
+			OwnerEmail: cfg.OwnerEmail,
+			SiteURL:    cfg.SiteURL,
+		}
+		if links != nil && cfg.SiteURL != "" {
+			letterhead.ManageURL = func(code string, expires time.Time) string {
+				return links.URL(cfg.SiteURL, code, expires)
+			}
+		}
+		_, isFake := processor.(*gateway.Fake)
+		ops = console.New(pool, mail, letterhead, console.Processor{
+			Gateway:        processor,
+			PublishableKey: cfg.StripePublishableKey,
+			Fake:           isFake,
+		})
+	}
+
+	// Where uploaded photographs live (decision #16).
+	//
+	// A failure here does not stop the binary: the rest of the site works
+	// without it and the routes behind it answer 503 saying so. It is logged
+	// loudly, because the symptom otherwise is an owner pressing an upload
+	// button that never works and no reason anywhere.
+	store, err := media.New(cfg.MediaDir)
+	if err != nil {
+		slog.Error("photograph storage is unavailable; uploads will be refused",
+			"dir", cfg.MediaDir, "err", err)
+		store = nil
 	}
 
 	// Background work. Without the sweep an abandoned checkout holds its room
@@ -142,17 +203,10 @@ func run() error {
 		// Email is queued, never sent inline, so a provider outage delays a
 		// confirmation rather than failing the booking that earned it.
 		//
-		// `q` is where the owner's edited copy is read from: a message with a
-		// row in email_templates renders from that instead of the blank file it
-		// ships with. Nothing is cached, so an edit saved in admin applies to
-		// the next message rather than the next deploy.
-		mail, err := email.New(email.Brand{
-			LogoURL: cfg.EmailLogoURL,
-			SiteURL: cfg.SiteURL,
-		}, q)
-		if err != nil {
-			return err
-		}
+		// The renderer above is where the owner's edited copy is read from: a
+		// message with a row in email_templates renders from that instead of the
+		// blank file it ships with. Nothing is cached, so an edit saved in the
+		// console applies to the next message rather than the next deploy.
 		runner.Handle(email.JobKind, mail.Handler(sender))
 
 		go runner.Run(ctx)
@@ -170,7 +224,9 @@ func run() error {
 			OwnerEmail:           cfg.OwnerEmail,
 			Links:                links,
 			SiteURL:              cfg.SiteURL,
-			Console:              console,
+			Console:              adminAuth,
+			Ops:                  ops,
+			Media:                store,
 		}),
 		ReadHeaderTimeout: 10 * time.Second,
 		WriteTimeout:      30 * time.Second,
