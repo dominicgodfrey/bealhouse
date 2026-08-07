@@ -102,7 +102,7 @@ function Shell({
   return (
     <div className="flex min-h-dvh flex-col bg-neutral-50 text-neutral-900">
       <header className="sticky top-0 z-10 border-b border-neutral-200 bg-white">
-        <div className="mx-auto flex max-w-2xl items-center justify-between gap-4 px-4 py-3">
+        <div className="mx-auto flex max-w-4xl items-center justify-between gap-4 px-4 py-3">
           <Link to="/admin" className="flex items-center gap-2.5 font-semibold tracking-tight">
             <img src="/logo.svg" alt="" className="h-5 w-auto" />
             Console
@@ -111,18 +111,32 @@ function Shell({
         </div>
 
         {identity && (
-          <nav className="mx-auto flex max-w-2xl gap-1 overflow-x-auto px-4 pb-2 text-sm">
-            {/*
-              One entry, because one screen is built. The frame is here so the
-              rest — today, upcoming, the calendar, rates — land in it rather
-              than each arriving with its own idea of where the tabs go.
-            */}
+          // One scrolling row rather than a menu behind a button. There are a
+          // dozen screens and a phone shows five at a time, but a hamburger
+          // costs a tap on every single navigation and hides which screen you
+          // are on — which is the thing a one-handed user most needs to know.
+          //
+          // Operations first, then content, then the account: roughly the order
+          // of how often a morning needs them.
+          <nav className="mx-auto flex max-w-4xl gap-1 overflow-x-auto px-4 pb-2 text-sm">
+            <Tab to="/admin/today">Today</Tab>
+            <Tab to="/admin/bookings">Bookings</Tab>
+            <Tab to="/admin/calendar">Calendar</Tab>
+            <Tab to="/admin/guests">Guests</Tab>
+            <Tab to="/admin/rates">Rates</Tab>
+            <Tab to="/admin/rooms">Rooms</Tab>
+            <Tab to="/admin/menu">Menu</Tab>
+            <Tab to="/admin/events">Events</Tab>
+            <Tab to="/admin/inquiries">Enquiries</Tab>
+            <Tab to="/admin/pages">Pages</Tab>
+            <Tab to="/admin/email">Email</Tab>
+            <Tab to="/admin/settings">Settings</Tab>
             <Tab to="/admin/account">Phones</Tab>
           </nav>
         )}
       </header>
 
-      <main className="mx-auto w-full max-w-2xl flex-1 px-4 py-6">{children}</main>
+      <main className="mx-auto w-full max-w-4xl flex-1 px-4 py-6">{children}</main>
     </div>
   )
 }

@@ -4,15 +4,33 @@ import { BrowserRouter, Navigate, Route, Routes } from 'react-router'
 
 import './index.css'
 import { Account } from './routes/admin/Account'
+import { BookingDetail } from './routes/admin/BookingDetail'
+import { Bookings } from './routes/admin/Bookings'
+import { CalendarScreen } from './routes/admin/CalendarScreen'
+import { Collect } from './routes/admin/Collect'
 import { Console } from './routes/admin/Console'
+import { EmailCopy } from './routes/admin/EmailCopy'
 import { Enroll } from './routes/admin/Enroll'
+import { EventsEditor, Inquiries } from './routes/admin/EventsEditor'
+import { GuestFile, Guests } from './routes/admin/Guests'
+import { MenuEditor } from './routes/admin/MenuEditor'
+import { NewBooking } from './routes/admin/NewBooking'
+import { PageCopyEditor } from './routes/admin/PageCopyEditor'
+import { Rates } from './routes/admin/Rates'
+import { RoomsContent } from './routes/admin/RoomsContent'
+import { SettingsScreen } from './routes/admin/SettingsScreen'
+import { Today } from './routes/admin/Today'
+import { About } from './routes/About'
 import { Confirm } from './routes/Confirm'
+import { Events } from './routes/Events'
 import { Health } from './routes/Health'
 import { Held } from './routes/Held'
 import { Home } from './routes/Home'
 import { Manage } from './routes/Manage'
 import { Pay } from './routes/Pay'
+import { Restaurant } from './routes/Restaurant'
 import { Room } from './routes/Room'
+import { Rooms } from './routes/Rooms'
 import { Search } from './routes/Search'
 
 const root = document.getElementById('root')
@@ -25,8 +43,19 @@ createRoot(root).render(
         {/* The booking flow: search → results → room → confirm → hold. */}
         <Route path="/" element={<Home />} />
         <Route path="/search" element={<Search />} />
+        <Route path="/rooms" element={<Rooms />} />
         <Route path="/rooms/:slug" element={<Room />} />
         <Route path="/book/:slug" element={<Confirm />} />
+
+        {/*
+          The rest of the marketing site. Every word on these comes out of the
+          console rather than out of this repository, so they are structure with
+          the owner's content in it — and structure that says "not yet" rather
+          than inventing a sentence when there is none.
+        */}
+        <Route path="/restaurant" element={<Restaurant />} />
+        <Route path="/events" element={<Events />} />
+        <Route path="/about" element={<About />} />
 
         {/*
           Both keyed by booking code, unlike /book/:slug above, which is keyed
@@ -58,8 +87,31 @@ createRoot(root).render(
         */}
         <Route path="/admin/enroll" element={<Enroll />} />
         <Route path="/admin" element={<Console />}>
-          {/* Becomes Today once there is a today to show. */}
-          <Route index element={<Navigate to="/admin/account" replace />} />
+          {/* What is happening at the inn today, which is what anybody opening
+              the console without a specific reason came to find out. */}
+          <Route index element={<Navigate to="/admin/today" replace />} />
+          <Route path="today" element={<Today />} />
+
+          {/* Operations. */}
+          <Route path="bookings" element={<Bookings />} />
+          <Route path="bookings/new" element={<NewBooking />} />
+          <Route path="bookings/:code" element={<BookingDetail />} />
+          {/* Keying in a card the guest is reading out over the telephone. */}
+          <Route path="bookings/:code/collect" element={<Collect />} />
+          <Route path="calendar" element={<CalendarScreen />} />
+          <Route path="guests" element={<Guests />} />
+          <Route path="guests/:id" element={<GuestFile />} />
+          <Route path="rates" element={<Rates />} />
+
+          {/* Content — all of it the owner's. */}
+          <Route path="rooms" element={<RoomsContent />} />
+          <Route path="menu" element={<MenuEditor />} />
+          <Route path="events" element={<EventsEditor />} />
+          <Route path="inquiries" element={<Inquiries />} />
+          <Route path="pages" element={<PageCopyEditor />} />
+          <Route path="email" element={<EmailCopy />} />
+
+          <Route path="settings" element={<SettingsScreen />} />
           <Route path="account" element={<Account />} />
         </Route>
 
