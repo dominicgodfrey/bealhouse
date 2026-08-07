@@ -79,6 +79,18 @@ func forbiddenAdmin(w http.ResponseWriter) {
 	writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "not signed in"})
 }
 
+// deniedEnrollment is the same refusal, worded for the page it lands on.
+//
+// Enrolment is the one anonymous surface where "not signed in" is true of
+// everybody and tells the owner nothing about the link in their hand. This
+// still says exactly one thing to expired, already spent, forged and
+// never-existed alike — the wording changes, not what it distinguishes.
+func deniedEnrollment(w http.ResponseWriter) {
+	writeJSON(w, http.StatusUnauthorized, map[string]string{
+		"error": "that invitation is not valid; it may have expired or already been used",
+	})
+}
+
 // identityKey is where RequireAdmin leaves who the caller is.
 type identityKey struct{}
 
@@ -265,7 +277,7 @@ func adminEnrollBegin(d adminDeps) http.HandlerFunc {
 
 		creation, ceremony, err := d.console.BeginEnrollment(r.Context(), body.Token)
 		if errors.Is(err, admin.ErrDenied) {
-			forbiddenAdmin(w)
+			deniedEnrollment(w)
 			return
 		}
 		if err != nil {
@@ -286,7 +298,7 @@ func adminEnrollFinish(d adminDeps) http.HandlerFunc {
 
 		session, id, err := d.console.FinishEnrollment(r.Context(), ceremony, r)
 		if errors.Is(err, admin.ErrDenied) {
-			forbiddenAdmin(w)
+			deniedEnrollment(w)
 			return
 		}
 		if err != nil {
