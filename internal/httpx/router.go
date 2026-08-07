@@ -244,6 +244,26 @@ func NewRouter(d Deps) http.Handler {
 		r.Get(media.URLPrefix+"*", mediaUnavailable)
 	}
 
+	// What the marketing pages tell a crawler (decision #3).
+	//
+	// The head each page is served with, plus the two files that say which
+	// pages exist and which to leave alone. All three read live data, because
+	// the rooms are rows the owner edits — see meta.go.
+	//
+	// The read models come straight off the pool rather than through the rate
+	// limiter under /api: this is one query on a page load a visitor is already
+	// waiting for, and a crawler slowed to a 429 mid-crawl drops the page.
+	pageMeta := &siteMeta{ops: d.Ops, siteURL: d.SiteURL}
+	if d.Pool != nil {
+		pageMeta.q = db.New(d.Pool)
+	}
+
+	// Ahead of the SPA fallback for the same reason /media/* is: served by the
+	// fallback, robots.txt would be a page of HTML answering 200, and a crawler
+	// parsing that as a rule set behaves unpredictably.
+	r.Get("/robots.txt", robotsTXT(d.SiteURL))
+	r.Get("/sitemap.xml", sitemapXML(pageMeta))
+
 	// Everything that is not /api is the SPA. No CORS, no second origin.
 	//
 	// Reads only. A POST to an unrouted path is not a client-side route that
@@ -254,7 +274,7 @@ func NewRouter(d Deps) http.Handler {
 	// secret is configured, so a deploy that forgets one must 404 and have
 	// Stripe retry rather than answer index.html and have it record every
 	// payment as delivered.
-	spa := serveSPA(d.SPA)
+	spa := serveSPA(d.SPA, pageMeta)
 	r.NotFound(func(w http.ResponseWriter, r *http.Request) {
 		switch r.Method {
 		case http.MethodGet, http.MethodHead:
@@ -275,14 +295,20 @@ func badRequest(w http.ResponseWriter, reason string) {
 
 // serverError logs the cause and tells the client nothing about it.
 func serverError(w http.ResponseWriter, r *http.Request, err error) {
+	logRequestError(r, err)
+	writeJSON(w, http.StatusInternalServerError, map[string]string{
+		"error": "something went wrong",
+	})
+}
+
+// logRequestError is serverError's first half on its own, for the handlers that
+// have already committed to a status code and a body by the time they fail.
+func logRequestError(r *http.Request, err error) {
 	slog.Error("request failed",
 		"err", err,
 		"path", r.URL.Path,
 		"request_id", middleware.GetReqID(r.Context()),
 	)
-	writeJSON(w, http.StatusInternalServerError, map[string]string{
-		"error": "something went wrong",
-	})
 }
 
 func databaseRequired(w http.ResponseWriter, r *http.Request) {

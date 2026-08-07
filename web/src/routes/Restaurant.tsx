@@ -41,8 +41,6 @@ export function Restaurant() {
         <div className="flex flex-col gap-10">
           {menu.data?.map((section) => <Course key={section.name} section={section} />)}
         </div>
-
-        {menu.data && menu.data.length > 0 && <MenuJsonLd sections={menu.data} />}
       </div>
     </Layout>
   )
@@ -84,44 +82,9 @@ function Course({ section }: { section: MenuSection }) {
   )
 }
 
-/**
- * The structured menu, for search results (decision #12).
- *
- * Built from the same rows the page just rendered rather than from a second
- * description of the menu, so the two cannot disagree — which is the entire
- * reason the menu is structured data and not a paragraph.
- *
- * Injected from the client for now. Architecture decision #3 has the server
- * writing per-route JSON-LD into the document it serves, which is what a
- * crawler that does not run JavaScript needs; this is the same data in the
- * meantime rather than nothing.
+/*
+ * The structured `Menu` for search results (decision #12) used to be built here
+ * and injected from the client. It is written by the server now — decision #3,
+ * internal/httpx/meta.go — from the same rows this page renders, which is what
+ * a crawler that does not run JavaScript needs and this never was.
  */
-function MenuJsonLd({ sections }: { sections: MenuSection[] }) {
-  const menu = {
-    '@context': 'https://schema.org',
-    '@type': 'Menu',
-    hasMenuSection: sections.map((section) => ({
-      '@type': 'MenuSection',
-      name: section.name,
-      description: section.description || undefined,
-      hasMenuItem: section.items.map((item) => ({
-        '@type': 'MenuItem',
-        name: item.name,
-        description: item.description || undefined,
-        offers:
-          item.priceCents > 0
-            ? { '@type': 'Offer', price: (item.priceCents / 100).toFixed(2), priceCurrency: 'USD' }
-            : undefined,
-      })),
-    })),
-  }
-
-  return (
-    <script
-      type="application/ld+json"
-      // The content is the inn's own menu rows, serialised by JSON.stringify,
-      // so there is no path from a visitor to what goes in here.
-      dangerouslySetInnerHTML={{ __html: JSON.stringify(menu) }}
-    />
-  )
-}

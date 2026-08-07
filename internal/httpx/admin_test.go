@@ -10,7 +10,6 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
-	"testing/fstest"
 
 	"github.com/go-webauthn/webauthn/webauthn"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -43,9 +42,7 @@ func adminRouter(t *testing.T) (http.Handler, *pgxpool.Pool, *db.Queries) {
 	}
 
 	h := NewRouter(Deps{
-		SPA: fstest.MapFS{
-			"index.html": &fstest.MapFile{Data: []byte("<!doctype html><title>Beal House</title>")},
-		},
+		SPA:     testSPA(),
 		SiteURL: "https://admin.test",
 		Console: console,
 	})
@@ -440,9 +437,7 @@ func enrolAnotherPhone(t *testing.T, q *db.Queries, token string) {
 // an API call with a page.
 func TestAnUnconfiguredConsoleAnswers503(t *testing.T) {
 	h := NewRouter(Deps{
-		SPA: fstest.MapFS{
-			"index.html": &fstest.MapFile{Data: []byte("<!doctype html><title>Beal House</title>")},
-		},
+		SPA: testSPA(),
 	})
 
 	for _, route := range protectedRoutes {

@@ -1,6 +1,7 @@
 package httpx
 
 import (
+	"context"
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
@@ -63,67 +64,77 @@ type Photo struct {
 // hands each one's link the dates once the visitor has picked some.
 func rooms(q *db.Queries) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		all, err := q.ListRooms(r.Context())
+		out, err := roomCards(r.Context(), q)
 		if err != nil {
 			serverError(w, r, err)
 			return
 		}
-
-		ids := make([]int64, 0, len(all))
-		for _, room := range all {
-			ids = append(ids, room.ID)
-		}
-
-		photos, err := q.ListPhotosForRooms(r.Context(), ids)
-		if err != nil {
-			serverError(w, r, err)
-			return
-		}
-		byRoom := map[int64][]Photo{}
-		for _, p := range photos {
-			byRoom[p.RoomID] = append(byRoom[p.RoomID], Photo{URL: p.Path, Alt: p.AltText})
-		}
-
-		lowest, err := q.ListLowestRates(r.Context(),
-			pgtype.Date{Time: console.Today(), Valid: true})
-		if err != nil {
-			serverError(w, r, err)
-			return
-		}
-		from := map[int64]int64{}
-		for _, l := range lowest {
-			from[l.RoomID] = int64(l.FromCents)
-		}
-
-		// A slice, never nil. The API returns [] and never null for an empty
-		// list — a room with no photos crashed the results page once already.
-		out := make([]RoomCard, 0, len(all))
-		for _, room := range all {
-			card := RoomCard{
-				Slug:                room.Slug,
-				Name:                room.Name,
-				Description:         room.Description,
-				MaxOccupancy:        int(room.MaxOccupancy),
-				Amenities:           room.Amenities,
-				Photos:              byRoom[room.ID],
-				PlaceholderPhotoURL: availability.PlaceholderPhoto(room.Slug),
-				IsPetFriendly:       room.IsPetFriendly,
-				PetFeeCents:         int64(room.PetFeeCents),
-			}
-			if room.View != nil {
-				card.View = *room.View
-			}
-			if card.Photos == nil {
-				card.Photos = []Photo{}
-			}
-			if cents, ok := from[room.ID]; ok {
-				card.FromCents = &cents
-			}
-			out = append(out, card)
-		}
-
 		writeJSON(w, http.StatusOK, out)
 	}
+}
+
+// roomCards is the rooms index, as one read model.
+//
+// A function rather than the body of the handler above because the server-
+// rendered <head> describes the same rooms (decision #3, internal/httpx/meta.go)
+// and a second query assembling them slightly differently is how the document a
+// crawler indexes ends up quoting a price the page does not show.
+func roomCards(ctx context.Context, q *db.Queries) ([]RoomCard, error) {
+	all, err := q.ListRooms(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	ids := make([]int64, 0, len(all))
+	for _, room := range all {
+		ids = append(ids, room.ID)
+	}
+
+	photos, err := q.ListPhotosForRooms(ctx, ids)
+	if err != nil {
+		return nil, err
+	}
+	byRoom := map[int64][]Photo{}
+	for _, p := range photos {
+		byRoom[p.RoomID] = append(byRoom[p.RoomID], Photo{URL: p.Path, Alt: p.AltText})
+	}
+
+	lowest, err := q.ListLowestRates(ctx, pgtype.Date{Time: console.Today(), Valid: true})
+	if err != nil {
+		return nil, err
+	}
+	from := map[int64]int64{}
+	for _, l := range lowest {
+		from[l.RoomID] = int64(l.FromCents)
+	}
+
+	// A slice, never nil. The API returns [] and never null for an empty
+	// list — a room with no photos crashed the results page once already.
+	out := make([]RoomCard, 0, len(all))
+	for _, room := range all {
+		card := RoomCard{
+			Slug:                room.Slug,
+			Name:                room.Name,
+			Description:         room.Description,
+			MaxOccupancy:        int(room.MaxOccupancy),
+			Amenities:           room.Amenities,
+			Photos:              byRoom[room.ID],
+			PlaceholderPhotoURL: availability.PlaceholderPhoto(room.Slug),
+			IsPetFriendly:       room.IsPetFriendly,
+			PetFeeCents:         int64(room.PetFeeCents),
+		}
+		if room.View != nil {
+			card.View = *room.View
+		}
+		if card.Photos == nil {
+			card.Photos = []Photo{}
+		}
+		if cents, ok := from[room.ID]; ok {
+			card.FromCents = &cents
+		}
+		out = append(out, card)
+	}
+	return out, nil
 }
 
 // menu serves GET /api/menu (decision #12).

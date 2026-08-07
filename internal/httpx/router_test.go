@@ -9,14 +9,26 @@ import (
 	"time"
 )
 
+// testIndexHTML stands in for the Vite build.
+//
+// Shaped like the real one — a <head> with a static <title> in it — because the
+// server writes each page's own head in there (decision #3) and a fixture with
+// no </head> would exercise the fallback that skips injection instead of the
+// path every real request takes.
+const testIndexHTML = `<!doctype html><html lang="en"><head>` +
+	`<meta charset="UTF-8"><title>Beal House</title></head>` +
+	`<body><div id="root"></div></body></html>`
+
+func testSPA() fstest.MapFS {
+	return fstest.MapFS{"index.html": &fstest.MapFile{Data: []byte(testIndexHTML)}}
+}
+
 // A router with no database. Every route that needs one answers 503, which is
 // plenty to exercise the middleware — and lets these tests run anywhere.
 func router(t *testing.T, behindProxy bool) http.Handler {
 	t.Helper()
 	return NewRouter(Deps{
-		SPA: fstest.MapFS{
-			"index.html": &fstest.MapFile{Data: []byte("<!doctype html><title>Beal House</title>")},
-		},
+		SPA:         testSPA(),
 		BehindProxy: behindProxy,
 	})
 }

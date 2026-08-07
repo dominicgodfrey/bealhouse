@@ -237,6 +237,37 @@ place a page speaks for itself is the About fallback, and it says only what is
 already true elsewhere in this repository — seven rooms, Littleton, New
 Hampshire.
 
+**The `<head>` is written by the server, per route** (`internal/httpx/meta.go`, decision #3). The
+SPA is one document for every address, so the fallback fills in that page's title, description,
+canonical, Open Graph tags and JSON-LD before serving it.
+
+- **It reimplements no read model.** The rooms in the head come from `roomCards`, which is what
+  `GET /api/rooms` answers with; the menu is `ops.PublicMenu`; the prose is `ops.PageFor`. A
+  second query assembling them slightly differently is how the document a crawler indexes ends
+  up quoting a price the page does not show.
+- **Vite's static `<title>` is stripped from the shell**, not joined by a second one. A browser
+  takes the first and a crawler may take either, which is the failure that looks fine on screen
+  and puts "Beal House" on all seven room results.
+- **A description is the owner's words or nothing.** Same rule as the pages: no copy written means
+  no `<meta name="description">` at all, because an empty one tells a search engine the page has
+  nothing to say. The home page's fallback is the one sentence this repository supplies and it
+  says only what the footer already says.
+- **Absolute URLs need `SITE_URL`**, exactly like the email letterhead. No origin means no
+  canonical, no `og:url`, no `og:image` and no `sitemap.xml` — a `<loc>` is defined as absolute
+  and a file full of relative ones is rejected whole.
+- **This is the one place console text becomes markup.** Page copy is plain text with no markdown
+  parser so that the console cannot put a `<script>` on the public site; `html/template` for the
+  attributes and `json.Marshal`'s `<` escaping inside the `ld+json` blocks are the other
+  half of that. Two different escapers — `TestTheOwnersWordsCannotEscapeTheDocument` asserts both.
+- **The booking flow and the console are `noindex` with no canonical**, and `robots.txt`
+  `Disallow`s them. A GET under `/book` or `/bookings` ends in a hold, so a crawler walking them
+  takes real rooms off sale for the TTL — decision #29's problem arriving politely.
+- **`robots.txt` and `sitemap.xml` are on the root router ahead of the SPA fallback**, for the
+  reason `/media/*` is: answered by the fallback they would be a page of HTML with a 200, and a
+  crawler parsing that as a rule set does something nobody predicted.
+- **Nothing here may fail a request.** A query that errors costs the structured data and logs a
+  warning; the visible page is what the visitor came for.
+
 **Photographs upload from the console** (`internal/media`, decision #16). An
 image arrives, is decoded, scaled so its longest side is at most 2400px,
 re-encoded as JPEG and written to `MEDIA_DIR` under a name that is the SHA-256

@@ -27,7 +27,7 @@ Stack constraint: **TypeScript/React + Go**. No launch deadline — one complete
 |---|---|---|
 | 1 | Distribution | Direct only. Availability rows carry a `source` field so Airbnb/Booking.com sync is a later adapter, not a rewrite |
 | 2 | Hosting | **Hetzner Cloud CX22, Ashburn VA (~$5/mo)** + Caddy for automatic TLS. Bluehost = domain/DNS/email only. See *VPS* below |
-| 3 | Rendering | Vite React SPA embedded in ONE Go binary via `embed.FS`; Go injects per-route meta + JSON-LD with live DB data |
+| 3 | Rendering | Vite React SPA embedded in ONE Go binary via `embed.FS`; Go injects per-route meta + JSON-LD with live DB data. **Built** (`internal/httpx/meta.go`): the SPA fallback writes the page's own title, description, canonical, Open Graph tags and structured data into `<head>` before serving it, from the same read models the page's own API calls return — so the document a crawler indexes and the one a visitor reads cannot quote different rooms at different prices. Vite's static `<title>` is stripped, or every page would carry two. A description is the owner's own words or **absent**, never invented, on the same terms as the pages themselves; absolute URLs appear only with a `SITE_URL` to build them on. The booking flow and the console are `noindex` and carry no canonical. `robots.txt` and a `sitemap.xml` generated from live rooms sit beside it, ahead of the SPA fallback for the reason `/media/*` is |
 | 4 | Pricing | Seasonal date-range rates + minimum-stay. Guest count is a **capacity filter only**, never a price input |
 | 5 | Rate storage | Materialized nightly calendar `(room_id, date, price_cents, min_stay)` |
 | 6 | Payment | Deposit at booking; balance auto-charged off-session at **T-7 days** |
@@ -551,11 +551,30 @@ Dependency-ordered, not deadline-driven (single launch).
    `/media/*` ahead of the SPA fallback. Alt text is required on every one, and remove and reorder
    are the same list the page renders from.
 
+   **The head is the server's now** (decision #3, `internal/httpx/meta.go`). The SPA is one
+   document for every address, so until this the home page, all seven rooms, the restaurant and
+   the events shared one title, no description and no structured data — which is the whole of the
+   site's search presence, and it cost most on the room pages, the ones somebody arrives at from
+   a search engine rather than from the front door. The fallback now writes the page's own title,
+   description, canonical, Open Graph tags and JSON-LD (`LodgingBusiness`, `HotelRoom` with the
+   same "from" price the card shows, `Restaurant` + `Menu`, `Event`) before serving the document,
+   and `robots.txt` and a live `sitemap.xml` sit beside it.
+
+   *Three things there were worth getting right.* The **description is the owner's or nothing** —
+   the same rule the pages follow, so a page nobody has written publishes no description rather
+   than an empty one, and the only sentence this repository supplies is the home page's fallback,
+   which says what the footer has always said. The **booking flow is `noindex` and `Disallow`ed**,
+   because `/book` and `/bookings` take a real room off sale for the hold TTL and a crawler
+   walking them empties the inn quietly — decision #29's risk arriving through the front door.
+   And this is **the one place console text becomes markup**: page copy is stored as plain text
+   with no markdown parser precisely so there is no way to put a `<script>` on the public site
+   from a phone, and `html/template` plus `json.Marshal`'s own escaping is the other half of that
+   promise. `TestTheOwnersWordsCannotEscapeTheDocument` asserts both halves, since the attribute
+   and the JSON-LD are different escapers and only one of them being right is the interesting
+   failure.
+
    **Still to do:** the AVIF and WebP variants, which need an encoder Go does not ship (see
-   decision #16), and server-injected per-route meta and JSON-LD (decision #3), which is what a
-   crawler that does not run JavaScript needs. The restaurant's `Menu` JSON-LD is emitted from the
-   client in the meantime, built from the same rows the page just rendered so the two cannot
-   disagree.
+   decision #16).
 8. **Launch** — backups + restore drill, Sentry, uptime monitoring, DNS cutover, Search Console,
    Google Business Profile, Stripe live keys.
 
@@ -603,6 +622,19 @@ Dependency-ordered, not deadline-driven (single launch).
 - **A payment link is never sent to a booking with a card on file:** a confirmed stay whose balance
   is already scheduled for T-7, or one with nothing outstanding, is refused. Both are how a guest
   pays twice. *(Done.)*
+- **Every marketing page describes itself, and only itself:** each of the five has its own title
+  and canonical, the shell's static `<title>` is gone rather than joined by a second one, and a
+  room page's structured offer quotes the same "from" price the API does. *(Done.)*
+- **A page nobody has written publishes no description:** absent, not empty — the head follows the
+  same rule the page does, and an invented sentence in a search result outlives the memory of
+  having invented it. *(Done.)*
+- **The console cannot put markup on the public site:** a page heading and a dish name containing
+  `"><script>` must survive into the document as text, through the HTML attribute escaper *and*
+  through JSON-LD, which are two different escapers. *(Done — this is the one place plain-text
+  page copy becomes markup.)*
+- **The booking flow is not crawlable:** `/book` and `/bookings` are `noindex`, carry no canonical
+  and are `Disallow`ed, because a GET there ends in a hold and a crawler walking them takes the
+  inn off sale. *(Done.)*
 - **An uploaded photograph is decoded, not trusted:** a renamed PDF is refused and nothing is
   written; a 3600px photograph comes back at 2400 with its aspect ratio kept; the same file uploaded
   twice occupies one path. *(Done.)*
