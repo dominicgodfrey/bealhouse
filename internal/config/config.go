@@ -73,6 +73,15 @@ type Config struct {
 	// stays overridable for the day the logo lives on a CDN.
 	EmailLogoURL string
 
+	// MediaDir is where photographs the owner uploads are stored (decision #16).
+	//
+	// Relative by default, which is right for a laptop and wrong for a server —
+	// on the VPS this belongs somewhere that survives a deploy, because the
+	// binary is replaced by `scp` and the photographs are not in it. Somewhere
+	// like /var/lib/bealhouse/media, and included in the nightly backup, since a
+	// `pg_dump` restores the paths and not the files they name.
+	MediaDir string
+
 	// BehindProxy says a trusted reverse proxy sits in front of this server and
 	// terminates TLS — Caddy, in the deployed shape (decision #2).
 	//
@@ -110,6 +119,8 @@ func Load() Config {
 
 		OwnerEmail:   env("OWNER_EMAIL", ""),
 		EmailLogoURL: emailLogoURL(env("EMAIL_LOGO_URL", ""), siteURL),
+
+		MediaDir: env("MEDIA_DIR", "media"),
 
 		BehindProxy: env("BEHIND_PROXY", "") == "true",
 	}
