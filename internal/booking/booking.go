@@ -91,6 +91,48 @@ type Request struct {
 	// disagree, something changed between the quote and the confirm, and the
 	// booking should fail loudly rather than charge a surprise.
 	ExpectedTotalCents int64
+
+	// Manual is the owner writing down a reservation they took on the phone,
+	// from the admin console. It changes three things and nothing else:
+	//
+	//   - The booking is confirmed rather than pending. Nobody is going to pay
+	//     for it in a browser, so there is no checkout to hold a room for.
+	//   - Its occupancy row is a 'booking' rather than a 'hold', so it has no
+	//     expiry and the sweeper cannot take the room back at minute fifteen.
+	//   - balance_charge_at is left NULL. That column is the flag saying no
+	//     scheduled charge exists (decision #7's shape), which is exactly the
+	//     truth here: there is no saved card, so a T-7 job could only flag a
+	//     failure and send the guest an alarming message about a payment they
+	//     were never going to make by card.
+	//
+	// Everything else is deliberately identical, and that is the point of it
+	// being a flag rather than a second function: the availability re-check,
+	// the pricing, the code generation and the claim on the room through the
+	// exclusion constraint are the same ones a guest goes through. An owner
+	// taking a booking by phone must not be able to double-book a room that a
+	// guest on the website could not.
+	//
+	// The money is collected outside this system, so amount_paid_cents stays
+	// zero and the console shows the whole total as outstanding.
+	Manual bool
+
+	// AfterCreate runs inside the transaction that wrote the booking, just
+	// before it commits, with the booking's code.
+	//
+	// It exists so a caller can queue mail that must not be able to exist
+	// without the booking, or the booking without it. The queue is a table, so
+	// both commit together and a crash between them can lose neither — the same
+	// discipline every message in this system is sent under.
+	//
+	// A hook rather than this package doing the mailing itself, because the
+	// confirmation payload is assembled in internal/payments and this package
+	// cannot import it: payments already imports this one. The console, which
+	// imports both, is where the two are joined.
+	//
+	// Nil on the guest-facing path, deliberately. There the confirmation belongs
+	// to the payment, not to the hold — a guest who never finishes paying must
+	// not be told they are booked.
+	AfterCreate func(ctx context.Context, q *db.Queries, code string) error
 }
 
 // Room is a booked room as the confirmation shows it.
@@ -198,7 +240,7 @@ func Create(ctx context.Context, beginner Beginner, req Request) (Booking, error
 
 	shortNotice := pricing.IsShortNotice(civil.Today(), req.Checkin)
 	chargeAt := pgtype.Date{}
-	if !shortNotice {
+	if !shortNotice && !req.Manual {
 		chargeAt = pgtype.Date{Time: pricing.BalanceChargeDate(req.Checkin), Valid: true}
 	}
 
@@ -221,20 +263,37 @@ func Create(ctx context.Context, beginner Beginner, req Request) (Booking, error
 		return Booking{}, fmt.Errorf("booking: recording the room: %w", err)
 	}
 
-	expires := time.Now().Add(time.Duration(settings.HoldTtlMinutes) * time.Minute)
+	// A hold expires; a booking does not. occupancy_holds_expire is a CHECK
+	// constraint asserting exactly that correspondence, so these two always move
+	// together.
+	kind, expires := "hold", time.Now().Add(time.Duration(settings.HoldTtlMinutes)*time.Minute)
+	expiry := pgtype.Timestamptz{Time: expires, Valid: true}
+	if req.Manual {
+		kind, expiry = "booking", pgtype.Timestamptz{}
+	}
+
 	if _, err := occupancy.Create(ctx, q, db.CreateOccupancyParams{
 		RoomID:    room.ID,
 		Checkin:   pgtype.Date{Time: req.Checkin, Valid: true},
 		Checkout:  pgtype.Date{Time: req.Checkout, Valid: true},
-		Kind:      "hold",
+		Kind:      kind,
 		Source:    "direct",
 		BookingID: &bookingID,
-		ExpiresAt: pgtype.Timestamptz{Time: expires, Valid: true},
+		ExpiresAt: expiry,
 	}); err != nil {
 		// ErrRoomTaken passes through untouched: losing this race is an
 		// ordinary outcome, and the caller has something specific to say
 		// about it.
 		return Booking{}, err
+	}
+
+	// Before the commit, so whatever it queues shares this transaction's fate.
+	// After the room is claimed, so nothing is queued for a booking that then
+	// loses the race for its room.
+	if req.AfterCreate != nil {
+		if err := req.AfterCreate(ctx, q, code); err != nil {
+			return Booking{}, err
+		}
 	}
 
 	if err := tx.Commit(ctx); err != nil {
@@ -339,7 +398,7 @@ func insertBooking(
 		id, err = q.CreateBooking(ctx, db.CreateBookingParams{
 			Code:              code,
 			GuestID:           guestID,
-			Status:            StatusPending,
+			Status:            req.status(),
 			Checkin:           pgtype.Date{Time: req.Checkin, Valid: true},
 			Checkout:          pgtype.Date{Time: req.Checkout, Valid: true},
 			Guests:            int32(req.Guests),
@@ -370,7 +429,7 @@ func view(req Request, room availability.Room, code string, expires time.Time) B
 
 	out := Booking{
 		Code:     code,
-		Status:   StatusPending,
+		Status:   req.status(),
 		Checkin:  req.Checkin.Format(time.DateOnly),
 		Checkout: req.Checkout.Format(time.DateOnly),
 		Nights:   civil.Nights(req.Checkin, req.Checkout),
@@ -391,7 +450,26 @@ func view(req Request, room availability.Room, code string, expires time.Time) B
 	if !shortNotice {
 		out.BalanceChargeOn = pricing.BalanceChargeDate(req.Checkin).Format(time.DateOnly)
 	}
+
+	// A manual booking has no countdown to show and no card to charge later.
+	// Both are reported as absent rather than as zero, matching what was
+	// actually written: no expiry on the occupancy row, NULL in
+	// balance_charge_at.
+	if req.Manual {
+		out.HoldExpiresAt = nil
+		out.BalanceChargeOn = ""
+		out.ChargeNowCents = 0
+	}
 	return out
+}
+
+// status is what the booking is the moment it is written: held pending a card,
+// or confirmed because the owner has already agreed it with the guest.
+func (r Request) status() string {
+	if r.Manual {
+		return StatusConfirmed
+	}
+	return StatusPending
 }
 
 func (r Request) validate() error {
