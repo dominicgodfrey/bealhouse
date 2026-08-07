@@ -160,6 +160,16 @@ them in parallel against one shared database, so:
   | httpx — webhook and manage tests | today+400 |
   | console | today+500 |
 
+- **A package whose fixture claims more than one room per transaction takes
+  `Exclusive` too**, and that one is about locks rather than rows.
+  `occupancy.Create` takes a per-room advisory lock held to the end of the
+  transaction, so two packages claiming rooms in different orders is an AB-BA
+  deadlock — the suite failed about one full parallel run in four, in whichever
+  package lost, reporting `25P02` ("current transaction is aborted") rather than
+  a deadlock. `availability` and `console` are the two. **Nothing in the
+  application does this**: a booking claims exactly one room, which is what
+  makes the advisory lock sufficient there.
+
   **The today+30 window is the soft spot.** The date picker opens on the current
   month, so clicking through the booking flow by hand lands a real hold right in
   it, and the availability search tests then fail with a room mysteriously

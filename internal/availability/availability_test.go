@@ -19,9 +19,20 @@ import (
 // Tests run inside a rolled-back transaction and use dates a month out, which
 // keeps them inside the seeded rate horizon without depending on a fixed
 // calendar year.
+//
+// They also take testdb.Exclusive, and that is about locks rather than rows.
+// These fixtures claim **several rooms inside one transaction**, and
+// occupancy.Create takes a per-room advisory lock held to the end of it. Two
+// packages doing that in different room orders is an AB-BA deadlock, which
+// Postgres breaks after deadlock_timeout — so the suite failed roughly one full
+// run in four, in whichever package lost, with an error about an aborted
+// transaction rather than about a deadlock. Nothing in the application does
+// this: a booking claims exactly one room, which is what makes that advisory
+// lock sufficient there. See CLAUDE.md.
 func setup(t *testing.T) (context.Context, *db.Queries) {
 	t.Helper()
 	pool := testdb.Connect(t)
+	testdb.Exclusive(t, pool)
 	tx := testdb.Tx(t, pool)
 	return context.Background(), db.New(tx)
 }

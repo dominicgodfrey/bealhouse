@@ -32,9 +32,17 @@ func day(offset int) time.Time { return civil.AddDays(civil.Today(), window+offs
 
 func date(offset int) string { return day(offset).Format(time.DateOnly) }
 
+// Exclusive as well as Tx, and that is about locks rather than rows. These
+// tests claim **several rooms inside one transaction**, and occupancy.Create
+// takes a per-room advisory lock held to the end of it — so two packages doing
+// that in different room orders deadlock, and Postgres breaks the cycle after
+// deadlock_timeout in whichever one loses. Nothing in the application claims
+// two rooms at once, which is what makes that lock sufficient there.
 func ops(t *testing.T) (*console.Ops, pgx.Tx) {
 	t.Helper()
-	tx := testdb.Tx(t, testdb.Connect(t))
+	pool := testdb.Connect(t)
+	testdb.Exclusive(t, pool)
+	tx := testdb.Tx(t, pool)
 	// No processor: the only operation that needs one is keying in a card, and
 	// gateway.Disabled is what a deployment without keys has anyway. Everything
 	// else here works with no Stripe account, which is the property the payments
