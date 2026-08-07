@@ -57,6 +57,39 @@ type EmailTemplate struct {
 	UpdatedAt time.Time
 }
 
+type Event struct {
+	ID          int64
+	Title       string
+	HappensOn   pgtype.Date
+	Description string
+	IsPublished bool
+	SortOrder   int32
+	CreatedAt   time.Time
+	UpdatedAt   time.Time
+}
+
+type EventInquiry struct {
+	ID        int64
+	Name      string
+	Email     string
+	Phone     string
+	EventDate pgtype.Date
+	PartySize *int32
+	Message   string
+	Status    string
+	CreatedAt time.Time
+	UpdatedAt time.Time
+}
+
+type EventPhoto struct {
+	ID        int64
+	EventID   int64
+	Path      string
+	AltText   string
+	SortOrder int32
+	CreatedAt time.Time
+}
+
 type Guest struct {
 	ID        int64
 	Email     string
@@ -64,6 +97,14 @@ type Guest struct {
 	Phone     string
 	CreatedAt time.Time
 	UpdatedAt time.Time
+}
+
+type GuestNote struct {
+	ID           int64
+	GuestID      int64
+	AuthorUserID *int64
+	Body         string
+	CreatedAt    time.Time
 }
 
 type Job struct {
@@ -75,6 +116,32 @@ type Job struct {
 	LastError string
 	UniqueKey *string
 	CreatedAt time.Time
+}
+
+type MenuItem struct {
+	ID          int64
+	SectionID   int64
+	Name        string
+	Description string
+	PriceCents  int32
+	IsAvailable bool
+	SortOrder   int32
+}
+
+type MenuSection struct {
+	ID          int64
+	Name        string
+	Description string
+	SortOrder   int32
+	CreatedAt   time.Time
+}
+
+// Owner-edited prose for the public pages. A row overrides the blank slot the page ships with; deleting the row empties it again.
+type PageCopy struct {
+	Slug      string
+	Heading   string
+	Body      string
+	UpdatedAt time.Time
 }
 
 // The ledger. bookings.amount_paid_cents is the gross of the succeeded charges here and is never reduced by a refund - pricing.Refund derives from what was collected, so decrementing it would make a second cancellation compute a different answer.
