@@ -4,6 +4,8 @@
 // OpenAPI spec so the two sides cannot drift; until the annotations exist,
 // these live here and are the one place to fix when they do.
 
+import type { PhotoSources } from '../components/Photo'
+
 export type Quote = {
   nights: number
   roomSubtotalCents: number
@@ -16,7 +18,7 @@ export type Quote = {
 }
 
 export type Bed = { type: string; count: number; location?: string }
-export type Photo = { url: string; alt: string }
+export type Photo = { url: string; alt: string } & PhotoSources
 
 export type Room = {
   id: number

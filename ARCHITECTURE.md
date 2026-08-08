@@ -40,7 +40,7 @@ Stack constraint: **TypeScript/React + Go**. No launch deadline — one complete
 | 13 | Tax | NH Meals & Rooms 8.5%, configurable; **each booking snapshots its rate** for audit |
 | 14 | Date picker | No flexible ±1 search. Calendar greys out unselectable dates live |
 | 15 | Admin auth | **Passkeys (WebAuthn), no password anywhere.** Single shared owner account, a real `users` table behind it, one credential per phone. *(revised; was a password plus TOTP)* The console is opened from the two owners' phones, so the authenticator is the handset itself: a private key it will only use after Face ID or a fingerprint. What that buys over the original plan is that **nothing stored server-side is a credential** — a leaked dump contains public keys — and that it **cannot be phished**, because the browser binds every signature to the origin. There is also no shared secret two people have to hand to each other and rotate. Sessions are **rows**, hashed, rolling **365 days** from last use, so a phone in regular use never signs in again and a lost one can be struck off. Enrolment is a **single-use** invitation, minted by `bealhouse enroll` on the server or from an already-signed-in console. **No step-up auth** on refunds: the owners' call, and the phones are locked |
-| 16 | Media | Owner uploads in admin → VPS disk, Go generates AVIF/WebP variants, Cloudflare free CDN. **Built, less the variants:** `internal/media` decodes an upload — which is also the only real check that it is an image — scales it to 2400px on the longest side, re-encodes it as JPEG, and stores it under the SHA-256 of its own bytes in `MEDIA_DIR`. Content addressing means the same photograph uploaded twice is one file and the URL can be served `immutable`; it also means **removing a photo does not delete the file**, since two rooms may point at the same bytes. `/media/*` is registered ahead of the SPA fallback, or a missing photograph would answer index.html with a 200 and render as a broken image with no error anywhere. **AVIF and WebP are what remain:** Go's standard library encodes neither, and producing them needs cgo with libvips or a third-party pure-Go encoder — a dependency to choose deliberately rather than in passing. `MEDIA_DIR` is in neither the binary nor `pg_dump`, so it needs its own place on the VPS and its own line in the backup |
+| 16 | Media | Owner uploads in admin → VPS disk, Go generates AVIF/WebP variants, Cloudflare free CDN. **Built:** `internal/media` decodes an upload — which is also the only real check that it is an image — scales it to 2400px on the longest side, re-encodes it as JPEG, and stores it under the SHA-256 of its own bytes in `MEDIA_DIR`. Content addressing means the same photograph uploaded twice is one file and the URL can be served `immutable`; it also means **removing a photo does not delete the file**, since two rooms may point at the same bytes. `/media/*` is registered ahead of the SPA fallback, or a missing photograph would answer index.html with a 200 and render as a broken image with no error anywhere. **Built, less AVIF:** an upload now produces a ladder — 480/960/1600/2400, in JPEG and WebP — and the page picks with `srcset`. The widths are the larger half of that by far: the 960px JPEG measured 76 KB against 955 KB at 2400px, where WebP saves a further half at the same width, so a card four hundred CSS pixels wide was downloading twelve times what it could use. The rung is **in the filename**, which is what makes `media.Sources` a pure function and keeps a srcset from ever naming a file that was not written — a 404 inside one does not fall back, it is a broken image. The encoder is `gen2brain/webp`, libwebp under wazero, chosen because it builds with `CGO_ENABLED=0` on a machine with no C compiler; the pure-Go alternatives are lossless-only and larger than the JPEG they replace. **AVIF is feasible and deliberately deferred**: −61% at full size, but 5.3 MB of binary and ~1.7s per upload, which would move the work into a background job and require the API to report which variants exist yet. `MEDIA_DIR` is in neither the binary nor `pg_dump`, so it needs its own place on the VPS and its own line in the backup |
 | 17 | Email | Resend. SPF/DKIM/DMARC at Bluehost DNS (SPF must include Resend *and* the mailbox host) |
 | 18 | Launch | Placeholder site today → clean cutover. Google Business Profile + Search Console on day one |
 | 19 | Guest self-service | Signed expiring link in confirmation email → view booking + **cancel**, refund executes automatically. Date changes go through the owner. **Built:** an HMAC over the code and an expiry (`BOOKING_LINK_SECRET`), not a stored token — stateless, valid for bookings made before the feature existed, and expiring thirty days after checkout. Cancelling is refused once the stay has begun, because decision #9's arithmetic does not describe a visit in progress |
@@ -573,8 +573,21 @@ Dependency-ordered, not deadline-driven (single launch).
    and the JSON-LD are different escapers and only one of them being right is the interesting
    failure.
 
-   **Still to do:** the AVIF and WebP variants, which need an encoder Go does not ship (see
-   decision #16).
+   **Photographs ship as a ladder now** (decision #16): 480/960/1600/2400, in JPEG and WebP, with
+   the page picking through `srcset`. The widths are the larger half by a distance — the 960px
+   JPEG measured 76 KB against 955 KB at 2400px, so a room card four hundred CSS pixels wide was
+   downloading twelve times what it could use, which is exactly the failure the re-encoding step
+   was written to prevent and had only half prevented. The rung is **in the filename**, which is
+   what makes `media.Sources` a pure function callable from three packages with no Store threaded
+   through, and what keeps a `srcset` from ever naming a file that was not written — a 404 inside
+   one does not fall back to the `src`, it is a broken image.
+
+   *Wiring it up found a real defect*: `availability` prefixed `/media/` onto a path that already
+   carried it, so every photograph on the **search results and the room page** would have been
+   broken. Nothing had noticed because no photographs have been uploaded yet and no test asserted
+   the shape; `TestAPhotoURLIsTheStoredPathUntouched` does now.
+
+   **Still to do:** AVIF, which is feasible and deferred — see decision #16 for the trade.
 8. **Launch** ← **IN PROGRESS.** The machinery is written and lives in [`deploy/`](deploy/):
    the hardened systemd unit, the Caddyfile, a deploy script, the nightly backup and its timer,
    and the restore drill. `.github/workflows/ci.yml` runs gofmt, vet, a generated-code check and
@@ -665,6 +678,13 @@ Dependency-ordered, not deadline-driven (single launch).
 - **The booking flow is not crawlable:** `/book` and `/bookings` are `noindex`, carry no canonical
   and are `Disallow`ed, because a GET there ends in a hold and a crawler walking them takes the
   inn off sale. *(Done.)*
+- **Every URL in a `srcset` is a file that exists:** a photograph smaller than a rung does not
+  have that rung, and a 404 inside a srcset does not fall back to the `src` — the browser has
+  committed to that candidate and the page shows a broken image. *(Done — the rung is in the
+  filename, so what exists is derivable rather than guessed.)*
+- **A stored path is the URL, unchanged:** prefixing `/media/` onto a path that already carries it
+  breaks every photograph on the page. *(Done — this was a real defect on the search results and
+  room pages, invisible only because nothing has been uploaded yet.)*
 - **An uploaded photograph is decoded, not trusted:** a renamed PDF is refused and nothing is
   written; a 3600px photograph comes back at 2400 with its aspect ratio kept; the same file uploaded
   twice occupies one path. *(Done.)*

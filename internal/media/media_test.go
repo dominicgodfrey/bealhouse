@@ -8,6 +8,7 @@ import (
 	"image/png"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"testing"
 )
@@ -74,18 +75,153 @@ func TestTheSamePhotographStoresOnce(t *testing.T) {
 		t.Errorf("the same image stored at two paths: %q and %q", first, second)
 	}
 
-	// And nothing is left lying about: the temporary file the write goes
-	// through is removed whether or not the rename happened.
-	entries, err := os.ReadDir(store.Dir())
-	if err != nil {
-		t.Fatalf("reading the store: %v", err)
+	// The whole ladder deduplicates, not just the canonical file — and nothing
+	// is left lying about, because the temporary file each write goes through is
+	// removed whether or not the rename happened.
+	after := stored(t, store)
+	if len(after) != 6 {
+		t.Errorf("%d files for a 1200px image (%v), want 6: 480/960/1200 in jpg and webp",
+			len(after), after)
 	}
-	if len(entries) != 1 {
-		names := make([]string, 0, len(entries))
-		for _, e := range entries {
-			names = append(names, e.Name())
+	for _, name := range after {
+		if strings.HasPrefix(name, ".upload-") {
+			t.Errorf("a temporary file was left behind: %s", name)
 		}
-		t.Errorf("%d files in the store (%v), want exactly 1", len(entries), names)
+	}
+}
+
+// The ladder, and its ceiling.
+//
+// The widths are what this change is actually for: a phone rendering a card
+// four hundred pixels wide was downloading the 2400px file. What must not
+// happen is a rung *above* the source, which would be a larger file that looks
+// worse than the original.
+func TestTheLadderStopsAtTheSourcesOwnWidth(t *testing.T) {
+	for _, c := range []struct {
+		name          string
+		width, height int
+		want          []int
+	}{
+		{"larger than the top rung", 3600, 2400, []int{480, 960, 1600, 2400}},
+		{"between rungs", 1200, 900, []int{480, 960, 1200}},
+		{"below every rung", 400, 300, []int{400}},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			store := newStore(t)
+			path, err := store.Save(bytes.NewReader(pngOf(t, c.width, c.height)))
+			if err != nil {
+				t.Fatalf("saving: %v", err)
+			}
+
+			_, canonical, ok := split(Name(path))
+			if !ok {
+				t.Fatalf("Save returned %q, which carries no width", path)
+			}
+			if got := widths(canonical); !equal(got, c.want) {
+				t.Errorf("ladder is %v, want %v", got, c.want)
+			}
+
+			// Every rung is really on disk, at really that width.
+			for _, w := range c.want {
+				img := decodeFile(t, store, strings.TrimPrefix(path, URLPrefix), w)
+				if img.Bounds().Dx() != w {
+					t.Errorf("the %dw rung is %dpx wide", w, img.Bounds().Dx())
+				}
+			}
+		})
+	}
+}
+
+// The property that matters most here, and the reason the width is in the
+// filename rather than in a column or a directory listing.
+//
+// A 404 inside a srcset does not degrade to the fallback — the browser has
+// already committed to that candidate, and the result is a broken image on the
+// page with nothing anywhere to say why. So every URL Sources hands out has to
+// be a file that Save actually wrote.
+func TestEveryURLInASrcsetIsAFileThatExists(t *testing.T) {
+	store := newStore(t)
+
+	for _, size := range [][2]int{{3600, 2400}, {1200, 900}, {700, 1400}, {400, 300}} {
+		path, err := store.Save(bytes.NewReader(pngOf(t, size[0], size[1])))
+		if err != nil {
+			t.Fatalf("saving: %v", err)
+		}
+
+		ladder := Sources(path)
+		urls := append(entries(ladder.JPEG), entries(ladder.WebP)...)
+		if len(urls) == 0 {
+			t.Errorf("%dx%d produced no sources at all", size[0], size[1])
+		}
+		for _, url := range urls {
+			name := Name(url)
+			if name == "" {
+				t.Errorf("srcset carries %q, which Name refuses", url)
+				continue
+			}
+			if _, err := os.Stat(filepath.Join(store.Dir(), name)); err != nil {
+				t.Errorf("srcset advertises %q, which is not on disk", url)
+			}
+		}
+	}
+}
+
+// A path stored before the ladder existed still works: the file is real, it
+// simply has no other sizes. An empty srcset renders the plain <img src>, which
+// is why the fallback has to be a whole file and not a rung.
+func TestAPathFromBeforeTheLadderOffersNoSources(t *testing.T) {
+	for _, path := range []string{
+		"/media/abc123.jpg",   // the old naming
+		"/media/photo.jpg",    // never ours
+		"/placeholders/x.svg", // not media at all
+		"",
+	} {
+		if got := (Sources(path)); got.JPEG != "" || got.WebP != "" {
+			t.Errorf("Sources(%q) = %+v, want nothing", path, got)
+		}
+	}
+}
+
+// WebP is only worth its dependency if it is actually smaller. 80 against the
+// JPEG's 85 is chosen to be visually equal and about a third less.
+func TestTheWebPRungIsSmallerThanTheJPEG(t *testing.T) {
+	store := newStore(t)
+
+	path, err := store.Save(bytes.NewReader(pngOf(t, 1600, 1200)))
+	if err != nil {
+		t.Fatalf("saving: %v", err)
+	}
+	stem, _, _ := split(Name(path))
+
+	jpg := size(t, store, rung(stem, 960, ".jpg"))
+	wp := size(t, store, rung(stem, 960, ".webp"))
+	if wp >= jpg {
+		t.Errorf("webp is %d bytes against the jpeg's %d; the format is buying nothing", wp, jpg)
+	}
+}
+
+// Sources is pure — no directory, no Store — which is what lets the handlers
+// that assemble room cards and search results call it without one being
+// threaded through three packages. If it ever starts reading the disk, that
+// stops being true quietly.
+func TestSourcesRoundTripsTheNamingRule(t *testing.T) {
+	name := rung("deadbeef", 960, ".jpg")
+	stem, width, ok := split(name)
+	if !ok || stem != "deadbeef" || width != 960 {
+		t.Fatalf("split(%q) = %q, %d, %v", name, stem, width, ok)
+	}
+
+	ladder := Sources(URLPrefix + rung("deadbeef", 2400, ".jpg"))
+	for _, want := range []string{
+		"/media/deadbeef-w480.jpg 480w",
+		"/media/deadbeef-w2400.jpg 2400w",
+	} {
+		if !strings.Contains(ladder.JPEG, want) {
+			t.Errorf("srcset %q is missing %q", ladder.JPEG, want)
+		}
+	}
+	if !strings.Contains(ladder.WebP, "/media/deadbeef-w960.webp 960w") {
+		t.Errorf("webp srcset %q is missing the 960 rung", ladder.WebP)
 	}
 }
 
@@ -180,6 +316,78 @@ func pngOf(t *testing.T, width, height int) []byte {
 		t.Fatalf("building a test image: %v", err)
 	}
 	return buf.Bytes()
+}
+
+// stored lists what is in the directory, sorted, for assertions that care about
+// the whole set rather than one file.
+func stored(t *testing.T, store *Store) []string {
+	t.Helper()
+
+	entries, err := os.ReadDir(store.Dir())
+	if err != nil {
+		t.Fatalf("reading the store: %v", err)
+	}
+	names := make([]string, 0, len(entries))
+	for _, e := range entries {
+		names = append(names, e.Name())
+	}
+	sort.Strings(names)
+	return names
+}
+
+// decodeFile opens one rung of the ladder that canonical belongs to.
+func decodeFile(t *testing.T, store *Store, canonical string, width int) image.Image {
+	t.Helper()
+
+	stem, _, ok := split(canonical)
+	if !ok {
+		t.Fatalf("%q carries no width", canonical)
+	}
+
+	file, err := os.Open(filepath.Join(store.Dir(), rung(stem, width, ".jpg")))
+	if err != nil {
+		t.Fatalf("opening the %dw rung: %v", width, err)
+	}
+	defer file.Close()
+
+	img, err := jpeg.Decode(file)
+	if err != nil {
+		t.Fatalf("the %dw rung is not a JPEG: %v", width, err)
+	}
+	return img
+}
+
+func size(t *testing.T, store *Store, name string) int64 {
+	t.Helper()
+	info, err := os.Stat(filepath.Join(store.Dir(), name))
+	if err != nil {
+		t.Fatalf("stat %s: %v", name, err)
+	}
+	return info.Size()
+}
+
+// entries pulls the URLs out of a srcset attribute value.
+func entries(srcset string) []string {
+	if srcset == "" {
+		return nil
+	}
+	var out []string
+	for _, part := range strings.Split(srcset, ", ") {
+		out = append(out, strings.Fields(part)[0])
+	}
+	return out
+}
+
+func equal(a, b []int) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		if a[i] != b[i] {
+			return false
+		}
+	}
+	return true
 }
 
 func decodeStored(t *testing.T, store *Store, storedPath string) image.Image {

@@ -5,6 +5,7 @@ import { formatCentsShort } from '../lib/money'
 import { useAsync } from '../lib/useAsync'
 import { Layout, Prose } from '../components/Layout'
 import { SearchForm } from '../components/SearchForm'
+import { Photo } from '../components/Photo'
 
 /**
  * The home page, anchored on booking.
@@ -62,9 +63,11 @@ export function Home() {
                   to={`/rooms/${room.slug}`}
                   className="flex flex-col gap-2 rounded-lg border border-neutral-200 p-3 transition hover:border-neutral-400"
                 >
-                  <img
+                  <Photo
                     src={room.photos[0]?.url ?? room.placeholderPhotoUrl}
                     alt={room.photos[0]?.alt ?? ''}
+                    sources={room.photos[0]}
+                    sizes="(min-width: 640px) 30vw, 100vw"
                     className="aspect-[4/3] w-full rounded object-cover"
                   />
                   <span className="font-medium">{room.name}</span>

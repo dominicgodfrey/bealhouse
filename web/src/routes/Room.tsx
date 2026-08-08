@@ -7,6 +7,7 @@ import { fetchRoom } from '../lib/api'
 import { formatLong } from '../lib/dates'
 import { parseStay, staySearch } from '../lib/stay'
 import { useAsync } from '../lib/useAsync'
+import { Photo } from '../components/Photo'
 
 /**
  * One room, with or without dates.
@@ -45,10 +46,15 @@ export function Room() {
               ? room.data.photos
               : [{ url: room.data.placeholderPhotoUrl, alt: '' }]
             ).map((photo, i) => (
-              <img
+              <Photo
                 key={i}
                 src={photo.url}
                 alt={photo.alt}
+                sources={photo}
+                sizes="(min-width: 640px) 50vw, 100vw"
+                // The room's own photographs are what the page is for, so the
+                // first one is not deferred.
+                loading={i === 0 ? 'eager' : 'lazy'}
                 className="h-64 w-full rounded-lg object-cover"
               />
             ))}

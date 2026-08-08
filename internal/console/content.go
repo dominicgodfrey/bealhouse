@@ -11,6 +11,7 @@ import (
 	"bealhouse/internal/civil"
 	db "bealhouse/internal/db/gen"
 	"bealhouse/internal/email"
+	"bealhouse/internal/media"
 )
 
 // ---------------------------------------------------------------------------
@@ -27,6 +28,11 @@ import (
 type Photo struct {
 	Path string `json:"path"`
 	Alt  string `json:"alt"`
+
+	// The other sizes it is stored at, for srcset. Derived from Path, and here
+	// as well as on the guest-side shapes because the events page renders these
+	// rows directly.
+	media.Ladder
 }
 
 // Bed is one bed in a room.
@@ -87,7 +93,8 @@ func (o *Ops) Rooms(ctx context.Context) ([]RoomContent, error) {
 
 	byRoom := map[int64][]Photo{}
 	for _, p := range photos {
-		byRoom[p.RoomID] = append(byRoom[p.RoomID], Photo{Path: p.Path, Alt: p.AltText})
+		byRoom[p.RoomID] = append(byRoom[p.RoomID],
+			Photo{Path: p.Path, Alt: p.AltText, Ladder: media.Sources(p.Path)})
 	}
 	bedsByRoom := map[int64][]Bed{}
 	for _, b := range beds {
@@ -486,7 +493,8 @@ func (o *Ops) Events(ctx context.Context) ([]Event, error) {
 
 	byEvent := map[int64][]Photo{}
 	for _, p := range photos {
-		byEvent[p.EventID] = append(byEvent[p.EventID], Photo{Path: p.Path, Alt: p.AltText})
+		byEvent[p.EventID] = append(byEvent[p.EventID],
+			Photo{Path: p.Path, Alt: p.AltText, Ladder: media.Sources(p.Path)})
 	}
 
 	out := make([]Event, 0, len(rows))
@@ -520,7 +528,8 @@ func (o *Ops) PublicEvents(ctx context.Context, on time.Time) ([]Event, error) {
 
 	byEvent := map[int64][]Photo{}
 	for _, p := range photos {
-		byEvent[p.EventID] = append(byEvent[p.EventID], Photo{Path: p.Path, Alt: p.AltText})
+		byEvent[p.EventID] = append(byEvent[p.EventID],
+			Photo{Path: p.Path, Alt: p.AltText, Ladder: media.Sources(p.Path)})
 	}
 
 	out := make([]Event, 0, len(rows))

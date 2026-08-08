@@ -13,6 +13,7 @@ import (
 
 	"bealhouse/internal/civil"
 	db "bealhouse/internal/db/gen"
+	"bealhouse/internal/media"
 	"bealhouse/internal/pricing"
 )
 
@@ -50,6 +51,12 @@ type Bed struct {
 type Photo struct {
 	URL string `json:"url"`
 	Alt string `json:"alt"`
+
+	// The other sizes the same photograph is stored at, derived from URL by a
+	// pure rule (media.Sources) rather than by listing a directory or carrying
+	// a column. Empty for a photograph stored before the ladder existed, which
+	// renders the plain URL and is exactly right.
+	media.Ladder
 }
 
 // PlaceholderPhoto is the bundled stand-in for a room with no uploaded photos.
@@ -233,10 +240,16 @@ func photosByRoom(ctx context.Context, q *db.Queries, ids []int64) (map[int64][]
 		return nil, fmt.Errorf("availability: loading photos: %w", err)
 	}
 	for _, p := range photos {
+		// p.Path is already the served URL — media.Save returns "/media/<name>"
+		// and the console stores exactly that. This used to prepend the prefix
+		// a second time, which made every photograph on the search results and
+		// the room page a broken image; it went unnoticed because no
+		// photographs have been uploaded yet. The rooms index has always used
+		// the column as it stands, which is what it is for.
 		byRoom[p.RoomID] = append(byRoom[p.RoomID], Photo{
-			// Uploaded media is served from disk under /media.
-			URL: "/media/" + p.Path,
-			Alt: p.AltText,
+			URL:    p.Path,
+			Alt:    p.AltText,
+			Ladder: media.Sources(p.Path),
 		})
 	}
 	return byRoom, nil

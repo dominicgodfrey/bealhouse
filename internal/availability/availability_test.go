@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"strings"
 	"testing"
 	"time"
 
@@ -320,6 +321,47 @@ func TestRoomsWithoutPhotosFallBackToAPlaceholder(t *testing.T) {
 		if room.PlaceholderPhotoURL != want {
 			t.Errorf("%s placeholder is %q, want %q", room.Slug, room.PlaceholderPhotoURL, want)
 		}
+	}
+}
+
+// A stored path is already the URL, and this used to prepend the prefix again.
+//
+// `media.Save` returns "/media/<name>" and the console writes exactly that into
+// the column, so the "/media/" this once added made every URL "/media//media/…"
+// — a broken image on the search results and the room page, which are the two
+// pages a guest books from. It went unnoticed because no photographs have been
+// uploaded yet and nothing asserted the shape. Both halves are checked here:
+// the URL, and that the srcset the page will use is derived from it.
+func TestAPhotoURLIsTheStoredPathUntouched(t *testing.T) {
+	ctx, q := setup(t)
+
+	const stored = "/media/0123456789abcdef0123456789abcdef-w2400.jpg"
+	id, err := q.GetRoomIDBySlug(ctx, "blue-room")
+	if err != nil {
+		t.Fatalf("looking up the room: %v", err)
+	}
+	if err := q.CreateRoomPhoto(ctx, db.CreateRoomPhotoParams{
+		RoomID: id, Path: stored, AltText: "The bay window", SortOrder: 0,
+	}); err != nil {
+		t.Fatalf("adding a photo: %v", err)
+	}
+
+	res := search(t, ctx, q, Request{Checkin: day(30), Checkout: day(32), Guests: 1})
+	room := roomBySlug(t, res, "blue-room")
+
+	if len(room.Photos) != 1 {
+		t.Fatalf("got %d photos, want 1", len(room.Photos))
+	}
+	if got := room.Photos[0].URL; got != stored {
+		t.Errorf("photo URL is %q, want the stored path %q unchanged", got, stored)
+	}
+	// The ladder rides along, and every entry in it addresses the same
+	// directory rather than a doubled one.
+	if !strings.Contains(room.Photos[0].JPEG, "-w960.jpg 960w") {
+		t.Errorf("srcset is %q, want the 960 rung in it", room.Photos[0].JPEG)
+	}
+	if strings.Contains(room.Photos[0].JPEG, "/media//") {
+		t.Errorf("srcset carries a doubled prefix: %q", room.Photos[0].JPEG)
 	}
 }
 

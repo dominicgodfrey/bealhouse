@@ -4,6 +4,7 @@ import { fetchEvents, fetchPageCopy, paragraphs, submitInquiry, type EventItem }
 import { formatLong } from '../lib/dates'
 import { useAsync } from '../lib/useAsync'
 import { ErrorNote, Layout, Loading, Prose } from '../components/Layout'
+import { Photo } from '../components/Photo'
 
 /**
  * The events business: what is on, and the form that starts a conversation.
@@ -51,9 +52,11 @@ function Card({ event }: { event: EventItem }) {
   return (
     <article className="flex flex-col gap-3 rounded-lg border border-neutral-200 p-4">
       {photo && (
-        <img
+        <Photo
           src={photo.path}
           alt={photo.alt}
+          sources={photo}
+          sizes="(min-width: 640px) 45vw, 100vw"
           className="aspect-[4/3] w-full rounded object-cover"
         />
       )}
@@ -77,7 +80,15 @@ function Card({ event }: { event: EventItem }) {
       {event.photos.length > 1 && (
         <div className="grid grid-cols-3 gap-2">
           {event.photos.slice(1).map((p, i) => (
-            <img key={i} src={p.path} alt={p.alt} className="aspect-square w-full rounded object-cover" />
+            <Photo
+              key={i}
+              src={p.path}
+              alt={p.alt}
+              sources={p}
+              // Three across, whatever the viewport.
+              sizes="(min-width: 640px) 15vw, 30vw"
+              className="aspect-square w-full rounded object-cover"
+            />
           ))}
         </div>
       )}

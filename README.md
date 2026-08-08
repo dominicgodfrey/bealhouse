@@ -157,5 +157,7 @@ the menu, and the page prose. All of it is editable in the console and all of it
 renders as *nothing* until written, rather than as a placeholder somebody has to
 remember to delete.
 
-Also outstanding: the AVIF and WebP variants from decision #16, which need an
-image encoder Go's standard library does not ship.
+Also outstanding: AVIF (decision #16). Photographs already ship as a ladder of
+four widths in JPEG and WebP; AVIF is feasible with no cgo and deferred because
+it would move the encoding into a background job for the last slice of the
+saving.

@@ -4,6 +4,7 @@ import { fetchPageCopy, fetchRoomCards, paragraphs, type RoomCard } from '../lib
 import { formatCentsShort } from '../lib/money'
 import { useAsync } from '../lib/useAsync'
 import { ErrorNote, Layout, Loading, Prose } from '../components/Layout'
+import { Photo } from '../components/Photo'
 
 /**
  * The seven rooms, without dates.
@@ -50,9 +51,12 @@ function Card({ room }: { room: RoomCard }) {
       to={`/rooms/${room.slug}`}
       className="flex flex-col gap-3 rounded-lg border border-neutral-200 p-4 transition hover:border-neutral-400"
     >
-      <img
+      <Photo
         src={photo?.url ?? room.placeholderPhotoUrl}
         alt={photo?.alt ?? ''}
+        sources={photo}
+        // The grid is one column on a phone, two at sm, three at lg.
+        sizes="(min-width: 1024px) 320px, (min-width: 640px) 45vw, 100vw"
         className="aspect-[4/3] w-full rounded object-cover"
       />
 

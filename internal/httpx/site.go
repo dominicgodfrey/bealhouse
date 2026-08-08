@@ -10,6 +10,7 @@ import (
 	"bealhouse/internal/availability"
 	"bealhouse/internal/console"
 	db "bealhouse/internal/db/gen"
+	"bealhouse/internal/media"
 )
 
 // The marketing site's read endpoints, plus the one write on it.
@@ -55,6 +56,9 @@ type RoomCard struct {
 type Photo struct {
 	URL string `json:"url"`
 	Alt string `json:"alt"`
+
+	// The other sizes it is stored at, for srcset. Derived from URL.
+	media.Ladder
 }
 
 // rooms serves GET /api/rooms, the rooms index.
@@ -96,7 +100,8 @@ func roomCards(ctx context.Context, q *db.Queries) ([]RoomCard, error) {
 	}
 	byRoom := map[int64][]Photo{}
 	for _, p := range photos {
-		byRoom[p.RoomID] = append(byRoom[p.RoomID], Photo{URL: p.Path, Alt: p.AltText})
+		byRoom[p.RoomID] = append(byRoom[p.RoomID],
+			Photo{URL: p.Path, Alt: p.AltText, Ladder: media.Sources(p.Path)})
 	}
 
 	lowest, err := q.ListLowestRates(ctx, pgtype.Date{Time: console.Today(), Valid: true})

@@ -3,6 +3,7 @@ import { Link } from 'react-router'
 import type { Room, Stay } from '../lib/api'
 import { formatCents, formatCentsShort } from '../lib/money'
 import { staySearch } from '../lib/stay'
+import { Photo } from './Photo'
 
 /**
  * One result.
@@ -17,9 +18,13 @@ export function RoomCard({ room, stay }: { room: Room; stay: Stay }) {
 
   return (
     <article className="flex flex-col gap-4 rounded-lg border border-neutral-200 p-4 sm:flex-row">
-      <img
+      <Photo
         src={photo?.url ?? room.placeholderPhotoUrl}
         alt={photo?.alt ?? ''}
+        sources={photo}
+        // Full width on a phone, a fixed 224px thumbnail once the card goes
+        // side by side.
+        sizes="(min-width: 640px) 224px, 100vw"
         className="h-40 w-full rounded object-cover sm:w-56"
       />
 

@@ -344,13 +344,40 @@ of its own bytes. `/media/*` serves it.
   refuses a blank, and the editor marks the box amber until it has one. A room
   with no photo falls back to `availability.PlaceholderPhoto(slug)`.
 
-**What is still missing from decision #16 is AVIF and WebP.** Go encodes JPEG,
-PNG and GIF in the standard library, decodes WebP through `x/image`, and encodes
-neither WebP nor AVIF. Producing them needs cgo and libvips — unbuildable on this
-machine, which has no C compiler — or a third-party pure-Go encoder, which is a
-dependency worth choosing deliberately. One well-sized JPEG per photograph ships
-instead. Since the paths are stored and not the variants, adding them later is a
-job that walks the directory rather than a schema change.
+**An upload produces a ladder: 480/960/1600/2400, in JPEG and WebP.** The page
+picks with `srcset`, through `web/src/components/Photo.tsx`.
+
+- **The widths matter far more than the formats.** Measured: the 960px JPEG is
+  76 KB against 955 KB at 2400px — twelve times — where WebP saves a further
+  half at the same width. A card four hundred CSS pixels wide was downloading
+  the full-size file, and no format recovers that.
+- **The rung is in the filename** (`<hash>-w960.webp`), so which rungs exist is
+  knowable from the stored path alone. That is what makes `media.Sources` a
+  **pure function** — no directory listing, no column, no Store threaded through
+  three packages — and why the srcset can never name a file that was not
+  written. A 404 inside a srcset does not fall back; it is a broken image.
+- **`src` is always a whole file, never a rung.** The canonical JPEG is the
+  fallback and works in anything.
+- **The hash is still of the canonical JPEG**, so dedup and `immutable` hold for
+  it. The rungs are named *from* that hash, so they are only as immutable as the
+  encoder settings: changing `jpegQuality`, `webpQuality` or the ladder means new
+  canonical names, not new bytes at old ones. Changing `maxEdge` gets that for
+  free; a quality change does not.
+- A path stored before the ladder existed gets **no srcset at all** and renders
+  the plain `<img src>`. Nothing to migrate.
+
+**AVIF is deliberately not built.** It is feasible with no cgo — the same
+WASM-backed family — and measured at −61% against JPEG at full size. It costs
+5.3 MB of binary and ~1.7s per upload, and that second number is what decides
+it: it would push the work into a background job, which then needs the API to
+report which variants exist *yet* so a `<picture>` never points at a file not
+written. JPEG plus WebP takes about half a second and needs none of that.
+
+**The encoder is `gen2brain/webp`, chosen for one property:** libwebp compiled
+to WebAssembly and run under wazero, so it builds with `CGO_ENABLED=0` on a
+machine with no C compiler — this one. The pure-Go alternatives encode lossless
+VP8L only, which for a photograph is larger than the JPEG it replaces. It costs
+about 5 MB on the binary.
 
 ## The booking flow, as built
 

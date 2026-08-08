@@ -14,15 +14,34 @@
 // page has. Decoding it here also means a file that is not really an image is
 // refused at the door rather than stored and served back to visitors.
 //
-// **What is still missing from decision #16 is the AVIF and WebP variants.**
-// Go's standard library encodes JPEG, PNG and GIF; it decodes WebP through
-// golang.org/x/image and encodes neither WebP nor AVIF. Producing them needs
-// either cgo and libvips — which this project cannot build on the developer's
-// machine, there being no C compiler — or a third-party pure-Go encoder. That is
-// a dependency decision worth making deliberately rather than in passing, so
-// what ships is one well-sized JPEG per photograph. The paths are stored, not
-// the variants, so adding them later is a job that walks the directory rather
-// than a schema change.
+// # Widths first, then formats (decision #16)
+//
+// An upload produces a ladder: the canonical image at up to [maxEdge], and a
+// copy at each standard width below it, in JPEG and in WebP. The page picks
+// with `srcset`.
+//
+// **The widths matter more than the formats, by a lot.** Measured on a
+// 2400×1600 photograph, the 960px JPEG is 76 KB against 955 KB for the 2400px
+// one — twelve times — where WebP at the same width saves a further 50% and
+// AVIF about 72%. A phone rendering a room card four hundred CSS pixels wide
+// was downloading the full-size image, and no amount of format cleverness
+// recovers that. So the ladder is the change and WebP rides along on it.
+//
+// **AVIF is deliberately not here.** It is feasible — the same family of
+// WASM-backed encoders provides it, with no cgo — and it was measured at
+// −61% against JPEG at full size. What it costs is 5.3 MB of binary and
+// roughly 1.7 seconds of encoding per upload, and that second number is what
+// decides it: it would push this work off the request and into a background
+// job, which then needs the API to report which variants exist yet so that a
+// `<picture>` never points at a file that has not been written. The whole
+// ladder in JPEG and WebP takes about half a second and needs none of that.
+// Adding AVIF later is still a job that walks the directory.
+//
+// **The encoder is `gen2brain/webp`, chosen for one property**: it is libwebp
+// compiled to WebAssembly and run under wazero, so it builds with `CGO_ENABLED=0`
+// on a machine with no C compiler — which is this one, and is also why
+// `go test -race` does not work here. The pure-Go alternatives encode lossless
+// VP8L only, which for a photograph is larger than the JPEG it replaces.
 //
 // # Content addressing
 //
@@ -42,6 +61,17 @@
 // orphan is a few hundred kilobytes on a 40 GB disk against the cost of the
 // alternative, which is a delete that takes a photograph off a page somebody
 // else was still using.
+//
+// The ladder is named *from* that hash rather than each rung being hashed
+// separately: `<hash>-w2400.jpg` is the canonical file and `<hash>-w960.webp`
+// is one of its rungs. Two consequences. The rungs are only as immutable as
+// the encoder settings are stable, so **changing [jpegQuality], [webpQuality]
+// or the ladder means new canonical names, not new bytes at old ones** — which
+// is what a change to [maxEdge] gets you for free and what a quality change
+// does not. And the width is *in the name*, so which rungs exist is knowable
+// from the stored path alone, with no directory listing and no column: see
+// [Sources]. That is what keeps `srcset` from ever naming a file that is not
+// there, which does not degrade — it renders as a broken image.
 package media
 
 import (
@@ -55,8 +85,10 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"strconv"
 	"strings"
 
+	"github.com/gen2brain/webp"
 	"golang.org/x/image/draw"
 
 	// Registered for their side effect: the decoders the image package consults
@@ -93,6 +125,20 @@ const maxEdge = 2400
 // grow noticeably and nobody can see the difference.
 const jpegQuality = 85
 
+// webpQuality is lower than the JPEG's on purpose: WebP at 80 is visually the
+// equal of JPEG at 85 and about a third smaller. Matching the numbers would
+// throw away most of what the format is for.
+const webpQuality = 80
+
+// ladder is the widths a photograph is stored at, smallest first.
+//
+// Four rungs roughly doubling: a phone showing a card, a phone showing the room
+// page, a laptop, and a high-density desktop. More rungs would be encoding work
+// and disk for differences no eye resolves; fewer means somebody downloads
+// twice what their screen can show. The top rung is [maxEdge], so the canonical
+// file is always the last one.
+var ladder = [...]int{480, 960, 1600, maxEdge}
+
 // ErrNotAnImage is a file that could not be decoded as one.
 //
 // Its own error because it is the owner's mistake and not the server's: they
@@ -121,9 +167,12 @@ func New(dir string) (*Store, error) {
 func (s *Store) Dir() string { return s.dir }
 
 // Save decodes an uploaded image, scales it to something a web page can carry,
-// and stores it under a name derived from its contents.
+// and stores it — and every smaller rung of the ladder, in JPEG and WebP —
+// under names derived from its contents.
 //
-// The returned path is what goes in the database and what the browser asks for.
+// The returned path is the canonical JPEG: what goes in the database, what an
+// `<img src>` points at, and the one every browser can render whatever it makes
+// of the rest. [Sources] derives the others from it.
 func (s *Store) Save(r io.Reader) (string, error) {
 	// Bounded before it is decoded, not after. An image bomb is a small file
 	// that decodes to something enormous, so the limit on the way in is the only
@@ -135,18 +184,76 @@ func (s *Store) Save(r io.Reader) (string, error) {
 		return "", ErrNotAnImage
 	}
 
-	encoded, err := encode(fit(source))
+	canonical := fit(source)
+	encoded, err := encodeJPEG(canonical)
 	if err != nil {
 		return "", err
 	}
 
+	// The hash is of the canonical JPEG, as it always was, so the same
+	// photograph uploaded twice is still one set of files and an upload that
+	// has already been stored costs nothing below.
 	sum := sha256.Sum256(encoded)
-	name := hex.EncodeToString(sum[:16]) + ".jpg"
+	stem := hex.EncodeToString(sum[:16])
+	width := canonical.Bounds().Dx()
 
-	if err := s.write(name, encoded); err != nil {
+	if err := s.write(rung(stem, width, ".jpg"), encoded); err != nil {
 		return "", err
 	}
-	return URLPrefix + name, nil
+
+	// Everything below the canonical rung, plus the canonical width in WebP.
+	// Scaling from `canonical` rather than from `source` for the same reason
+	// the page does not: it is already the right colours and a fraction of the
+	// pixels, and nobody can see the difference between one resample and two at
+	// these ratios.
+	for _, w := range widths(width) {
+		img := canonical
+		if w != width {
+			img = resize(canonical, w)
+		}
+
+		if w != width { // the canonical JPEG is already written
+			jpg, err := encodeJPEG(img)
+			if err != nil {
+				return "", err
+			}
+			if err := s.write(rung(stem, w, ".jpg"), jpg); err != nil {
+				return "", err
+			}
+		}
+
+		wp, err := encodeWebP(img)
+		if err != nil {
+			return "", err
+		}
+		if err := s.write(rung(stem, w, ".webp"), wp); err != nil {
+			return "", err
+		}
+	}
+
+	return URLPrefix + rung(stem, width, ".jpg"), nil
+}
+
+// rung composes a name. One function, because the writer and [Sources] have to
+// agree exactly and a format string in each is how they stop agreeing.
+func rung(stem string, width int, ext string) string {
+	return stem + "-w" + strconv.Itoa(width) + ext
+}
+
+// widths is the ladder for an image of this width: every standard rung below
+// it, and the width itself.
+//
+// Never a rung above, because upscaling makes a bigger file that looks worse,
+// and never a rung within a hair of the canonical width, because two files
+// nobody can tell apart is disk and encoding time for nothing.
+func widths(canonical int) []int {
+	out := make([]int, 0, len(ladder))
+	for _, w := range ladder {
+		if w < canonical*9/10 {
+			out = append(out, w)
+		}
+	}
+	return append(out, canonical)
 }
 
 // write puts the bytes at name, and is a no-op if they are already there.
@@ -205,18 +312,39 @@ func fit(source image.Image) image.Image {
 
 	width = width * maxEdge / longest
 	height = height * maxEdge / longest
+	return scale(source, width, height)
+}
 
+// resize scales to an exact width, keeping the aspect ratio.
+func resize(source image.Image, width int) image.Image {
+	bounds := source.Bounds()
+	height := bounds.Dy() * width / bounds.Dx()
+	if height < 1 {
+		height = 1
+	}
+	return scale(source, width, height)
+}
+
+func scale(source image.Image, width, height int) image.Image {
 	// CatmullRom rather than the cheaper kernels: this runs once per upload on a
 	// two-core box and the result is looked at for years.
 	out := image.NewRGBA(image.Rect(0, 0, width, height))
-	draw.CatmullRom.Scale(out, out.Bounds(), source, bounds, draw.Src, nil)
+	draw.CatmullRom.Scale(out, out.Bounds(), source, source.Bounds(), draw.Src, nil)
 	return out
 }
 
-func encode(img image.Image) ([]byte, error) {
+func encodeJPEG(img image.Image) ([]byte, error) {
 	var buf writerTo
 	if err := jpeg.Encode(&buf, img, &jpeg.Options{Quality: jpegQuality}); err != nil {
 		return nil, fmt.Errorf("media: encoding the image: %w", err)
+	}
+	return buf.bytes, nil
+}
+
+func encodeWebP(img image.Image) ([]byte, error) {
+	var buf writerTo
+	if err := webp.Encode(&buf, img, webp.Options{Quality: webpQuality}); err != nil {
+		return nil, fmt.Errorf("media: encoding WebP: %w", err)
 	}
 	return buf.bytes, nil
 }
@@ -228,6 +356,79 @@ type writerTo struct{ bytes []byte }
 func (w *writerTo) Write(p []byte) (int, error) {
 	w.bytes = append(w.bytes, p...)
 	return len(p), nil
+}
+
+// Ladder is the set of sizes one stored photograph is available at, ready for
+// `srcset`.
+//
+// Both strings are empty for a path with no ladder — one stored before this
+// existed, or one from somewhere else entirely — and a page with an empty
+// srcset renders the plain `<img src>`, which is the canonical JPEG and works
+// everywhere. That is why the fallback is a real file and not a rung.
+type Ladder struct {
+	// JPEG and WebP are srcset attribute values: "url 480w, url 960w, …".
+	JPEG string `json:"srcset,omitempty"`
+	WebP string `json:"webpSrcset,omitempty"`
+}
+
+// Sources derives a photograph's ladder from its stored path.
+//
+// **Pure, and deliberately so.** It reads no directory and takes no Store, so
+// the handlers that assemble room cards and search results can call it without
+// one being threaded through three packages — and there is one implementation
+// of the rule rather than a second copy of it in TypeScript that drifts. The
+// width is in the canonical file's own name, which is what makes that possible:
+// every rung the writer produced is recoverable from the name alone, so the
+// srcset can never advertise a file that was not written. That failure does not
+// degrade; a 404 inside a srcset is a broken image.
+func Sources(stored string) Ladder {
+	name := Name(stored)
+	if name == "" {
+		return Ladder{}
+	}
+	stem, width, ok := split(name)
+	if !ok {
+		// A path from before the ladder existed. The file is real and the page
+		// will show it; it simply has no other sizes to offer.
+		return Ladder{}
+	}
+
+	all := widths(width)
+	if len(all) < 2 {
+		// One rung is not a choice, and a one-entry srcset only adds bytes to
+		// the HTML. The WebP is still worth advertising.
+		return Ladder{WebP: srcset(stem, all, ".webp")}
+	}
+	return Ladder{
+		JPEG: srcset(stem, all, ".jpg"),
+		WebP: srcset(stem, all, ".webp"),
+	}
+}
+
+func srcset(stem string, widths []int, ext string) string {
+	var b strings.Builder
+	for i, w := range widths {
+		if i > 0 {
+			b.WriteString(", ")
+		}
+		b.WriteString(URLPrefix + rung(stem, w, ext) + " " + strconv.Itoa(w) + "w")
+	}
+	return b.String()
+}
+
+// split takes "<stem>-w960.jpg" apart. The inverse of rung, and false for
+// anything that does not have that shape.
+func split(name string) (stem string, width int, ok bool) {
+	base := strings.TrimSuffix(name, path.Ext(name))
+	at := strings.LastIndex(base, "-w")
+	if at < 1 {
+		return "", 0, false
+	}
+	width, err := strconv.Atoi(base[at+2:])
+	if err != nil || width < 1 {
+		return "", 0, false
+	}
+	return base[:at], width, true
 }
 
 // Name extracts the stored filename from a path this package produced.

@@ -11,8 +11,9 @@
  */
 
 import { request } from './api'
+import type { PhotoSources } from '../components/Photo'
 
-export type Photo = { url: string; alt: string }
+export type Photo = { url: string; alt: string } & PhotoSources
 
 export type RoomCard = {
   slug: string
@@ -59,7 +60,7 @@ export type EventItem = {
   title: string
   happensOn?: string
   description: string
-  photos: { path: string; alt: string }[]
+  photos: ({ path: string; alt: string } & PhotoSources)[]
 }
 
 export function fetchEvents(): Promise<EventItem[]> {
