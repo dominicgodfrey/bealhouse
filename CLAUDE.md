@@ -103,6 +103,13 @@ it the server still boots and reports `db: not_configured`.
   directly. It takes the per-room advisory lock that stops deadlocks and
   translates `23P01` into `ErrRoomTaken`. See the concurrency section in
   ARCHITECTURE.md for why this is not optional.
+  **It deliberately does not retry a deadlock**, and putting one back would undo
+  a fix rather than add a safeguard: the claims that matter run inside a
+  transaction the deadlock has already aborted, so a retry there can only return
+  `25P02` and hide the `40P01` that explains it. The advisory lock is what stops
+  claims deadlocking; running the whole thing again belongs to the caller, and
+  every caller can — the jobs runner, the guest's own request, the owner's
+  button.
 
 ## Deploying
 

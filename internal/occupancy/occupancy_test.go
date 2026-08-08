@@ -8,6 +8,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
 
@@ -44,7 +46,8 @@ func roomID(t *testing.T, ctx context.Context, q *db.Queries, slug string) int64
 }
 
 // book writes a confirmed booking through the same entry point the API uses,
-// so the tests exercise the deadlock retry rather than bypassing it.
+// so the tests exercise the advisory lock and the translation rather than
+// bypassing them.
 func book(ctx context.Context, q *db.Queries, room int64, checkin, checkout pgtype.Date) error {
 	_, err := Create(ctx, q, db.CreateOccupancyParams{
 		RoomID:   room,
@@ -107,10 +110,12 @@ func TestConcurrentBookingsRaceForTheSameRoom(t *testing.T) {
 //
 // Identical spans are the obvious race, but staggered overlapping ones are
 // worse: each insert waits on a different uncommitted neighbour, which is
-// exactly the cycle Postgres resolves by aborting somebody with 40P01. Before
-// Create retried, that surfaced as a raw driver error roughly once every
-// twenty-five runs — an error page mid-checkout that a guest could not tell
-// apart from the room being genuinely gone.
+// exactly the cycle Postgres resolves by aborting somebody with 40P01. That
+// surfaced as a raw driver error roughly once every twenty-five runs — an error
+// page mid-checkout that a guest could not tell apart from the room being
+// genuinely gone. Retrying only made it rarer; the per-room advisory lock is
+// what holds this now, by making the claims for one room queue instead of
+// waiting on each other, and this test is what says so.
 //
 // The invariant is not "one winner" here, since some spans do not overlap each
 // other. It is that a caller never sees anything except success or a clean
@@ -151,6 +156,117 @@ func TestStaggeredOverlapsNeverLeakDeadlocks(t *testing.T) {
 	}
 	if won == 0 {
 		t.Error("every racer lost; at least one span should have been claimed")
+	}
+}
+
+// hurry shortens how long this transaction waits before looking for a deadlock,
+// which is the whole cost of the test below.
+//
+// Not every role is allowed to set it, and a refused statement aborts the
+// transaction it was refused in — which would leave every claim after it
+// answering 25P02, the very confusion the test exists to rule out. So it goes
+// inside a savepoint: taken where it is allowed, and costing a second of waiting
+// where it is not.
+func hurry(ctx context.Context, tx pgx.Tx) {
+	sp, err := tx.Begin(ctx)
+	if err != nil {
+		return
+	}
+	if _, err := sp.Exec(ctx, "SET LOCAL deadlock_timeout = '100ms'"); err != nil {
+		_ = sp.Rollback(ctx)
+		return
+	}
+	_ = sp.Commit(ctx)
+}
+
+// When a deadlock does happen, the caller has to be told it was a deadlock.
+//
+// Nothing in the application claims two rooms in one transaction — a booking
+// claims exactly one, which is what makes the per-room advisory lock sufficient
+// — but two transactions doing it in opposite orders is an AB-BA deadlock, and
+// that is the shape two test fixtures hit about one full run of the suite in
+// four.
+//
+// While Create retried, it could not: the deadlock had already aborted the
+// transaction it was retrying inside, so the retry came back 25P02, "current
+// transaction is aborted", and the caller was told an unrelated statement had
+// failed earlier. The claim now is only that whatever Postgres said arrives —
+// which is all a caller needs to know it must run the whole thing again.
+//
+// The second claims wait out deadlock_timeout, so this test costs about that
+// long; it is lowered first where the role is allowed to.
+func TestADeadlockArrivesAsADeadlock(t *testing.T) {
+	ctx, q, pool := setup(t)
+	first, second := roomID(t, ctx, q, "flume"), roomID(t, ctx, q, "rose-chamber")
+	checkin, checkout := mustDate(t, "2027-12-01"), mustDate(t, "2027-12-04")
+
+	claim := func(tx pgx.Tx, room int64) error {
+		_, err := Create(ctx, db.New(tx), db.CreateOccupancyParams{
+			RoomID:   room,
+			Checkin:  checkin,
+			Checkout: checkout,
+			Kind:     "booking",
+			Source:   "direct",
+		})
+		return err
+	}
+
+	var txs [2]pgx.Tx
+	for i := range txs {
+		tx, err := pool.Begin(ctx)
+		if err != nil {
+			t.Fatalf("beginning transaction %d: %v", i, err)
+		}
+		// Nothing here is committed, and the victim rolls back sooner than this.
+		defer func() { _ = tx.Rollback(context.WithoutCancel(ctx)) }()
+		hurry(ctx, tx)
+		txs[i] = tx
+	}
+
+	// One room each and no contention yet: what each holds is the advisory lock
+	// for its own room, until the end of its transaction.
+	if err := claim(txs[0], first); err != nil {
+		t.Fatalf("claiming the first room: %v", err)
+	}
+	if err := claim(txs[1], second); err != nil {
+		t.Fatalf("claiming the second room: %v", err)
+	}
+
+	// Now each reaches for the other's, and Postgres has to break the cycle.
+	errs := make([]error, len(txs))
+	var wg sync.WaitGroup
+	for i, want := range []int64{second, first} {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			errs[i] = claim(txs[i], want)
+			if errs[i] != nil {
+				// The victim's transaction is aborted but its locks are the
+				// client's until the client ends it, so the survivor waits on
+				// this rollback. That is also why retrying in here cannot work.
+				_ = txs[i].Rollback(ctx)
+			}
+		}()
+	}
+	wg.Wait()
+
+	var victims int
+	for i, err := range errs {
+		if err == nil {
+			continue
+		}
+		victims++
+		var pgErr *pgconn.PgError
+		if !errors.As(err, &pgErr) {
+			t.Fatalf("transaction %d failed with something that is not a database error: %v", i, err)
+		}
+		if pgErr.Code != deadlockDetected {
+			t.Errorf("transaction %d reported SQLSTATE %s (%s), want %s deadlock_detected; 25P02 in particular means the deadlock was swallowed and the caller handed its aftermath instead",
+				i, pgErr.Code, pgErr.Message, deadlockDetected)
+		}
+	}
+	if victims != 1 {
+		t.Fatalf("%d of two transactions were aborted; a deadlock has exactly one victim", victims)
 	}
 }
 

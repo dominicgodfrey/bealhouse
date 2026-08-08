@@ -613,10 +613,20 @@ Dependency-ordered, not deadline-driven (single launch).
    two packages doing that in different orders is an AB-BA deadlock. Nothing in the application
    does this — a booking claims exactly one room, which is what makes that lock sufficient — so
    the fix is `testdb.Exclusive` in the two fixtures. It also exposed something worth knowing
-   about `occupancy.Create`: its deadlock retry is a no-op when the caller owns the transaction,
-   because the deadlock has already aborted it, and the retry then returns `25P02` in place of the
-   real error. Left alone deliberately; it is a money path and the retry is right for the
-   single-room case it was written for.
+   about `occupancy.Create`: its deadlock retry was a no-op when the caller owns the transaction,
+   because the deadlock has already aborted it, and the retry then returned `25P02` in place of
+   the real error — which is why the flake read as an unrelated statement having failed earlier.
+
+   *That retry is now gone, and the deadlock reaches the caller as itself.* It was left over
+   from before the advisory lock: with the lock, claims for one room queue rather than wait on
+   each other, so the single-room case it was written for can no longer deadlock at all — and
+   the claims that matter run inside a transaction, where a retry could never have worked.
+   Making it work would mean a `SAVEPOINT` around every claim, and the retry inside it would
+   then wait out `deadlock_timeout` again against a lock the other transaction still holds.
+   Running the work again belongs to the caller, and every caller can: the jobs runner re-runs
+   its job, a guest's request is one they can send again, and the owner blocking a room is a
+   person looking at a button. `TestADeadlockArrivesAsADeadlock` deadlocks two transactions on
+   purpose and asserts the SQLSTATE that comes back is `40P01` and not its aftermath.
 
    **Still to do:** Sentry (a DSN and an `slog` handler), uptime monitoring from outside the box,
    DNS cutover, Search Console, the Google Business Profile, and Stripe live keys.
@@ -753,6 +763,11 @@ as the insert (`pg_advisory_xact_lock(4771, room_id)`), so waiters queue in a de
 cycle can form. Losers now get `23P01` every time. It is scoped per room, so the other six are
 unaffected, and it made the contended path roughly three times faster by removing the lock-wait
 pileup.
+
+The retry stayed beside it for a while and is now gone. It could not work where every claim
+actually happens — inside the caller's own transaction, which the deadlock has already aborted —
+and on its way out it replaced the `40P01` with the `25P02` its own retry had earned. A deadlock
+now reaches the caller as a deadlock, and running the work again is the caller's to do.
 
 Verified over 200 runs of the full occupancy suite plus a deliberately adversarial staggered-overlap
 test that asserts a caller never sees anything except success or a clean "room taken".
