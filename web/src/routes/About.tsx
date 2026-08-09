@@ -163,7 +163,7 @@ function ContactForm() {
 
       {/* Left-aligned: it is a form, like the search on the home page. */}
       <form onSubmit={submit} className="flex flex-col gap-4 text-left">
-        <ContactField label="Your name">
+        <ContactField label="Your name" required>
           <input
             required
             value={form.name}
@@ -172,7 +172,7 @@ function ContactForm() {
             className={contactInput}
           />
         </ContactField>
-        <ContactField label="Email">
+        <ContactField label="Email" required>
           <input
             required
             type="email"
@@ -182,7 +182,7 @@ function ContactForm() {
             className={contactInput}
           />
         </ContactField>
-        <ContactField label="Phone" hint="Optional.">
+        <ContactField label="Phone">
           <input
             type="tel"
             value={form.phone}
@@ -191,7 +191,7 @@ function ContactForm() {
             className={contactInput}
           />
         </ContactField>
-        <ContactField label="Your message">
+        <ContactField label="Your message" required>
           <textarea
             required
             rows={5}
@@ -220,15 +220,36 @@ const contactInput = 'w-full rounded-lg border border-neutral-300 px-3 py-3 text
 function ContactField({
   label,
   hint,
+  required = false,
   children,
 }: {
   label: string
   hint?: string
+  /**
+   * Marks the label rather than the input — the `required` attribute on the
+   * control is what actually enforces it, and this is the part somebody can see
+   * before they start typing.
+   */
+  required?: boolean
   children: React.ReactNode
 }) {
   return (
     <label className="flex flex-col gap-1 text-sm">
-      <span className="font-medium">{label}</span>
+      <span className="font-medium">
+        {label}
+        {/*
+          aria-hidden, because the input's own `required` is already what a
+          screen reader announces — read out, this would be the word "asterisk"
+          in the middle of the label. The colour is not carrying the meaning on
+          its own either: the star is there in any palette, and the fields
+          without one are the optional ones.
+        */}
+        {required && (
+          <span aria-hidden="true" className="ml-0.5 text-red-600">
+            *
+          </span>
+        )}
+      </span>
       {children}
       {hint && <span className="text-xs text-neutral-500">{hint}</span>}
     </label>
