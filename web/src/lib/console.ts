@@ -643,6 +643,8 @@ export type Attraction = {
   name: string
   /** Free text — "Walking distance" is not a number of minutes. */
   distance: string
+  /** A sentence or two. Empty renders the entry without one. */
+  description: string
   /** Empty means no link. The page renders the name as plain text. */
   url: string
 }

@@ -213,7 +213,7 @@ function SignIn({ onSignedIn }: { onSignedIn: () => void }) {
   return (
     <div className="flex flex-col gap-4 rounded-lg border border-neutral-200 bg-white p-5">
       <div className="flex flex-col gap-1">
-        <h1 className="text-xl font-semibold tracking-tight">Beal House console</h1>
+        <h1 className="text-xl font-semibold tracking-tight">The Beal House console</h1>
         <p className="text-sm text-neutral-600">
           Sign in with the phone you enrolled. It will ask for Face ID, a fingerprint, or your
           passcode.

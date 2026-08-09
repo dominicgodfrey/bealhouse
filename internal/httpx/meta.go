@@ -30,9 +30,8 @@ import (
 //     they have written some and is *absent* where they have not, exactly as
 //     the page renders no paragraph rather than a placeholder. The one
 //     exception is the home page's fallback, which says only what is already
-//     true elsewhere in this repository — an inn in Littleton, New Hampshire,
-//     booked direct — and is the same sentence the footer has carried all
-//     along.
+//     true elsewhere in this repository — an inn on West Main Street in
+//     Littleton, New Hampshire — and is the same thing the footer now carries.
 //   - **The tags say what the page says.** Every value here comes from the
 //     same read models the page's own API calls return, so the document a
 //     crawler indexes and the document a visitor reads cannot describe
@@ -41,12 +40,44 @@ import (
 // Absolute URLs need an origin, so `og:url`, `og:image` and the canonical link
 // appear only when SITE_URL is set — the same rule the email letterhead
 // follows, and for the same reason: a guessed origin is worse than none.
+//
+// The inn's own contact details are here rather than guessed, which is the one
+// thing the comment above this block used to say could not be done. They are
+// the owner's, taken off the site they run today, and they are duplicated in
+// web/src/lib/contact.ts for the footer and the About page — the two copies are
+// in two languages and there is no build step that could share them, so
+// **change both**. This one is the copy a search engine reads.
 const (
-	innName     = "Beal House"
+	innName     = "The Beal House"
+	innStreet   = "2 West Main Street"
 	innLocality = "Littleton"
 	innRegion   = "NH"
+	innPostal   = "03561"
 	innCountry  = "US"
+	innPhone    = "+1-603-444-2661"
+	innEmail    = "info@thebealhouse.com"
+
+	// Where the map pin goes, which is what a structured address is for. From
+	// OpenStreetMap's own record of the building, so it agrees with the map the
+	// About page embeds rather than with a second geocoding of the same street.
+	innLatitude  = 44.3086662
+	innLongitude = -71.7815120
 )
+
+// postalAddress is the inn's address as schema.org wants it, in one place: it
+// appears on the lodging business, on the restaurant and on every event, and
+// three hand-written copies is three chances for one of them to keep an old
+// street after a move.
+func postalAddress() map[string]any {
+	return map[string]any{
+		"@type":           "PostalAddress",
+		"streetAddress":   innStreet,
+		"addressLocality": innLocality,
+		"addressRegion":   innRegion,
+		"postalCode":      innPostal,
+		"addressCountry":  innCountry,
+	}
+}
 
 // metaDescriptionLimit is where a description gets cut. Search engines show
 // roughly this much and truncate the rest mid-word; doing it here means the cut
@@ -108,6 +139,8 @@ func (s *siteMeta) forPath(ctx context.Context, path string) headMeta {
 		return s.events(ctx, meta)
 	case path == "/local-area":
 		return s.localArea(ctx, meta)
+	case path == "/about":
+		return s.about(ctx, meta)
 	case path == "/policies":
 		return s.policyPage(ctx, meta)
 	}
@@ -118,9 +151,9 @@ func (s *siteMeta) forPath(ctx context.Context, path string) headMeta {
 	return meta
 }
 
-// title composes "Rooms · Beal House", and leaves the home page as just the
-// inn's name — a home page titled "Home · Beal House" wastes the most valuable
-// characters in a search result on the word "home".
+// title composes "Rooms · The Beal House", and leaves the home page as just the
+// inn's name — a home page titled "Home · The Beal House" wastes the most
+// valuable characters in a search result on the word "home".
 func title(section string) string { return section + " · " + innName }
 
 func (s *siteMeta) home(ctx context.Context, meta headMeta) headMeta {
@@ -132,8 +165,8 @@ func (s *siteMeta) home(ctx context.Context, meta headMeta) headMeta {
 	// know nothing about.
 	meta.Description = s.copyFor(ctx, "home")
 	if meta.Description == "" {
-		meta.Description = "An inn in " + innLocality +
-			", New Hampshire. Book direct — no booking fees."
+		meta.Description = "An inn at " + innStreet + " in " + innLocality +
+			", New Hampshire. Book direct."
 	}
 
 	cards, ok := s.cards(ctx)
@@ -144,19 +177,21 @@ func (s *siteMeta) home(ctx context.Context, meta headMeta) headMeta {
 	meta.Image = s.leadPhoto(cards)
 
 	business := map[string]any{
-		"@context": "https://schema.org",
-		"@type":    "LodgingBusiness",
-		"name":     innName,
-		"address": map[string]any{
-			"@type":           "PostalAddress",
-			"addressLocality": innLocality,
-			"addressRegion":   innRegion,
-			"addressCountry":  innCountry,
+		"@context":  "https://schema.org",
+		"@type":     "LodgingBusiness",
+		"name":      innName,
+		"address":   postalAddress(),
+		"telephone": innPhone,
+		"email":     innEmail,
+		// The coordinates are the same pair the About page's map is centred on,
+		// so the pin a search result drops and the pin the page shows are the
+		// same building.
+		"geo": map[string]any{
+			"@type":     "GeoCoordinates",
+			"latitude":  innLatitude,
+			"longitude": innLongitude,
 		},
 	}
-	// No streetAddress and no telephone: neither is anywhere in this
-	// repository, and a structured address is precisely the wrong place to
-	// guess — it is what a map pin is built from.
 	if len(cards) > 0 {
 		business["numberOfRooms"] = len(cards)
 	}
@@ -307,15 +342,11 @@ func (s *siteMeta) restaurant(ctx context.Context, meta headMeta) headMeta {
 	}
 
 	restaurant := map[string]any{
-		"@context": "https://schema.org",
-		"@type":    "Restaurant",
-		"name":     "The restaurant at " + innName,
-		"address": map[string]any{
-			"@type":           "PostalAddress",
-			"addressLocality": innLocality,
-			"addressRegion":   innRegion,
-			"addressCountry":  innCountry,
-		},
+		"@context":  "https://schema.org",
+		"@type":     "Restaurant",
+		"name":      "The restaurant at the Beal House",
+		"address":   postalAddress(),
+		"telephone": innPhone,
 	}
 	if url := s.absolute("/restaurant"); url != "" {
 		restaurant["url"] = url
@@ -430,14 +461,9 @@ func (s *siteMeta) events(ctx context.Context, meta headMeta) headMeta {
 			"name":      event.Title,
 			"startDate": event.HappensOn,
 			"location": map[string]any{
-				"@type": "Place",
-				"name":  innName,
-				"address": map[string]any{
-					"@type":           "PostalAddress",
-					"addressLocality": innLocality,
-					"addressRegion":   innRegion,
-					"addressCountry":  innCountry,
-				},
+				"@type":   "Place",
+				"name":    innName,
+				"address": postalAddress(),
 			},
 		}
 		if event.Description != "" {
@@ -457,6 +483,37 @@ func (s *siteMeta) events(ctx context.Context, meta headMeta) headMeta {
 func (s *siteMeta) localArea(ctx context.Context, meta headMeta) headMeta {
 	meta.Title = title("Local area")
 	meta.Description = s.copyFor(ctx, "local-area")
+	return meta
+}
+
+// about is the one page that carries the inn's address and telephone in words,
+// so it is the one that carries them as structured data too.
+//
+// ContactPage rather than a second LodgingBusiness: there is one inn and it is
+// described on the home page, and two LodgingBusiness blocks at two URLs is how
+// a search engine ends up with two entries for one house. This block says "the
+// page where you find them" and points back at the business.
+func (s *siteMeta) about(ctx context.Context, meta headMeta) headMeta {
+	meta.Title = title("About us")
+	meta.Description = s.copyFor(ctx, "about")
+
+	block := map[string]any{
+		"@context": "https://schema.org",
+		"@type":    "ContactPage",
+		"name":     title("About us"),
+		"about": map[string]any{
+			"@type":     "LodgingBusiness",
+			"name":      innName,
+			"address":   postalAddress(),
+			"telephone": innPhone,
+			"email":     innEmail,
+		},
+	}
+	if url := s.absolute("/about"); url != "" {
+		block["url"] = url
+	}
+
+	meta.LD = append(meta.LD, marshalLD(block))
 	return meta
 }
 

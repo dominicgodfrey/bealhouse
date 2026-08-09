@@ -121,7 +121,7 @@ type Renderer struct {
 // the file for it — see custom.go for where that line is drawn.
 func New(brand Brand, store Store) (*Renderer, error) {
 	if brand.InnName == "" {
-		brand.InnName = "Beal House"
+		brand.InnName = "The Beal House"
 	}
 
 	tmpl, err := template.ParseFS(files, "templates/*.html")

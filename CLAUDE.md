@@ -279,16 +279,55 @@ bundle this same binary serves. Set it only to serve the file from elsewhere. No
 `SITE_URL` means no origin to make it absolute with, and the templates fall back
 to the inn's name in text.
 
-**The marketing pages ship as structure with the owner's content in it.** Home,
-rooms, restaurant, events and about all read live data — the seven rooms, the
-menu, what is on — plus an optional prose slot from `page_copy`. **A page with
-nothing written renders no paragraph at all**, not a placeholder: the restaurant
-says the menu is not up and to ring the inn, the events page shows only its
-form. That is honest and looks deliberate, where an invented sentence about the
-food would sit on the public internet until somebody remembered it. The one
-place a page speaks for itself is the About fallback, and it says only what is
-already true elsewhere in this repository — seven rooms, Littleton, New
-Hampshire.
+**The marketing pages ship as structure with the owner's content in it.** Rooms,
+restaurant, events, about and local area all read live data — the seven rooms,
+the menu, what is on — plus an optional prose slot from `page_copy`. **A page
+with nothing written renders no paragraph at all**, not a placeholder: the
+restaurant says the menu is not up and to ring the inn, the events page shows
+only its form. That is honest and looks deliberate, where an invented sentence
+about the food would sit on the public internet until somebody remembered it.
+
+**The inn is "The Beal House", with the article**, which is how it names itself.
+One string, `innName` in `internal/httpx/meta.go` and `inn.name` in
+`web/src/lib/contact.ts`.
+
+**The home page is one screenful and does not scroll**, on a desktop monitor and
+on a phone alike (`Layout`'s `fills`). Header, the search under it, the
+restaurant and events buttons above the footer, the footer on the bottom edge,
+and the whole middle left clear because what is behind it is the house. That
+constraint is the design rather than a style: a page that can scroll always has
+room for one more paragraph, and this one has to decide what it is for. Anything
+added to it comes out of the empty middle — it does not get a scrollbar.
+
+- **The backdrop is `page_photos` for slug `home`**, which is the winter
+  photograph of the house, and it is a `<video>` the moment `backdropVideo` in
+  `Home.tsx` names one. The photograph stays as the poster; a first paint of
+  black while footage buffers is worse than a still.
+- **The calendar starts closed and floats**, never pushing the page (SearchForm's
+  `overlay`). It hangs off the field where there is room under it and pins
+  itself above the bottom of the viewport where there is not — the `roomy`
+  variant in `index.css`, which tests **width and height**, because a 1280×620
+  window is wide and has no room in it. **Nothing between that panel and the
+  viewport may carry a `backdrop-filter`**: a blurred ancestor becomes the
+  containing block for `fixed`, and the sheet would pin itself to the card it is
+  trying to escape.
+- **Search with no dates opens the calendar** rather than sitting greyed out.
+
+**Everything that used to be below the fold there is on `/about`**: the owner's
+story, the address, the telephone, a map and the contact form. It is a page that
+can be as long as it needs to be, and unlike the About page `/local-area`
+replaced, it is never empty — the address and the map are facts about the inn
+rather than copy somebody has to write.
+
+**The address and telephone are site chrome, not `page_copy`.** They are in the
+footer of every page including the ones with no prose slot at all, and an empty
+console field must not be able to take the telephone number off the site. They
+live in two files — `meta.go` for the structured data and `web/src/lib/contact.ts`
+for the pages — with no build step between them, so **change both**.
+
+**The map is OpenStreetMap's iframe embed**, which is why `frame-src` in the CSP
+names it. An iframe and no third-party JavaScript on the one public page that
+also has a form on it, no API key, and one CSP entry rather than two.
 
 **The `<head>` is written by the server, per route** (`internal/httpx/meta.go`, decision #3). The
 SPA is one document for every address, so the fallback fills in that page's title, description,
@@ -440,8 +479,9 @@ only the last two steps need one.
   somebody expecting an endpoint, and answering it with index.html and a 200 is
   worse than answering nothing — see the webhook note below.
 - **The CSP already allows Stripe** (`js.stripe.com`, `hooks.stripe.com`,
-  `api.stripe.com`) because the Payment Element will not load otherwise. It has
-  no `unsafe-inline` for scripts and the Vite build needs none; keep it that way.
+  `api.stripe.com`) because the Payment Element will not load otherwise, and
+  `www.openstreetmap.org` in `frame-src` for the About page's map. It has no
+  `unsafe-inline` for scripts and the Vite build needs none; keep it that way.
   HSTS is asserted only on a request that actually arrived over TLS.
 
 ## Step 4: payments
@@ -819,7 +859,18 @@ an override, no row means the page renders its structure with nothing in that
 slot, and emptying both fields is a DELETE rather than a row of empty strings.
 Plain text, not markdown — blank lines are paragraphs — because the alternative
 is a parser in the bundle or a way to put a `<script>` on the public site from a
-phone. The four pages are `console.PageSlugs()`, a property of the binary.
+phone. The pages are `console.PageSlugs()`, a property of the binary.
+
+  **`home` is in that list and renders no paragraph anywhere.** Its slot is the
+  backdrop photograph behind the search and the meta description a search engine
+  shows under the inn's name, which is why the console labels it as those two
+  things rather than as "the home page".
+
+  **`local_attractions` has a description per entry**, editable on the same
+  screen. The sentences in the seed were written here and not by the owner —
+  their site lists names and distances alone — so they are, with the links, the
+  rows most worth their review. An entry with no description renders as a name
+  and a distance, exactly as every entry did before the column.
 
 ## Step 5: the manage-booking link
 

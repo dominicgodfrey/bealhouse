@@ -1,232 +1,156 @@
-import { useState } from 'react'
 import { Link } from 'react-router'
 
-import { fetchPageCopy, paragraphs, submitInquiry } from '../lib/site'
+import { fetchPageCopy } from '../lib/site'
 import { useAsync } from '../lib/useAsync'
-import { ErrorNote, Layout, Prose } from '../components/Layout'
+import { Layout } from '../components/Layout'
+import { Photo } from '../components/Photo'
 import { SearchForm } from '../components/SearchForm'
-import { Gallery, fromPagePhotos } from '../components/Gallery'
 
 /**
- * The home page, anchored on booking.
+ * The home page: one screenful, and it does not scroll.
  *
- * The search is first and stays first: it is the one thing on this site that
- * makes money, and its date picker already knows what can genuinely be sold.
- * Everything below it is the owner's — their words and their photographs from
- * the console — so this file describes a shape rather than an inn.
+ * Header at the top, the search under it, the two other things the inn does
+ * just above the footer, and the footer on the bottom edge — on a desktop
+ * monitor and on a phone alike. Everything between the search and those two
+ * buttons is deliberately empty, because what is behind it is the house.
  *
- * It deliberately does not list the rooms. A grid of three-of-seven made the
- * rooms page redundant while answering the wrong question: somebody who has not
- * chosen dates cannot be told which rooms are free, and somebody who has is
- * already past this page. The nav and the search both lead to /rooms, which
- * shows all seven properly.
+ * That constraint is the whole design. A home page that scrolls has somewhere
+ * to put a paragraph, and then somewhere to put another one; a page that cannot
+ * scroll has to decide what it is for. This one is for booking a room and for
+ * showing the building. Everything that used to live below the fold here — the
+ * owner's story, the photographs of it, the way to write to the inn — is on
+ * /about now, which is a page that can be as long as it needs to be.
  *
- * The owner's story sits at the bottom, after the search and the two things the
- * inn does besides rooms. It is what a visitor reads once they are interested,
- * not what they came for.
+ * Nothing here is `overflow-auto` except the calendar, which floats over the
+ * page rather than growing it (see SearchForm's `overlay`). If a control is
+ * ever added to this screen, it comes out of the empty middle — it does not get
+ * a scrollbar.
  */
+
+/**
+ * The looped footage that belongs behind all this: photographs of the house and
+ * the drone footage over it.
+ *
+ * Empty until the owner supplies the file, and while it is empty the backdrop
+ * is the winter photograph of the house they already have on the site. Set this
+ * to the URL of the uploaded video — `/media/<name>.mp4` if it is served from
+ * MEDIA_DIR like everything else — and the <video> below takes over, with the
+ * same photograph as its poster so the first frame is never a black rectangle.
+ *
+ * A constant rather than a setting, for now, because there is exactly one video
+ * and nobody has asked to change it from a phone. When that changes it belongs
+ * in `page_copy`'s neighbourhood, not here.
+ */
+const backdropVideo = ''
+
 export function Home() {
   const copy = useAsync(() => fetchPageCopy('home'), [])
+  const photo = copy.data?.photos[0]
 
   return (
-    <Layout>
-      <div className="flex flex-col gap-14">
-        <section className="flex flex-col gap-8">
-          <div className="flex flex-col items-center gap-3 text-center">
-            <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">
-              Seven rooms in the White Mountains
-            </h1>
-          </div>
-
+    <Layout
+      fills
+      backdrop={
+        <>
           {/*
-            The search itself is not centred text — it is a form, and its fields
-            read left to right like every other form on the site.
+            neutral-200 underneath everything: the first paint, and what a
+            visitor sees for the moment before the photograph decodes. A white
+            gap here reads as a broken page.
           */}
-          <SearchForm alwaysOpen />
-        </section>
+          <div className="absolute inset-0 bg-neutral-200" />
 
-        <section className="grid gap-6 sm:grid-cols-2">
-          <Link
-            to="/restaurant"
-            className="rounded-lg border border-neutral-200 p-5 text-center transition hover:border-neutral-400"
-          >
-            <h2 className="text-lg font-semibold tracking-tight">The restaurant</h2>
-            <p className="mt-1 text-sm text-neutral-600">
-              What the kitchen is serving, updated as it changes.
-            </p>
-          </Link>
-          <Link
-            to="/events"
-            className="rounded-lg border border-neutral-200 p-5 text-center transition hover:border-neutral-400"
-          >
-            <h2 className="text-lg font-semibold tracking-tight">Events</h2>
-            <p className="mt-1 text-sm text-neutral-600">
-              Gatherings at the inn, and how to ask about one.
-            </p>
-          </Link>
-        </section>
-
-        {/*
-          The owner's own account of the place, and a way to write to them, side
-          by side at lg and stacked below it.
-
-          Two columns rather than one under the other because the second is the
-          reply to the first: somebody who has just read who Hwasoo and Tom are
-          is the person most likely to have a question, and putting the box
-          right there is the difference between a question asked and a tab
-          closed.
-        */}
-        <section className="grid gap-10 lg:grid-cols-2 lg:items-start">
-          {/*
-            Photograph and prose are independent — either can be empty and this
-            renders whatever there is, or nothing at all.
-          */}
-          {(copy.data?.written || copy.data?.photos.length) && (
-            <div className="flex flex-col gap-6">
-              <Gallery photos={fromPagePhotos(copy.data.photos)} />
-              {copy.data.written && (
-                <Prose heading={copy.data.heading} paragraphs={paragraphs(copy.data.body)} />
-              )}
-            </div>
+          {photo && !backdropVideo && (
+            <Photo
+              src={photo.path}
+              alt={photo.alt}
+              sources={photo}
+              // Full-bleed, so the browser should be choosing the largest rung
+              // its screen can use rather than a card-sized one.
+              sizes="100vw"
+              // The one photograph on this site that is unambiguously above the
+              // fold, because the page is nothing but above the fold.
+              loading="eager"
+              className="absolute inset-0 size-full object-cover"
+            />
           )}
 
-          <ContactForm />
-        </section>
+          {backdropVideo && (
+            // muted and playsInline are what make autoplay legal on iOS; the
+            // poster is the still it holds until enough of the file has
+            // arrived, which on mountain mobile data is a while.
+            <video
+              className="absolute inset-0 size-full object-cover"
+              src={backdropVideo}
+              poster={photo?.path}
+              autoPlay
+              muted
+              loop
+              playsInline
+              // It has no sound and says nothing a screen reader needs.
+              aria-hidden="true"
+            />
+          )}
+        </>
+      }
+    >
+      {/*
+        justify-between is what keeps the middle clear: the search sits against
+        the top of this box and the two buttons against the bottom, and the gap
+        between them is however much of the screen is left. On a short phone
+        that gap goes to nothing and the two blocks meet — which is the correct
+        way for this to degrade, since both of them still fit.
+      */}
+      <div className="flex h-full flex-col justify-between gap-4 px-4 py-4 sm:px-6 sm:py-6">
+        <div className="mx-auto w-full max-w-3xl">
+          {/*
+            The search in a card of its own, because it is dark type on a
+            photograph otherwise. bg-white/95 rather than solid: it should read
+            as something laid over the house, not as a band cut out of it.
+
+            NO backdrop-blur here, and that is load-bearing rather than taste:
+            `backdrop-filter` makes an element the containing block for every
+            `fixed` descendant, and the calendar pins itself to the bottom of
+            the viewport on a screen with no room under the field. Blurred, this
+            card would become "the viewport" and the calendar would hang off the
+            card it was trying to escape. At 95% white the blur was invisible
+            anyway.
+          */}
+          <div className="rounded-xl bg-white/95 p-4 shadow-lg sm:p-5">
+            <SearchForm overlay />
+          </div>
+        </div>
+
+        {/*
+          The restaurant and the events, at the foot of the screen. They are the
+          two things the inn does that are not a room, and this is the only page
+          that has room to say so at all — so they are buttons rather than an
+          explanation.
+        */}
+        <div className="mx-auto grid w-full max-w-3xl grid-cols-2 gap-3">
+          <Elsewhere to="/restaurant" name="The restaurant" says="What the kitchen is serving." />
+          <Elsewhere to="/events" name="Events" says="Gatherings, and how to ask about one." />
+        </div>
       </div>
     </Layout>
   )
 }
 
 /**
- * A way to write to the inn, next to the paragraph about who runs it.
+ * One of the two buttons above the footer.
  *
- * It lands in the same inbox the events form does, marked `contact` so the
- * owner can tell a general question from a wedding enquiry. One table and one
- * screen, because both are messages a person reads and answers the same way,
- * and two inboxes is two places to forget to look.
- *
- * Like the events form it inserts a row and stops: no email, no ticket, no
- * auto-reply. The honest promise is that somebody reads it, and the thank-you
- * says exactly that and nothing more.
+ * The sentence under the name is hidden on a phone and not shortened for one.
+ * Two lines of explanation each is 40-odd vertical pixels on the screen that
+ * has the least of them, and the name of the thing is what somebody taps — a
+ * clipped half-sentence would cost the same space and read as a bug.
  */
-function ContactForm() {
-  const [form, setForm] = useState({ name: '', email: '', phone: '', message: '' })
-  const [working, setWorking] = useState(false)
-  const [error, setError] = useState<Error | null>(null)
-  const [sent, setSent] = useState(false)
-
-  function set<K extends keyof typeof form>(key: K, value: string) {
-    setForm((f) => ({ ...f, [key]: value }))
-  }
-
-  async function submit(e: React.FormEvent) {
-    e.preventDefault()
-    setWorking(true)
-    setError(null)
-    try {
-      await submitInquiry({ ...form, eventDate: '', partySize: 0, kind: 'contact' })
-      setSent(true)
-    } catch (err) {
-      setError(err instanceof Error ? err : new Error('Something went wrong.'))
-    } finally {
-      setWorking(false)
-    }
-  }
-
-  if (sent) {
-    return (
-      <section className="flex flex-col gap-2 rounded-lg border border-neutral-200 bg-neutral-50 p-6">
-        <h2 className="text-2xl font-semibold tracking-tight">Thank you</h2>
-        <p className="text-neutral-700">
-          We have your message and one of us will write back. If it is urgent, the inn's phone is
-          the faster route.
-        </p>
-      </section>
-    )
-  }
-
+function Elsewhere({ to, name, says }: { to: string; name: string; says: string }) {
   return (
-    <section className="flex flex-col gap-4 rounded-lg border border-neutral-200 p-6">
-      <div className="flex flex-col gap-1">
-        <h2 className="text-2xl font-semibold tracking-tight">Get in touch</h2>
-        <p className="text-sm text-neutral-600">
-          A question about a room, the restaurant, or anything else. One of us reads it and writes
-          back.
-        </p>
-      </div>
-
-      {error && <ErrorNote error={error} />}
-
-      {/* Left-aligned: it is a form, like the search above it. */}
-      <form onSubmit={submit} className="flex flex-col gap-4 text-left">
-        <ContactField label="Your name">
-          <input
-            required
-            value={form.name}
-            onChange={(e) => set('name', e.target.value)}
-            autoComplete="name"
-            className={contactInput}
-          />
-        </ContactField>
-        <ContactField label="Email">
-          <input
-            required
-            type="email"
-            value={form.email}
-            onChange={(e) => set('email', e.target.value)}
-            autoComplete="email"
-            className={contactInput}
-          />
-        </ContactField>
-        <ContactField label="Phone" hint="Optional.">
-          <input
-            type="tel"
-            value={form.phone}
-            onChange={(e) => set('phone', e.target.value)}
-            autoComplete="tel"
-            className={contactInput}
-          />
-        </ContactField>
-        <ContactField label="Your message">
-          <textarea
-            required
-            rows={5}
-            value={form.message}
-            onChange={(e) => set('message', e.target.value)}
-            className={contactInput}
-          />
-        </ContactField>
-
-        <button
-          type="submit"
-          disabled={working}
-          className="self-start rounded-lg bg-neutral-900 px-5 py-3 text-sm font-medium text-white hover:bg-neutral-700 disabled:opacity-60"
-        >
-          {working ? 'Sending…' : 'Send it'}
-        </button>
-      </form>
-    </section>
-  )
-}
-
-// py-3 rather than py-2: a 44px target is what a thumb can hit, and iOS zooms
-// the whole page in on focus if the text is under 16px.
-const contactInput = 'w-full rounded-lg border border-neutral-300 px-3 py-3 text-base'
-
-function ContactField({
-  label,
-  hint,
-  children,
-}: {
-  label: string
-  hint?: string
-  children: React.ReactNode
-}) {
-  return (
-    <label className="flex flex-col gap-1 text-sm">
-      <span className="font-medium">{label}</span>
-      {children}
-      {hint && <span className="text-xs text-neutral-500">{hint}</span>}
-    </label>
+    <Link
+      to={to}
+      className="rounded-xl bg-white/95 px-4 py-3 text-center shadow-lg transition hover:bg-white"
+    >
+      <span className="block font-semibold tracking-tight">{name}</span>
+      <span className="mt-0.5 hidden text-sm text-neutral-600 sm:block">{says}</span>
+    </Link>
   )
 }

@@ -594,11 +594,11 @@ VALUES (sqlc.arg(slug), sqlc.arg(path), sqlc.arg(alt_text), sqlc.arg(sort_order)
 -- Saved as a whole document, like the menu and the galleries.
 
 -- name: ListLocalAttractions :many
-SELECT name, distance, url FROM local_attractions ORDER BY sort_order, id;
+SELECT name, distance, description, url FROM local_attractions ORDER BY sort_order, id;
 
 -- name: DeleteLocalAttractions :exec
 DELETE FROM local_attractions;
 
 -- name: CreateLocalAttraction :exec
-INSERT INTO local_attractions (name, distance, url, sort_order)
-VALUES (sqlc.arg(name), sqlc.arg(distance), sqlc.arg(url), sqlc.arg(sort_order));
+INSERT INTO local_attractions (name, distance, description, url, sort_order)
+VALUES (sqlc.arg(name), sqlc.arg(distance), sqlc.arg(description), sqlc.arg(url), sqlc.arg(sort_order));

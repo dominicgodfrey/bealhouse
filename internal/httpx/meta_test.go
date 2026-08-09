@@ -104,7 +104,7 @@ func TestEveryMarketingPageGetsItsOwnHead(t *testing.T) {
 	m, _ := meta(t, "https://bealhouse.test")
 
 	seen := map[string]string{}
-	for _, path := range []string{"/", "/rooms", "/restaurant", "/events", "/local-area"} {
+	for _, path := range []string{"/", "/rooms", "/restaurant", "/events", "/about", "/local-area"} {
 		doc := page(t, m, path)
 
 		title := only(t, titleTag, doc, "<title>")
@@ -400,7 +400,7 @@ func TestTheSitemapListsEveryRoomAndTheSiteURLsAreAbsolute(t *testing.T) {
 			t.Errorf("the sitemap does not list %s", want)
 		}
 	}
-	for _, page := range []string{"/", "/rooms", "/restaurant", "/events", "/local-area"} {
+	for _, page := range []string{"/", "/rooms", "/restaurant", "/events", "/about", "/local-area"} {
 		if !strings.Contains(body, "<loc>https://bealhouse.test"+page+"</loc>") {
 			t.Errorf("the sitemap does not list %s", page)
 		}

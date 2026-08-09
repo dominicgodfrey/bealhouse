@@ -4,7 +4,7 @@ import { ErrorNote, Layout, Loading, Prose } from '../components/Layout'
 import { Gallery, fromPagePhotos } from '../components/Gallery'
 
 /**
- * Beal House policies — the page the booking flow asks you to agree to.
+ * The Beal House policies — the page the booking flow asks you to agree to.
  *
  * **The rules with numbers in them are not written here and are not written in
  * the console.** They are read from `/api/policies`, which reads settings and
@@ -24,7 +24,7 @@ export function Policies() {
   return (
     <Layout>
       <div className="flex flex-col gap-10">
-        <h1 className="text-center text-3xl font-semibold tracking-tight sm:text-4xl">Beal House policies</h1>
+        <h1 className="text-center text-3xl font-semibold tracking-tight sm:text-4xl">The Beal House policies</h1>
 
         {copy.data && (
           <>

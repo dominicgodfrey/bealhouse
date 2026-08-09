@@ -31,11 +31,17 @@ export default defineConfig({
   // MEDIA_DIR on the server and are served by the Go binary, not from
   // web/public — so without this every photograph on the dev site is a broken
   // image, which looks exactly like a bug in the srcset.
+  //
+  // Both ports are overridable by environment, and neither normally is. It is
+  // for the case of two checkouts of this repository running at once: the
+  // second one's Vite cannot have 5173 and — the part that actually bites —
+  // must not proxy its API to the *first* one's Go binary, which is a different
+  // build. That failure looks like a page whose new field is silently missing.
   server: {
-    port: 5173,
+    port: Number(process.env.PORT) || 5173,
     proxy: {
-      '/api': 'http://localhost:8080',
-      '/media': 'http://localhost:8080',
+      '/api': process.env.API_ORIGIN || 'http://localhost:8080',
+      '/media': process.env.API_ORIGIN || 'http://localhost:8080',
     },
   },
 

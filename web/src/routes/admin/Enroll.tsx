@@ -71,7 +71,7 @@ export function Enroll() {
           <img src="/logo.svg" alt="" className="mb-2 h-5 w-auto self-start" />
           <h1 className="text-xl font-semibold tracking-tight">Set up this phone</h1>
           <p className="text-sm text-neutral-600">
-            This adds the phone you are holding to the Beal House console. It will ask for Face ID,
+            This adds the phone you are holding to The Beal House console. It will ask for Face ID,
             a fingerprint, or your passcode, and nothing is stored here that could be typed in
             somewhere else.
           </p>

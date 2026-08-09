@@ -89,8 +89,9 @@ function Nearby() {
       <div className="flex flex-col gap-1">
         <span className="font-medium">Nearby highlights</span>
         <span className="text-sm text-neutral-500">
-          The list on the local area page. A link is optional — leave it empty and the name shows
-          as plain text rather than as a link going nowhere.
+          The list on the local area page. The link and the description are both optional — with no
+          link the name shows as plain text rather than as a link going nowhere, and with no
+          description the entry is a name and a distance, as it was before.
         </span>
       </div>
 
@@ -100,45 +101,54 @@ function Nearby() {
       {saving.saved && <Saved>Saved. The page shows it now.</Saved>}
 
       {list.map((place, i) => (
-        <div
-          key={i}
-          className="flex flex-col gap-2 rounded-lg border border-neutral-200 p-3 sm:flex-row sm:items-center"
-        >
-          <Input
-            value={place.name}
-            placeholder="Franconia Notch State Park"
-            onChange={(e) => set(i, { ...place, name: e.target.value })}
-          />
-          <Input
-            value={place.distance}
-            placeholder="15 minutes away"
-            onChange={(e) => set(i, { ...place, distance: e.target.value })}
-            className="sm:w-48"
-          />
-          <Input
-            value={place.url}
-            placeholder="https://… (optional)"
-            onChange={(e) => set(i, { ...place, url: e.target.value })}
-          />
-          <div className="flex gap-2">
-            <Button onClick={() => move(i, -1)}>↑</Button>
-            <Button onClick={() => move(i, 1)}>↓</Button>
-            <Button
-              onClick={() => {
-                setDraft(list.filter((_, j) => j !== i))
-                saving.clear()
-              }}
-            >
-              Remove
-            </Button>
+        // Two rows now rather than one: the name, the distance and the link
+        // still sit on one line, and the sentence about the place gets the full
+        // width under them. It is the only field here long enough to need it.
+        <div key={i} className="flex flex-col gap-2 rounded-lg border border-neutral-200 p-3">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+            <Input
+              value={place.name}
+              placeholder="Franconia Notch State Park"
+              onChange={(e) => set(i, { ...place, name: e.target.value })}
+            />
+            <Input
+              value={place.distance}
+              placeholder="15 minutes away"
+              onChange={(e) => set(i, { ...place, distance: e.target.value })}
+              className="sm:w-48"
+            />
+            <Input
+              value={place.url}
+              placeholder="https://… (optional)"
+              onChange={(e) => set(i, { ...place, url: e.target.value })}
+            />
+            <div className="flex gap-2">
+              <Button onClick={() => move(i, -1)}>↑</Button>
+              <Button onClick={() => move(i, 1)}>↓</Button>
+              <Button
+                onClick={() => {
+                  setDraft(list.filter((_, j) => j !== i))
+                  saving.clear()
+                }}
+              >
+                Remove
+              </Button>
+            </div>
           </div>
+
+          <Textarea
+            rows={2}
+            value={place.description}
+            placeholder="What this place is — a sentence or two. Optional."
+            onChange={(e) => set(i, { ...place, description: e.target.value })}
+          />
         </div>
       ))}
 
       <div className="flex flex-wrap gap-2">
         <Button
           onClick={() => {
-            setDraft([...list, { name: '', distance: '', url: '' }])
+            setDraft([...list, { name: '', distance: '', description: '', url: '' }])
             saving.clear()
           }}
         >
@@ -157,10 +167,15 @@ function Nearby() {
 }
 
 const titles: Record<string, string> = {
-  home: 'Home',
+  // The home page renders no paragraph — it is one screenful of search over a
+  // photograph. Its photographs ARE that photograph, and its words are what a
+  // search engine shows under the inn's name, so the slot is still worth having
+  // and worth labelling honestly.
+  home: 'Home (the backdrop photo, and what search engines show)',
   rooms: 'The rooms page',
   restaurant: 'The restaurant',
   events: 'Events',
+  about: 'About us',
   'local-area': 'The local area',
   policies: 'Policies',
 }

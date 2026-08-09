@@ -74,7 +74,7 @@ type shell struct {
 //
 // It has to go, or every page would have two: the browser takes the first and a
 // crawler is entitled to take either, which is exactly the sort of thing that
-// works in testing and puts "Beal House" on all seven room results.
+// works in testing and puts "The Beal House" on all seven room results.
 var staticTitle = regexp.MustCompile(`(?is)<title>.*?</title>`)
 
 func newShell(index []byte) shell {

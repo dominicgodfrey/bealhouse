@@ -160,7 +160,7 @@ func (c *Console) enrollingAccount(ctx context.Context, e db.UserEnrollment) (*a
 		if _, err := randRead(handle); err != nil {
 			return nil, err
 		}
-		return &account{handle: handle, name: "Beal House"}, nil
+		return &account{handle: handle, name: "The Beal House"}, nil
 	}
 
 	u, err := c.q.GetUser(ctx, *e.UserID)
@@ -280,5 +280,5 @@ func (c *Console) enrollingAccountFrom(ctx context.Context, e db.UserEnrollment,
 		return nil, fmt.Errorf("admin: looking for the owner account: %w", err)
 	}
 
-	return &account{handle: handle, name: "Beal House"}, nil
+	return &account{handle: handle, name: "The Beal House"}, nil
 }

@@ -275,7 +275,7 @@ function Accessibility({
 
       <Aside>
         Only tick this if it is true of the room as a guest with mobility needs would mean it. Every
-        room at Beal House currently requires stairs. Saying otherwise is a promise somebody plans a
+        room at The Beal House currently requires stairs. Saying otherwise is a promise somebody plans a
         trip around.
       </Aside>
 

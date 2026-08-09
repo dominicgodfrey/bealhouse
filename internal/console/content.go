@@ -799,17 +799,23 @@ type PageCopy struct {
 // binary rather than of the table — exactly like email.Names(). A page added in
 // a later release turns up in the editor on its own.
 //
-// "local-area" replaced "about": the owner's story moved onto the home page,
-// where a visitor deciding whether to book actually reads it, and the standalone
-// page became what the inn's current site calls Local Area — what there is to do
-// in Littleton, which is the question a guest is really asking.
+// "about" and "local-area" are both here and they are different questions. The
+// local-area page is what there is to do in Littleton; About is who runs the
+// inn, where it is and how to reach them. The story used to sit at the foot of
+// the home page and moved off it when that page became the booking screen and
+// nothing else — there is no room below the fold there now, because there is no
+// below the fold.
+//
+// "home" keeps its slot even though the home page renders no prose: its
+// photographs are the backdrop behind the search, and its copy is still the
+// page's meta description.
 //
 // "policies" is a slot on a page that mostly writes itself: the booking and
 // refund rules there are read from settings and from pricing, so they cannot
 // drift from what the code actually enforces. What this adds is the paragraphs
 // only the owner can write — smoking, children, parking, quiet hours.
 func PageSlugs() []string {
-	return []string{"home", "rooms", "restaurant", "events", "local-area", "policies"}
+	return []string{"home", "rooms", "restaurant", "events", "about", "local-area", "policies"}
 }
 
 // ---------------------------------------------------------------------------
@@ -822,6 +828,11 @@ type Attraction struct {
 	// Free text — "walking distance" is the honest answer for half the list and
 	// is not a number of minutes.
 	Distance string `json:"distance"`
+	// A sentence or two about the place, for the guest who has never been to
+	// Littleton and cannot tell from the name whether it is a ski hill or a
+	// sweet shop. Empty renders the row without one rather than with a
+	// placeholder — the same rule page copy follows.
+	Description string `json:"description"`
 	// Empty means no link, and the page renders the name as plain text rather
 	// than as an anchor going nowhere.
 	URL string `json:"url"`
@@ -834,7 +845,7 @@ func (o *Ops) Attractions(ctx context.Context) ([]Attraction, error) {
 	}
 	out := make([]Attraction, 0, len(rows))
 	for _, r := range rows {
-		a := Attraction{Name: r.Name, Distance: r.Distance}
+		a := Attraction{Name: r.Name, Distance: r.Distance, Description: r.Description}
 		if r.Url != nil {
 			a.URL = *r.Url
 		}
@@ -867,10 +878,11 @@ func (o *Ops) SaveAttractions(ctx context.Context, list []Attraction) error {
 				url = &trimmed
 			}
 			if err := q.CreateLocalAttraction(ctx, db.CreateLocalAttractionParams{
-				Name:      strings.TrimSpace(a.Name),
-				Distance:  strings.TrimSpace(a.Distance),
-				Url:       url,
-				SortOrder: int32(i),
+				Name:        strings.TrimSpace(a.Name),
+				Distance:    strings.TrimSpace(a.Distance),
+				Description: strings.TrimSpace(a.Description),
+				Url:         url,
+				SortOrder:   int32(i),
 			}); err != nil {
 				return err
 			}

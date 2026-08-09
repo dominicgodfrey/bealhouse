@@ -78,12 +78,16 @@ UPDATE rooms SET amenities = amenities || ARRAY['Jacuzzi', 'Dedicated workspace'
   updated_at = now()
 WHERE slug IN ('mrs-beals-suite', 'garden-suite', 'flume');
 
--- The About page is gone: its slot is "local-area" now (console.PageSlugs()),
--- and the owner's story moved to the bottom of the home page. Clear the old row
--- so a database seeded before that change does not keep an orphan the console
--- can no longer reach.
-DELETE FROM page_copy WHERE slug = 'about';
-DELETE FROM page_photos WHERE slug = 'about';
+-- The About page is back, and the owner's story is on it rather than at the
+-- foot of the home page. The home page is the booking screen now — header,
+-- search, the two other things the inn does, footer, and nothing below the fold
+-- because there is no below the fold — so a paragraph there had nowhere to go.
+--
+-- The 'home' slot itself stays: its photographs are the backdrop behind the
+-- search, and its copy is still what the home page's meta description is built
+-- from. What it no longer has is a paragraph rendered on the page, so the row
+-- is deleted here and the same words are inserted under 'about' below.
+DELETE FROM page_copy WHERE slug = 'home';
 
 -- Page prose. Same contract as the console writes: a row is an override, and
 -- deleting the row empties the slot. Headings are left blank where the page
@@ -91,13 +95,14 @@ DELETE FROM page_photos WHERE slug = 'about';
 INSERT INTO page_copy (slug, heading, body) VALUES
 
   -- The owner's own account of themselves, which the current site has on its
-  -- About page. It sits at the foot of the home page here. The site's
-  -- "Welcome to the Beal House / we look forward to welcoming the community"
-  -- banner is deliberately not carried over: the home page's own heading and
-  -- the search below it already say the inn is open and taking bookings, and a
-  -- second welcome above the fold pushed the one thing that earns money down
-  -- the screen.
-  ('home', 'About Us',
+  -- About page and which is where it lives here too. The site's "Welcome to the
+  -- Beal House / we look forward to welcoming the community" banner is
+  -- deliberately not carried over: the home page's search says the inn is open
+  -- and taking bookings, and a second welcome above it pushed the one thing
+  -- that earns money down the screen.
+  --
+  -- The heading is blank because the About page carries its own h1.
+  ('about', '',
    E'Hwasoo and Tom met in Seoul, Korea. We have spent our careers in service and food in the United States and in Asia. We could not be more delighted to have found Littleton and the Beal House!\n\nWe look forward to being another joyful place where community members gather and break bread together.'),
 
   ('rooms', '',

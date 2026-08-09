@@ -203,21 +203,23 @@ func (q *Queries) CreateGuestNote(ctx context.Context, arg CreateGuestNoteParams
 }
 
 const createLocalAttraction = `-- name: CreateLocalAttraction :exec
-INSERT INTO local_attractions (name, distance, url, sort_order)
-VALUES ($1, $2, $3, $4)
+INSERT INTO local_attractions (name, distance, description, url, sort_order)
+VALUES ($1, $2, $3, $4, $5)
 `
 
 type CreateLocalAttractionParams struct {
-	Name      string
-	Distance  string
-	Url       *string
-	SortOrder int32
+	Name        string
+	Distance    string
+	Description string
+	Url         *string
+	SortOrder   int32
 }
 
 func (q *Queries) CreateLocalAttraction(ctx context.Context, arg CreateLocalAttractionParams) error {
 	_, err := q.db.Exec(ctx, createLocalAttraction,
 		arg.Name,
 		arg.Distance,
+		arg.Description,
 		arg.Url,
 		arg.SortOrder,
 	)
@@ -802,13 +804,14 @@ func (q *Queries) ListGuestNotes(ctx context.Context, guestID int64) ([]ListGues
 
 const listLocalAttractions = `-- name: ListLocalAttractions :many
 
-SELECT name, distance, url FROM local_attractions ORDER BY sort_order, id
+SELECT name, distance, description, url FROM local_attractions ORDER BY sort_order, id
 `
 
 type ListLocalAttractionsRow struct {
-	Name     string
-	Distance string
-	Url      *string
+	Name        string
+	Distance    string
+	Description string
+	Url         *string
 }
 
 // ---------------------------------------------------------------------------
@@ -825,7 +828,12 @@ func (q *Queries) ListLocalAttractions(ctx context.Context) ([]ListLocalAttracti
 	items := []ListLocalAttractionsRow{}
 	for rows.Next() {
 		var i ListLocalAttractionsRow
-		if err := rows.Scan(&i.Name, &i.Distance, &i.Url); err != nil {
+		if err := rows.Scan(
+			&i.Name,
+			&i.Distance,
+			&i.Description,
+			&i.Url,
+		); err != nil {
 			return nil, err
 		}
 		items = append(items, i)

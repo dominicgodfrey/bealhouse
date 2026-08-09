@@ -48,6 +48,12 @@ func clientIP(r *http.Request, behindProxy bool) string {
 //
 // style-src keeps 'unsafe-inline' because React writes style attributes, which
 // this directive governs; script-src deliberately does not.
+//
+// openstreetmap.org is in frame-src for the map on the About page, and it is an
+// iframe rather than a script for exactly that reason: it costs one frame-src
+// entry, no key, no bundle and no third-party JavaScript running on a page that
+// also has a contact form on it. Google Maps would have wanted script-src as
+// well, which is a larger hole for the same pin.
 const contentSecurityPolicy = "default-src 'self'; " +
 	"base-uri 'self'; " +
 	"object-src 'none'; " +
@@ -57,7 +63,7 @@ const contentSecurityPolicy = "default-src 'self'; " +
 	"font-src 'self' data:; " +
 	"style-src 'self' 'unsafe-inline'; " +
 	"script-src 'self' https://js.stripe.com; " +
-	"frame-src https://js.stripe.com https://hooks.stripe.com; " +
+	"frame-src https://js.stripe.com https://hooks.stripe.com https://www.openstreetmap.org; " +
 	"connect-src 'self' https://api.stripe.com"
 
 // secureHeaders sets the headers that cost nothing and prevent whole classes of

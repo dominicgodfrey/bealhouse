@@ -20,6 +20,7 @@ import { Rates } from './routes/admin/Rates'
 import { RoomsContent } from './routes/admin/RoomsContent'
 import { SettingsScreen } from './routes/admin/SettingsScreen'
 import { Today } from './routes/admin/Today'
+import { About } from './routes/About'
 import { Confirm } from './routes/Confirm'
 import { Events } from './routes/Events'
 import { Health } from './routes/Health'
@@ -57,6 +58,12 @@ createRoot(root).render(
         <Route path="/restaurant" element={<Restaurant />} />
         <Route path="/events" element={<Events />} />
         <Route path="/local-area" element={<LocalArea />} />
+        {/*
+          The inn's own page: who runs it, where it is, and the form. The home
+          page carried the first of those until it became a single screenful
+          that does not scroll; the other two were only ever in the footer.
+        */}
+        <Route path="/about" element={<About />} />
 
         {/*
           Indexable, unlike the booking flow it belongs to: a guest looking for

@@ -99,6 +99,11 @@ export type Attraction = {
   name: string
   /** Free text: "Walking distance" is the honest answer for half the list. */
   distance: string
+  /**
+   * A sentence or two about the place. Empty renders the row as a name and a
+   * distance alone, which is what it was before — not a placeholder.
+   */
+  description: string
   /** Empty means no link — the name renders as plain text, not a dead anchor. */
   url: string
 }

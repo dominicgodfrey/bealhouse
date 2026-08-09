@@ -40,17 +40,22 @@ export function LocalArea() {
             <h2 className="text-2xl font-semibold tracking-tight">Nearby highlights</h2>
 
             {/*
-              A definition list, because that is what this is: a place and how
-              far away it is. Two columns on anything but a phone so the
-              distances line up down the right and the eye can scan them —
-              which was the whole complaint about the run-on paragraph this
-              replaced.
+              Two columns on anything but a phone, so the distances line up
+              down the right and the eye can scan them — which was the whole
+              complaint about the run-on paragraph this replaced.
+
+              This was a <dl> while an entry was a place and a distance and
+              nothing else. It stopped being one when the entries got a
+              sentence each: a term with a definition and an optional second
+              definition is not what a description list means, and an entry the
+              owner has not described yet would have been a <dt> with no <dd>
+              at all.
             */}
-            <dl className="grid w-full max-w-2xl gap-x-10 gap-y-3 sm:grid-cols-2">
+            <div className="grid w-full max-w-3xl gap-x-10 gap-y-5 sm:grid-cols-2">
               {nearby.data.map((place) => (
                 <Nearby key={place.name} place={place} />
               ))}
-            </dl>
+            </div>
           </section>
         )}
       </div>
@@ -60,28 +65,40 @@ export function LocalArea() {
 
 function Nearby({ place }: { place: Attraction }) {
   return (
-    <div className="flex items-baseline justify-between gap-3 border-b border-neutral-100 pb-2">
-      <dt className="font-medium">
-        {/*
-          A row with no link renders as plain text rather than as an anchor
-          going nowhere. Mount Washington is the one that has none: it could be
-          the Cog, the Auto Road or the state park, and which the owner means is
-          theirs to say.
-        */}
-        {place.url ? (
-          <a
-            href={place.url}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="underline decoration-neutral-300 underline-offset-4 hover:decoration-neutral-900"
-          >
-            {place.name}
-          </a>
-        ) : (
-          place.name
-        )}
-      </dt>
-      <dd className="shrink-0 text-sm text-neutral-500">{place.distance}</dd>
-    </div>
+    <article className="border-b border-neutral-100 pb-3 text-left">
+      <div className="flex items-baseline justify-between gap-3">
+        <h3 className="font-medium">
+          {/*
+            A row with no link renders as plain text rather than as an anchor
+            going nowhere. Mount Washington is the one that has none: it could
+            be the Cog, the Auto Road or the state park, and which the owner
+            means is theirs to say.
+          */}
+          {place.url ? (
+            <a
+              href={place.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="underline decoration-neutral-300 underline-offset-4 hover:decoration-neutral-900"
+            >
+              {place.name}
+            </a>
+          ) : (
+            place.name
+          )}
+        </h3>
+        <p className="shrink-0 text-sm text-neutral-500">{place.distance}</p>
+      </div>
+
+      {/*
+        Nothing at all for a place nobody has described yet — the same rule the
+        prose slots follow. A row that is a name and a distance is what every
+        row was until this column existed, and it still reads correctly beside
+        one that has a sentence.
+      */}
+      {place.description && (
+        <p className="mt-1 text-sm text-neutral-600">{place.description}</p>
+      )}
+    </article>
   )
 }

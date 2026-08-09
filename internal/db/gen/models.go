@@ -130,6 +130,8 @@ type LocalAttraction struct {
 	Url       *string
 	SortOrder int32
 	CreatedAt time.Time
+	// One or two sentences about the place. Empty means the row renders as name and distance alone.
+	Description string
 }
 
 type MenuItem struct {

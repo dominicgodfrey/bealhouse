@@ -131,7 +131,7 @@ func bookingProblem(w http.ResponseWriter, r *http.Request, err error) {
 	case errors.Is(err, booking.ErrGuestEmailRequired):
 		badRequest(w, "a valid email address is required")
 	case errors.Is(err, booking.ErrPoliciesNotAccepted):
-		badRequest(w, "the Beal House policies have to be accepted before booking")
+		badRequest(w, "The Beal House policies have to be accepted before booking")
 	default:
 		if reason, ok := searchProblem(err); ok {
 			badRequest(w, reason)

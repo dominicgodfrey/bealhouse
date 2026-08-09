@@ -68,7 +68,7 @@ var (
 // Render produces the confirmation as PDF bytes.
 func Render(in Confirmation) ([]byte, error) {
 	if in.InnName == "" {
-		in.InnName = "Beal House"
+		in.InnName = "The Beal House"
 	}
 
 	doc := fpdf.New("P", "mm", "A4", "")

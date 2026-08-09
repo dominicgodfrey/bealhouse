@@ -162,14 +162,14 @@ function ConfirmForm({ room, stay }: { room: RoomDetail; stay: Stay }) {
               className="mt-0.5 size-4 shrink-0"
             />
             <span className="text-neutral-700">
-              I have read and agree to the{' '}
+              I have read and agree to{' '}
               <Link
                 to="/policies"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="underline underline-offset-4 hover:text-neutral-900"
               >
-                Beal House policies
+                The Beal House policies
               </Link>
               , including the deposit and cancellation terms.
             </span>

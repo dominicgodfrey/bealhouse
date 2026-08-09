@@ -70,7 +70,7 @@ func TestLogoIsUsedWhenConfigured(t *testing.T) {
 	}
 	// Alt text matters here: it is what a guest sees before they choose to load
 	// images, which for a first email from an unknown sender is most of them.
-	if !strings.Contains(msg.HTML, `alt="Beal House"`) {
+	if !strings.Contains(msg.HTML, `alt="The Beal House"`) {
 		t.Error("the logo has no alt text")
 	}
 }
@@ -87,7 +87,7 @@ func TestUnknownTemplateIsAnError(t *testing.T) {
 // forgets it still sends something with a letterhead.
 func TestInnNameDefaults(t *testing.T) {
 	r := renderer(t, Brand{})
-	if r.brand.InnName != "Beal House" {
+	if r.brand.InnName != "The Beal House" {
 		t.Errorf("inn name %q, want the default", r.brand.InnName)
 	}
 

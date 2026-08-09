@@ -162,7 +162,7 @@ func NewRP(siteURL string, isDev bool) (*RP, error) {
 		}
 		return &RP{
 			ID:          "localhost",
-			DisplayName: "Beal House",
+			DisplayName: "The Beal House",
 			Origins:     []string{"http://localhost:8080", "http://localhost:5173"},
 		}, nil
 	}
@@ -172,7 +172,7 @@ func NewRP(siteURL string, isDev bool) (*RP, error) {
 		return nil, fmt.Errorf("admin: SITE_URL %q is not an origin a passkey can be scoped to", siteURL)
 	}
 
-	rp := &RP{ID: u.Hostname(), DisplayName: "Beal House", Origins: []string{siteURL}}
+	rp := &RP{ID: u.Hostname(), DisplayName: "The Beal House", Origins: []string{siteURL}}
 
 	// A developer who has set SITE_URL to a localhost address still runs the
 	// SPA on Vite's port. Only ever widened for localhost, and only in dev — so
