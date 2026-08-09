@@ -121,7 +121,7 @@ function Section({ title, children }: { title: string; children: React.ReactNode
     <section className="flex flex-col gap-4">
       {/* Left, with the rules under it. A centred heading over left-aligned
           body copy reads as two different pages stacked. */}
-      <h2 className="border-b border-neutral-200 pb-2 text-2xl font-semibold tracking-tight">
+      <h2 className="border-b border-sienna-line pb-2 text-2xl font-semibold tracking-tight">
         {title}
       </h2>
       <dl className="flex flex-col gap-4">{children}</dl>

@@ -98,7 +98,7 @@ export function Room() {
                     {room.data.amenities.map((amenity) => (
                       <li
                         key={amenity}
-                        className="rounded-full border border-neutral-200 bg-neutral-50 px-3 py-1 text-sm text-neutral-700"
+                        className="rounded-full border border-sienna-line bg-sienna px-3 py-1 text-sm text-neutral-700"
                       >
                         {amenity}
                       </li>
@@ -107,12 +107,12 @@ export function Room() {
                 </div>
               )}
 
-              <p className="rounded-lg bg-neutral-50 px-4 py-3 text-sm text-neutral-600">
+              <p className="rounded-lg bg-sienna px-4 py-3 text-sm text-neutral-600">
                 {room.data.accessibilityNotice}
               </p>
             </div>
 
-            <aside className="flex flex-col gap-3 rounded-lg border border-neutral-200 p-4">
+            <aside className="flex flex-col gap-3 rounded-lg border border-sienna-line bg-sienna p-4">
               {!room.data.hasDates && (
                 <>
                   <p className="text-sm text-neutral-600">

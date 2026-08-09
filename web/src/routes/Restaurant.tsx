@@ -131,7 +131,7 @@ function Course({ section }: { section: MenuSection }) {
         below it are not. A name on the left and a price on the right is what a
         menu looks like, and centring that would make the prices unscannable.
       */}
-      <div className="flex flex-col items-center gap-1 border-b border-neutral-200 pb-2 text-center">
+      <div className="flex flex-col items-center gap-1 border-b border-sienna-line pb-2 text-center">
         <h2 className="text-2xl font-semibold tracking-tight">{section.name}</h2>
         {section.description && (
           <p className="text-sm text-neutral-600">{section.description}</p>

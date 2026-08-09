@@ -21,11 +21,17 @@
   --font-serif: var(--font-sans);
 
   /*
-   * The tint on the home page's panels — burnt sienna, taken most of the way to
-   * white. Full strength fights the red house behind it; this stays quiet over
-   * a photograph and still reads as a colour rather than as dirty white.
+   * Burnt sienna, taken most of the way to white. Full strength fights the red
+   * house behind the home page; this stays quiet over a photograph and still
+   * reads as a colour rather than as dirty white on the pages that are white.
+   *
+   * It is the fill on every panel the site has — cards, forms, the menu, the
+   * calendar — so `border-neutral-200` around one of them is a grey line on a
+   * warm ground. `sienna-line` is the same hue carried far enough past the fill
+   * to read as an edge.
    */
   --color-sienna: #f2ddd0;
+  --color-sienna-line: #e0bda7;
 }
 
 /*

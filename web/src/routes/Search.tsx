@@ -65,7 +65,7 @@ function Results({ stay }: { stay: NonNullable<ReturnType<typeof parseStay>> }) 
       {/* Shown with every search, not tucked into a room page: a guest with
           mobility needs should learn this here rather than on arrival. */}
       {accessibilityNotice && (
-        <p className="rounded-lg bg-neutral-50 px-4 py-3 text-sm text-neutral-600">
+        <p className="rounded-lg border border-sienna-line bg-sienna px-4 py-3 text-sm text-neutral-600">
           {accessibilityNotice}
         </p>
       )}

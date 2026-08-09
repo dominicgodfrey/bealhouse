@@ -295,8 +295,14 @@ One string, `innName` in `internal/httpx/meta.go` and `inn.name` in
 then Candara, which is what most visitors will see — already installed
 everywhere, so it costs zero bytes and there is no FOUT. The `.tabular-nums`
 rule is not decoration: Candara's default figures are old-style, like Georgia's
-before it, and money in a column needs the lining set. The one custom colour is
-`--color-sienna`, the tint on the home page's panels.
+before it, and money in a column needs the lining set.
+
+**Two custom colours, and they are a pair.** `--color-sienna` fills every panel
+on the public site — cards, forms, the menu's rules, the calendar — and
+`--color-sienna-line` is the same hue carried past it to read as an edge. A
+`border-neutral-200` on one of these is a grey line on a warm ground. The site
+chrome (header, footer) stays neutral so the frame does not compete with the
+pages, and the console is untouched: it is a tool, not the inn's front.
 
 **The home page is one screenful and does not scroll**, on a desktop monitor and
 on a phone alike (`Layout`'s `fills`). Header, the search under it, the

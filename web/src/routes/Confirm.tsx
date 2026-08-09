@@ -103,7 +103,7 @@ function ConfirmForm({ room, stay }: { room: RoomDetail; stay: Stay }) {
       {/* Side by side from lg. Below that the summary reads first and the form
           follows it, which is the order somebody fills them in anyway. */}
       <div className="grid gap-8 lg:grid-cols-2">
-        <section className="flex flex-col gap-4 rounded-lg border border-neutral-200 p-4">
+        <section className="flex flex-col gap-4 rounded-lg border border-sienna-line bg-sienna p-4">
           <div>
             <h2 className="font-medium">{room.name}</h2>
             <p className="text-sm text-neutral-600">
@@ -153,7 +153,7 @@ function ConfirmForm({ room, stay }: { room: RoomDetail; stay: Stay }) {
             half-filled booking form to read the terms, and losing what they had
             typed, is how a booking becomes an abandoned one.
           */}
-          <label className="flex items-start gap-3 rounded-lg border border-neutral-200 bg-neutral-50 p-4 text-sm">
+          <label className="flex items-start gap-3 rounded-lg border border-sienna-line bg-sienna p-4 text-sm">
             <input
               type="checkbox"
               required

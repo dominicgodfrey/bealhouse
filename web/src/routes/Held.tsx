@@ -70,7 +70,7 @@ export function Held() {
               reference above if you would like to check with us.
             </p>
           ) : (
-            <p className="rounded-lg border border-neutral-200 px-4 py-3 text-sm">
+            <p className="rounded-lg border border-sienna-line bg-sienna px-4 py-3 text-sm">
               Payment received — confirming your booking…
             </p>
           ))}
@@ -105,7 +105,7 @@ export function Held() {
           </p>
         )}
 
-        <section className="flex flex-col gap-4 rounded-lg border border-neutral-200 p-4">
+        <section className="flex flex-col gap-4 rounded-lg border border-sienna-line bg-sienna p-4">
           <div>
             <h2 className="font-medium">{room?.name}</h2>
             <p className="text-sm text-neutral-600">
@@ -226,7 +226,7 @@ function Countdown({ expiresAt }: { expiresAt?: string }) {
   const seconds = remaining % 60
 
   return (
-    <p className="rounded-lg border border-neutral-200 px-4 py-3 text-sm">
+    <p className="rounded-lg border border-sienna-line bg-sienna px-4 py-3 text-sm">
       Held for{' '}
       <span className="font-mono font-medium">
         {minutes}:{String(seconds).padStart(2, '0')}

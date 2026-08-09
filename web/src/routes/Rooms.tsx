@@ -49,7 +49,7 @@ function Card({ room }: { room: RoomCard }) {
   return (
     <Link
       to={`/rooms/${room.slug}`}
-      className="flex flex-col gap-3 rounded-lg border border-neutral-200 p-4 transition hover:border-neutral-400"
+      className="flex flex-col gap-3 rounded-lg border border-sienna-line bg-sienna p-4 transition hover:border-neutral-400"
     >
       <Photo
         src={photo?.url ?? room.placeholderPhotoUrl}

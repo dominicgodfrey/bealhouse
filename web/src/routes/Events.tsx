@@ -58,7 +58,7 @@ function Card({ event }: { event: EventItem }) {
   const photo = event.photos[0]
 
   return (
-    <article className="flex flex-col gap-3 rounded-lg border border-neutral-200 p-4">
+    <article className="flex flex-col gap-3 rounded-lg border border-sienna-line bg-sienna p-4">
       {photo && (
         <Photo
           src={photo.path}
@@ -146,7 +146,7 @@ function InquiryForm() {
 
   if (sent) {
     return (
-      <section className="rounded-lg border border-neutral-200 bg-neutral-50 p-6">
+      <section className="rounded-lg border border-sienna-line bg-sienna p-6">
         <h2 className="text-2xl font-semibold tracking-tight">Thank you</h2>
         <p className="mt-2 max-w-prose text-neutral-700">
           We have your message and one of us will write back. If it is urgent, the inn's phone is
@@ -157,7 +157,7 @@ function InquiryForm() {
   }
 
   return (
-    <section className="flex flex-col gap-4 rounded-lg border border-neutral-200 p-6">
+    <section className="flex flex-col gap-4 rounded-lg border border-sienna-line bg-sienna p-6">
       {/*
         The form's own heading is centred; the fields under it are not, for the
         same reason the search is not.

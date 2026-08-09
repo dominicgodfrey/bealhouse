@@ -17,7 +17,7 @@ export function RoomCard({ room, stay }: { room: Room; stay: Stay }) {
   const query = staySearch(stay)
 
   return (
-    <article className="flex flex-col gap-4 rounded-lg border border-neutral-200 p-4 sm:flex-row">
+    <article className="flex flex-col gap-4 rounded-lg border border-sienna-line bg-sienna p-4 sm:flex-row">
       <Photo
         src={photo?.url ?? room.placeholderPhotoUrl}
         alt={photo?.alt ?? ''}
