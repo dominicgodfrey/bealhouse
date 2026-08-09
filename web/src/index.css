@@ -1,1 +1,41 @@
 @import 'tailwindcss';
+
+/*
+ * The site's typeface.
+ *
+ * A transitional serif rather than the UI sans Tailwind ships with: this is an
+ * 1833 house in a New England town, and the default system stack reads like a
+ * dashboard. Serifs at body size are what a printed menu and a letter from an
+ * inn look like, which is the register the whole site is trying to hold.
+ *
+ * NO WEBFONT, and that is deliberate rather than a shortcut. The CSP allows
+ * `font-src 'self'`, so a self-hosted file would work — but it would be 100 KB
+ * or so per weight on a page whose whole job is to load on mountain mobile
+ * data, plus a flash of unstyled text on every first visit. Every family named
+ * below is already installed on the machines that will read this site, so the
+ * cost is zero bytes and there is no FOUT to manage.
+ *
+ * The order walks from best to most available: Iowan and Charter ship with
+ * Apple systems, Palatino and Georgia are on effectively every desktop, and
+ * `ui-serif`/`serif` catch the rest. Georgia is the one most visitors will
+ * actually see, and it was drawn for screens — which is the property that
+ * matters here, not pedigree.
+ */
+@theme {
+  --font-sans:
+    'Iowan Old Style', 'Palatino Linotype', Palatino, Charter, Georgia, ui-serif, Cambria,
+    'Times New Roman', serif;
+
+  --font-serif: var(--font-sans);
+}
+
+/*
+ * Numbers line up in columns wherever they are compared — prices down a menu,
+ * a total against a subtotal, nightly rates in a breakdown. Georgia's default
+ * figures are old-style (the 3, 4, 5, 7 and 9 drop below the baseline), which
+ * is handsome in a sentence and unreadable in a column, so the lining set is
+ * asked for wherever the layout already asks for tabular figures.
+ */
+.tabular-nums {
+  font-variant-numeric: lining-nums tabular-nums;
+}

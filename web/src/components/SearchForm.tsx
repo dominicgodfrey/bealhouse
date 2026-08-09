@@ -69,8 +69,14 @@ export function SearchForm({ initial, alwaysOpen = false }: Props) {
 
         <label className="rounded-lg border border-neutral-300 px-4 py-3">
           <span className="block text-xs uppercase tracking-wide text-neutral-500">Guests</span>
+          {/*
+            text-base rather than text-sm: iOS zooms the whole page in when a
+            focused field's text is under 16px, and it does not zoom back out.
+            The whole label is the tap target, so the control itself being short
+            is fine — but the text has to be readable.
+          */}
           <select
-            className="w-full bg-transparent text-sm outline-none"
+            className="w-full bg-transparent text-base outline-none"
             value={guests}
             onChange={(e) => setGuests(Number(e.target.value))}
           >
@@ -92,14 +98,22 @@ export function SearchForm({ initial, alwaysOpen = false }: Props) {
         </button>
       </div>
 
-      <label className="flex items-center gap-2 text-sm text-neutral-700">
+      {/*
+        The whole label is the tap target and -my-2 py-2 makes it 44px tall
+        without moving anything: the checkbox itself is 16px, which is a
+        difficult thing to hit with a thumb and an easy one to miss into the
+        calendar below.
+      */}
+      <label className="-my-2 flex items-center gap-2 py-2 text-sm text-neutral-700">
         <input
           type="checkbox"
           checked={withPet}
           onChange={(e) => setWithPet(e.target.checked)}
-          className="size-4"
+          className="size-4 shrink-0"
         />
-        I am bringing a pet <span className="text-neutral-500">($50 per stay, one room)</span>
+        <span>
+          I am bringing a pet <span className="text-neutral-500">($50 per stay, one room)</span>
+        </span>
       </label>
 
       {open && (

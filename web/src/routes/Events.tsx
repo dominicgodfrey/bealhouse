@@ -4,6 +4,7 @@ import { fetchEvents, fetchPageCopy, paragraphs, submitInquiry, type EventItem }
 import { formatLong } from '../lib/dates'
 import { useAsync } from '../lib/useAsync'
 import { ErrorNote, Layout, Loading, Prose } from '../components/Layout'
+import { Gallery, fromPagePhotos } from '../components/Gallery'
 import { Photo } from '../components/Photo'
 
 /**
@@ -21,19 +22,26 @@ export function Events() {
   return (
     <Layout>
       <div className="flex flex-col gap-10">
-        <div className="flex flex-col gap-3">
-          <h1 className="text-4xl font-semibold tracking-tight">Events</h1>
+        <div className="flex flex-col items-center gap-3 text-center">
+          <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">Events</h1>
           {copy.data && (
             <Prose heading={copy.data.heading} paragraphs={paragraphs(copy.data.body)} />
           )}
         </div>
+
+        {/*
+          The page's own photographs, which are of the rooms gatherings happen
+          in. Separate from an event's photographs below — those belong to one
+          dated thing and disappear with it, these describe the business.
+        */}
+        {copy.data && <Gallery photos={fromPagePhotos(copy.data.photos)} eager />}
 
         {events.loading && <Loading what="what's on" />}
         {events.error && <ErrorNote error={events.error} />}
 
         {events.data && events.data.length > 0 && (
           <section className="flex flex-col gap-6">
-            <h2 className="text-2xl font-semibold tracking-tight">Coming up</h2>
+            <h2 className="text-center text-2xl font-semibold tracking-tight">Coming up</h2>
             <div className="grid gap-6 sm:grid-cols-2">
               {events.data.map((event, i) => <Card key={i} event={event} />)}
             </div>
@@ -150,11 +158,15 @@ function InquiryForm() {
 
   return (
     <section className="flex flex-col gap-4 rounded-lg border border-neutral-200 p-6">
-      <div className="flex flex-col gap-1">
+      {/*
+        The form's own heading is centred; the fields under it are not, for the
+        same reason the search is not.
+      */}
+      <div className="flex flex-col items-center gap-1 text-center">
         <h2 className="text-2xl font-semibold tracking-tight">Tell us about it</h2>
         <p className="max-w-prose text-sm text-neutral-600">
           A rough date and a rough number is enough to start. Nothing here books anything or takes a
-          payment — one of us reads it and writes back.
+          payment, we'll read it and write back as soon as we can.
         </p>
       </div>
 
@@ -226,7 +238,9 @@ function InquiryForm() {
   )
 }
 
-const inputClass = 'rounded-lg border border-neutral-300 px-3 py-3 text-sm'
+// text-base, not text-sm: iOS zooms the whole page in when a focused field's
+// text is under 16px, and the page never zooms back out.
+const inputClass = 'rounded-lg border border-neutral-300 px-3 py-3 text-base'
 
 function Field({
   label,
