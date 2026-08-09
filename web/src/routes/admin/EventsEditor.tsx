@@ -159,25 +159,48 @@ function EventCard({
  */
 export function Inquiries() {
   const [status, setStatus] = useState<string>('')
+  const [kind, setKind] = useState<string>('')
   const [nonce, reload] = useReload()
-  const inquiries = useAsync(() => fetchInquiries(status || undefined), [status, nonce])
+  const inquiries = useAsync(
+    () => fetchInquiries(status || undefined, kind || undefined),
+    [status, kind, nonce],
+  )
 
   return (
     <Screen
-      title="Enquiries"
-      subtitle="From the events page."
+      title="Messages"
+      subtitle="From the events page and the contact form."
       actions={
-        <div className="flex flex-wrap gap-2">
-          {[
-            ['', 'All'],
-            ['new', 'New'],
-            ['contacted', 'Answered'],
-            ['closed', 'Closed'],
-          ].map(([value, label]) => (
-            <Button key={value} onClick={() => setStatus(value)} kind={status === value ? 'primary' : 'plain'}>
-              {label}
-            </Button>
-          ))}
+        <div className="flex flex-col gap-2 sm:items-end">
+          <div className="flex flex-wrap gap-2">
+            {[
+              ['', 'All'],
+              ['new', 'New'],
+              ['contacted', 'Answered'],
+              ['closed', 'Closed'],
+            ].map(([value, label]) => (
+              <Button key={value} onClick={() => setStatus(value)} kind={status === value ? 'primary' : 'plain'}>
+                {label}
+              </Button>
+            ))}
+          </div>
+
+          {/*
+            One inbox with a filter rather than two screens. Both are messages a
+            person reads and answers the same way, and a second screen is a
+            second place to forget to look.
+          */}
+          <div className="flex flex-wrap gap-2">
+            {[
+              ['', 'Both kinds'],
+              ['event', 'Events'],
+              ['contact', 'Contact form'],
+            ].map(([value, label]) => (
+              <Button key={value} onClick={() => setKind(value)} kind={kind === value ? 'primary' : 'plain'}>
+                {label}
+              </Button>
+            ))}
+          </div>
         </div>
       }
     >
@@ -210,7 +233,12 @@ function InquiryCard({ inquiry, onChanged }: { inquiry: Inquiry; onChanged: () =
       {error && <ErrorNote error={error} />}
 
       <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <span className="font-medium">{inquiry.name}</span>
+        <span className="flex items-baseline gap-2">
+          <span className="font-medium">{inquiry.name}</span>
+          <span className="rounded bg-neutral-100 px-2 py-0.5 text-xs text-neutral-600">
+            {inquiry.kind === 'contact' ? 'Contact form' : 'Events'}
+          </span>
+        </span>
         <span className="text-xs text-neutral-500">{formatInstant(inquiry.at)}</span>
       </div>
 
@@ -228,10 +256,17 @@ function InquiryCard({ inquiry, onChanged }: { inquiry: Inquiry; onChanged: () =
         )}
       </p>
 
-      <p className="text-sm text-neutral-600">
-        {inquiry.eventDate ? formatShort(inquiry.eventDate) : 'no date given'}
-        {inquiry.partySize ? ` · about ${inquiry.partySize} people` : ''}
-      </p>
+      {/*
+        Events only. A contact message has no date and no party size, and
+        printing "no date given" against a question about parking is noise
+        dressed up as information.
+      */}
+      {inquiry.kind !== 'contact' && (
+        <p className="text-sm text-neutral-600">
+          {inquiry.eventDate ? formatShort(inquiry.eventDate) : 'no date given'}
+          {inquiry.partySize ? ` · about ${inquiry.partySize} people` : ''}
+        </p>
+      )}
 
       {inquiry.message && <p className="text-sm whitespace-pre-wrap">{inquiry.message}</p>}
 
