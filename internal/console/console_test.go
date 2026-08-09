@@ -109,9 +109,11 @@ func field(t *testing.T, env map[string]any, key string) string {
 
 // A guest for a manual booking. The email is unique per test so the guest
 // upsert cannot make two tests share a row.
-func guest(t *testing.T) (string, string) {
+// A phone number as well as a name and an address: booking.Create refuses a
+// booking without one, the console's manual path included.
+func guest(t *testing.T) (string, string, string) {
 	t.Helper()
-	return t.Name(), t.Name() + "@example.test"
+	return t.Name(), t.Name() + "@example.test", "603-555-0100"
 }
 
 func firstRoomSlug(t *testing.T, tx pgx.Tx) string {
@@ -143,7 +145,7 @@ func firstRoomID(t *testing.T, tx pgx.Tx) int64 {
 func TestAManualBookingIsConfirmedAndHasNeitherHoldNorScheduledCharge(t *testing.T) {
 	o, tx := ops(t)
 	ctx := context.Background()
-	name, email := guest(t)
+	name, email, phone := guest(t)
 
 	made, err := o.CreateBooking(ctx, console.ManualBooking{
 		RoomSlug: firstRoomSlug(t, tx),
@@ -152,6 +154,7 @@ func TestAManualBookingIsConfirmedAndHasNeitherHoldNorScheduledCharge(t *testing
 		Guests:   2,
 		Name:     name,
 		Email:    email,
+		Phone:    phone,
 	})
 	if err != nil {
 		t.Fatalf("taking a manual booking: %v", err)
@@ -192,7 +195,7 @@ func TestAManualBookingIsConfirmedAndHasNeitherHoldNorScheduledCharge(t *testing
 func TestAManualBookingConfirmsTheGuestAndTellsTheOwner(t *testing.T) {
 	o, tx := ops(t)
 	ctx := context.Background()
-	name, address := guest(t)
+	name, address, phone := guest(t)
 
 	made, err := o.CreateBooking(ctx, console.ManualBooking{
 		RoomSlug: firstRoomSlug(t, tx),
@@ -201,6 +204,7 @@ func TestAManualBookingConfirmsTheGuestAndTellsTheOwner(t *testing.T) {
 		Guests:   2,
 		Name:     name,
 		Email:    address,
+		Phone:    phone,
 	})
 	if err != nil {
 		t.Fatalf("taking a manual booking: %v", err)
@@ -256,7 +260,7 @@ func TestAManualBookingConfirmsTheGuestAndTellsTheOwner(t *testing.T) {
 func TestChoosingAPaymentLinkQueuesOne(t *testing.T) {
 	o, tx := ops(t)
 	ctx := context.Background()
-	name, address := guest(t)
+	name, address, phone := guest(t)
 
 	made, err := o.CreateBooking(ctx, console.ManualBooking{
 		RoomSlug: firstRoomSlug(t, tx),
@@ -265,6 +269,7 @@ func TestChoosingAPaymentLinkQueuesOne(t *testing.T) {
 		Guests:   2,
 		Name:     name,
 		Email:    address,
+		Phone:    phone,
 		Payment:  console.SettleByLink,
 	})
 	if err != nil {
@@ -291,6 +296,7 @@ func TestChoosingAPaymentLinkQueuesOne(t *testing.T) {
 		Guests:   2,
 		Name:     name,
 		Email:    address,
+		Phone:    phone,
 	})
 	if err != nil {
 		t.Fatalf("taking the second booking: %v", err)
@@ -305,7 +311,7 @@ func TestChoosingAPaymentLinkQueuesOne(t *testing.T) {
 func TestAPaymentLinkIsRefusedWhenACardIsAlreadyScheduled(t *testing.T) {
 	o, tx := ops(t)
 	ctx := context.Background()
-	name, address := guest(t)
+	name, address, phone := guest(t)
 
 	made, err := o.CreateBooking(ctx, console.ManualBooking{
 		RoomSlug: firstRoomSlug(t, tx),
@@ -314,6 +320,7 @@ func TestAPaymentLinkIsRefusedWhenACardIsAlreadyScheduled(t *testing.T) {
 		Guests:   2,
 		Name:     name,
 		Email:    address,
+		Phone:    phone,
 	})
 	if err != nil {
 		t.Fatalf("taking a manual booking: %v", err)
@@ -336,7 +343,7 @@ func TestAPaymentLinkIsRefusedWhenACardIsAlreadyScheduled(t *testing.T) {
 func TestAPaymentLinkIsRefusedWhenNothingIsOutstanding(t *testing.T) {
 	o, tx := ops(t)
 	ctx := context.Background()
-	name, address := guest(t)
+	name, address, phone := guest(t)
 
 	made, err := o.CreateBooking(ctx, console.ManualBooking{
 		RoomSlug: firstRoomSlug(t, tx),
@@ -345,6 +352,7 @@ func TestAPaymentLinkIsRefusedWhenNothingIsOutstanding(t *testing.T) {
 		Guests:   2,
 		Name:     name,
 		Email:    address,
+		Phone:    phone,
 	})
 	if err != nil {
 		t.Fatalf("taking a manual booking: %v", err)
@@ -370,7 +378,7 @@ func TestAPaymentLinkIsRefusedWhenNothingIsOutstanding(t *testing.T) {
 func TestARefusedManualBookingQueuesNoMail(t *testing.T) {
 	o, tx := ops(t)
 	ctx := context.Background()
-	name, address := guest(t)
+	name, address, phone := guest(t)
 
 	first := console.ManualBooking{
 		RoomSlug: firstRoomSlug(t, tx),
@@ -379,6 +387,7 @@ func TestARefusedManualBookingQueuesNoMail(t *testing.T) {
 		Guests:   2,
 		Name:     name,
 		Email:    address,
+		Phone:    phone,
 	}
 	if _, err := o.CreateBooking(ctx, first); err != nil {
 		t.Fatalf("the first booking should succeed: %v", err)
@@ -411,7 +420,7 @@ func TestARefusedManualBookingQueuesNoMail(t *testing.T) {
 func TestAManualBookingCannotTakeARoomThatIsGone(t *testing.T) {
 	o, tx := ops(t)
 	ctx := context.Background()
-	name, email := guest(t)
+	name, email, phone := guest(t)
 
 	first := console.ManualBooking{
 		RoomSlug: firstRoomSlug(t, tx),
@@ -420,6 +429,7 @@ func TestAManualBookingCannotTakeARoomThatIsGone(t *testing.T) {
 		Guests:   2,
 		Name:     name,
 		Email:    email,
+		Phone:    phone,
 	}
 	if _, err := o.CreateBooking(ctx, first); err != nil {
 		t.Fatalf("the first booking should succeed: %v", err)
@@ -443,7 +453,7 @@ func TestAManualBookingCannotTakeARoomThatIsGone(t *testing.T) {
 func TestTodaySortsArrivalsDeparturesAndInHouse(t *testing.T) {
 	o, tx := ops(t)
 	ctx := context.Background()
-	name, email := guest(t)
+	name, email, phone := guest(t)
 
 	// One stay arriving on the pivot day, one leaving on it, one straddling it.
 	// Three rooms, because one room cannot hold all three at once.
@@ -473,6 +483,7 @@ func TestTodaySortsArrivalsDeparturesAndInHouse(t *testing.T) {
 			Guests:   2,
 			Name:     name,
 			Email:    email,
+			Phone:    phone,
 		}); err != nil {
 			t.Fatalf("booking %s: %v", s.slug, err)
 		}
@@ -570,7 +581,7 @@ func TestASeasonCannotEndBeforeItStarts(t *testing.T) {
 func TestBlockingARoomSomebodyHasIsRefused(t *testing.T) {
 	o, tx := ops(t)
 	ctx := context.Background()
-	name, email := guest(t)
+	name, email, phone := guest(t)
 
 	if _, err := o.CreateBooking(ctx, console.ManualBooking{
 		RoomSlug: firstRoomSlug(t, tx),
@@ -579,6 +590,7 @@ func TestBlockingARoomSomebodyHasIsRefused(t *testing.T) {
 		Guests:   2,
 		Name:     name,
 		Email:    email,
+		Phone:    phone,
 	}); err != nil {
 		t.Fatalf("booking: %v", err)
 	}
@@ -604,7 +616,7 @@ func TestBlockingARoomSomebodyHasIsRefused(t *testing.T) {
 func TestUnblockingWillNotReleaseABooking(t *testing.T) {
 	o, tx := ops(t)
 	ctx := context.Background()
-	name, email := guest(t)
+	name, email, phone := guest(t)
 
 	made, err := o.CreateBooking(ctx, console.ManualBooking{
 		RoomSlug: firstRoomSlug(t, tx),
@@ -613,6 +625,7 @@ func TestUnblockingWillNotReleaseABooking(t *testing.T) {
 		Guests:   2,
 		Name:     name,
 		Email:    email,
+		Phone:    phone,
 	})
 	if err != nil {
 		t.Fatalf("booking: %v", err)
@@ -718,7 +731,7 @@ func TestEmptyingAPageDeletesItsRow(t *testing.T) {
 func TestARefundOfNothingIsRefused(t *testing.T) {
 	o, tx := ops(t)
 	ctx := context.Background()
-	name, email := guest(t)
+	name, email, phone := guest(t)
 
 	made, err := o.CreateBooking(ctx, console.ManualBooking{
 		RoomSlug: firstRoomSlug(t, tx),
@@ -727,6 +740,7 @@ func TestARefundOfNothingIsRefused(t *testing.T) {
 		Guests:   2,
 		Name:     name,
 		Email:    email,
+		Phone:    phone,
 	})
 	if err != nil {
 		t.Fatalf("booking: %v", err)

@@ -139,7 +139,8 @@ function ConfirmForm({ room, stay }: { room: RoomDetail; stay: Stay }) {
             onChange={setPhone}
             type="tel"
             autoComplete="tel"
-            hint="Optional, in case we need to reach you about your arrival."
+            required
+            hint="In case we need to reach you about your arrival."
           />
 
           {/*

@@ -209,11 +209,18 @@ func TestGuestDetailsAreRequired(t *testing.T) {
 		guest Guest
 		want  error
 	}{
-		{"no name", Guest{Email: "ada@example.com"}, ErrGuestNameRequired},
-		{"blank name", Guest{Name: "   ", Email: "ada@example.com"}, ErrGuestNameRequired},
-		{"no email", Guest{Name: "Ada"}, ErrGuestEmailRequired},
-		{"email without a local part", Guest{Name: "Ada", Email: "@example.com"}, ErrGuestEmailRequired},
-		{"email without a domain", Guest{Name: "Ada", Email: "ada@"}, ErrGuestEmailRequired},
+		{"no name", Guest{Email: "ada@example.com", Phone: "6035550100"}, ErrGuestNameRequired},
+		{"blank name", Guest{Name: "   ", Email: "ada@example.com", Phone: "6035550100"}, ErrGuestNameRequired},
+		{"no email", Guest{Name: "Ada", Phone: "6035550100"}, ErrGuestEmailRequired},
+		{"email without a local part", Guest{Name: "Ada", Email: "@example.com", Phone: "6035550100"}, ErrGuestEmailRequired},
+		{"email without a domain", Guest{Name: "Ada", Email: "ada@", Phone: "6035550100"}, ErrGuestEmailRequired},
+
+		// The phone is required on the same terms as the email, and for the same
+		// reason it is checked here rather than only in the form: `required` is a
+		// suggestion to anything that is not a browser.
+		{"no phone", Guest{Name: "Ada", Email: "ada@example.com"}, ErrGuestPhoneRequired},
+		{"phone that is not a number", Guest{Name: "Ada", Email: "ada@example.com", Phone: "n/a"}, ErrGuestPhoneRequired},
+		{"phone too short to be one", Guest{Name: "Ada", Email: "ada@example.com", Phone: "555"}, ErrGuestPhoneRequired},
 	}
 
 	for _, tt := range tests {

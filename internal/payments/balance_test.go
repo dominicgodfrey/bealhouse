@@ -135,7 +135,7 @@ func shortNotice(t *testing.T, ctx context.Context, b booking.Beginner) booking.
 		Checkin:          day(2),
 		Checkout:         day(4),
 		Guests:           2,
-		Guest:            booking.Guest{Name: "Grace Hopper", Email: "grace@example.com"},
+		Guest:            booking.Guest{Name: "Grace Hopper", Email: "grace@example.com", Phone: "603-555-0101"},
 		AcceptedPolicies: true,
 	})
 	if err != nil {

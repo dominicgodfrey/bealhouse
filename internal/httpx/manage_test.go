@@ -36,7 +36,7 @@ func manageable(t *testing.T) (context.Context, pgx.Tx, *db.Queries, booking.Boo
 		Checkin:          civil.AddDays(civil.Today(), stayStart),
 		Checkout:         civil.AddDays(civil.Today(), stayEnd),
 		Guests:           2,
-		Guest:            booking.Guest{Name: "Ada Lovelace", Email: "ada@example.com"},
+		Guest:            booking.Guest{Name: "Ada Lovelace", Email: "ada@example.com", Phone: "603-555-0100"},
 		AcceptedPolicies: true,
 	})
 	if err != nil {

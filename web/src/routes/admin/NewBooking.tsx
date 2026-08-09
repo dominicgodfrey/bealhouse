@@ -134,8 +134,10 @@ export function NewBooking() {
             onChange={(e) => set('email', e.target.value)}
           />
         </Field>
-        <Field label="Phone">
-          <Input value={form.phone} onChange={(e) => set('phone', e.target.value)} />
+        {/* The server refuses a booking without one, website or console alike,
+            so the hint is here rather than a surprise at "Book it". */}
+        <Field label="Phone" hint="Required — every booking needs a number the inn can ring.">
+          <Input type="tel" value={form.phone} onChange={(e) => set('phone', e.target.value)} />
         </Field>
 
         <Payment chosen={form.payment} onChoose={(payment) => set('payment', payment)} />

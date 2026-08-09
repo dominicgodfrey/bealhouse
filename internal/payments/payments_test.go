@@ -49,7 +49,7 @@ func held(t *testing.T, ctx context.Context, b booking.Beginner) booking.Booking
 		Checkin:          day(stayStart),
 		Checkout:         day(stayEnd),
 		Guests:           2,
-		Guest:            booking.Guest{Name: "Ada Lovelace", Email: "ada@example.com"},
+		Guest:            booking.Guest{Name: "Ada Lovelace", Email: "ada@example.com", Phone: "603-555-0100"},
 		AcceptedPolicies: true,
 	})
 	if err != nil {
@@ -776,7 +776,7 @@ func TestShortNoticeStaysNeverAppearInTheBalanceScan(t *testing.T) {
 		Checkin:          day(2),
 		Checkout:         day(4),
 		Guests:           2,
-		Guest:            booking.Guest{Name: "Grace Hopper", Email: "grace@example.com"},
+		Guest:            booking.Guest{Name: "Grace Hopper", Email: "grace@example.com", Phone: "603-555-0101"},
 		AcceptedPolicies: true,
 	})
 	if err != nil {
@@ -848,7 +848,7 @@ func TestLateCancellationForfeitsTheDepositAndNoMore(t *testing.T) {
 		Checkin:          day(4),
 		Checkout:         day(6),
 		Guests:           2,
-		Guest:            booking.Guest{Name: "Grace Hopper", Email: "grace@example.com"},
+		Guest:            booking.Guest{Name: "Grace Hopper", Email: "grace@example.com", Phone: "603-555-0101"},
 		AcceptedPolicies: true,
 	})
 	if err != nil {

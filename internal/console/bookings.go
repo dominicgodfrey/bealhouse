@@ -692,6 +692,8 @@ func (o *Ops) CreateBooking(ctx context.Context, in ManualBooking) (booking.Book
 		return booking.Booking{}, badf("the booking needs a name")
 	case errors.Is(err, booking.ErrGuestEmailRequired):
 		return booking.Booking{}, badf("the booking needs an email address")
+	case errors.Is(err, booking.ErrGuestPhoneRequired):
+		return booking.Booking{}, badf("the booking needs a phone number")
 	case err != nil:
 		return booking.Booking{}, err
 	}

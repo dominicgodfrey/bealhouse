@@ -42,6 +42,13 @@ var (
 	ErrGuestNameRequired  = errors.New("booking: a name is required")
 	ErrGuestEmailRequired = errors.New("booking: an email address is required")
 
+	// ErrGuestPhoneRequired: an inn with seven rooms needs to be able to reach
+	// the person arriving tonight, and email is the wrong channel for a late
+	// arrival, a road closed by snow, or a card that failed at T-7. Enforced
+	// here rather than only in the form, on the same terms as the email — a
+	// `required` attribute is a suggestion to anything that is not a browser.
+	ErrGuestPhoneRequired = errors.New("booking: a phone number is required")
+
 	// ErrPoliciesNotAccepted is a booking that did not agree to the terms.
 	// Server-side on purpose: the tick-box disables a button, and a disabled
 	// button is a suggestion to anything that is not a browser.
@@ -505,6 +512,13 @@ func (r Request) validate() error {
 	if !strings.Contains(email, "@") || strings.HasPrefix(email, "@") || strings.HasSuffix(email, "@") {
 		return ErrGuestEmailRequired
 	}
+	// Same standard as the email above: enough to catch the empty box and "n/a",
+	// and no attempt at a real number. Seven digits is the shortest thing that
+	// could be one anywhere, and counting only the digits is what lets every way
+	// of writing it through — brackets, dashes, spaces, a +1, an extension.
+	if digits(r.Guest.Phone) < 7 {
+		return ErrGuestPhoneRequired
+	}
 	// The tick-box in the browser disables a button; this refuses the booking.
 	// One of those is enforcement and the other is a courtesy, and the guest is
 	// agreeing to the terms under which their money is kept.
@@ -512,6 +526,17 @@ func (r Request) validate() error {
 		return ErrPoliciesNotAccepted
 	}
 	return nil
+}
+
+// digits counts the digits in a string and ignores everything else.
+func digits(s string) int {
+	n := 0
+	for _, r := range s {
+		if r >= '0' && r <= '9' {
+			n++
+		}
+	}
+	return n
 }
 
 func pick(res availability.Result, slug string) (availability.Room, bool) {

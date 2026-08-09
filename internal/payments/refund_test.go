@@ -49,7 +49,7 @@ func TestMoneyForAResoldRoomIsQueuedForRefund(t *testing.T) {
 		Checkin:          day(stayStart),
 		Checkout:         day(stayEnd),
 		Guests:           2,
-		Guest:            booking.Guest{Name: "Grace Hopper", Email: "grace@example.com"},
+		Guest:            booking.Guest{Name: "Grace Hopper", Email: "grace@example.com", Phone: "603-555-0101"},
 		AcceptedPolicies: true,
 	}); err != nil {
 		t.Fatalf("selling the room to somebody else: %v", err)
@@ -118,7 +118,7 @@ func TestRefundingTwiceReturnsTheMoneyOnce(t *testing.T) {
 		Checkin:          day(stayStart),
 		Checkout:         day(stayEnd),
 		Guests:           2,
-		Guest:            booking.Guest{Name: "Grace Hopper", Email: "grace@example.com"},
+		Guest:            booking.Guest{Name: "Grace Hopper", Email: "grace@example.com", Phone: "603-555-0101"},
 		AcceptedPolicies: true,
 	}); err != nil {
 		t.Fatalf("selling the room to somebody else: %v", err)
@@ -166,7 +166,7 @@ func TestAFailedRefundStaysOwed(t *testing.T) {
 		Checkin:          day(stayStart),
 		Checkout:         day(stayEnd),
 		Guests:           2,
-		Guest:            booking.Guest{Name: "Grace Hopper", Email: "grace@example.com"},
+		Guest:            booking.Guest{Name: "Grace Hopper", Email: "grace@example.com", Phone: "603-555-0101"},
 		AcceptedPolicies: true,
 	}); err != nil {
 		t.Fatalf("selling the room to somebody else: %v", err)
