@@ -82,7 +82,7 @@ export function DietBadges({ item }: { item: MenuItem }) {
  */
 export function DietKey() {
   return (
-    <div className="flex flex-col items-center gap-3 border-t border-neutral-200 pt-6 text-center">
+    <div className="flex flex-col items-center gap-3 border-t border-sienna-line pt-6 text-center">
       <ul className="flex flex-wrap justify-center gap-x-6 gap-y-2">
         {DIETS.map((d) => (
           <li key={d.key} className="flex items-center gap-2 text-sm text-neutral-700">
@@ -98,8 +98,8 @@ export function DietKey() {
       </ul>
 
       <p className="max-w-prose text-sm text-neutral-500">
-        Please tell us about any allergies or dietary restrictions you may have when you come in,
-        we will do our best to accommodate.
+        Please tell us about any allergies or dietary restrictions you may have, we will do our
+        best to accommodate you.
       </p>
     </div>
   )

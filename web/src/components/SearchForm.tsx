@@ -148,7 +148,7 @@ export function SearchForm({ initial, overlay = false }: Props) {
           className="size-4 shrink-0"
         />
         <span>
-          I am bringing a pet <span className="text-neutral-500">($50 per stay, one room)</span>
+          I am bringing a pet <span className="text-neutral-500">($50 pet charge per stay)</span>
         </span>
       </label>
 
