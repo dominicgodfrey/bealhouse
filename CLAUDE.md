@@ -291,6 +291,13 @@ about the food would sit on the public internet until somebody remembered it.
 One string, `innName` in `internal/httpx/meta.go` and `inn.name` in
 `web/src/lib/contact.ts`.
 
+**The type is a humanist sans and there is no webfont** (`index.css`). Optima,
+then Candara, which is what most visitors will see — already installed
+everywhere, so it costs zero bytes and there is no FOUT. The `.tabular-nums`
+rule is not decoration: Candara's default figures are old-style, like Georgia's
+before it, and money in a column needs the lining set. The one custom colour is
+`--color-sienna`, the tint on the home page's panels.
+
 **The home page is one screenful and does not scroll**, on a desktop monitor and
 on a phone alike (`Layout`'s `fills`). Header, the search under it, the
 restaurant and events buttons above the footer, the footer on the bottom edge,
@@ -299,10 +306,12 @@ constraint is the design rather than a style: a page that can scroll always has
 room for one more paragraph, and this one has to decide what it is for. Anything
 added to it comes out of the empty middle — it does not get a scrollbar.
 
-- **The backdrop is `page_photos` for slug `home`**, which is the winter
-  photograph of the house, and it is a `<video>` the moment `backdropVideo` in
-  `Home.tsx` names one. The photograph stays as the poster; a first paint of
-  black while footage buffers is worse than a still.
+- **The backdrop is a slideshow**: `page_photos` for slug `home` — the house —
+  then the local area page's own photographs, cross-fading and looping. Every
+  one is in the DOM with only opacity animating, so it never shows a blank frame
+  and never touches layout. One photograph starts no timer, and neither does a
+  visitor who has asked for less motion. It becomes a `<video>` the moment
+  `backdropVideo` in `Home.tsx` names one, with the first photograph as poster.
 - **The calendar starts closed and floats**, never pushing the page (SearchForm's
   `overlay`). It hangs off the field where there is room under it and pins
   itself above the bottom of the viewport where there is not — the `roomy`
