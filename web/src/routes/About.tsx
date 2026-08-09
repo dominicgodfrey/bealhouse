@@ -23,11 +23,23 @@ export function About() {
       <div className="flex flex-col gap-10">
         <h1 className="text-center text-3xl font-semibold tracking-tight sm:text-4xl">About us</h1>
 
-        {copy.data && (
-          <>
-            <Gallery photos={fromPagePhotos(copy.data.photos)} eager />
-            <Prose heading={copy.data.heading} paragraphs={paragraphs(copy.data.body)} />
-          </>
+        {/*
+          The owners beside their own words, not above them: the paragraph is
+          two sentences and a full-width gallery over it left the page reading
+          as a photograph with a caption. Either half can be missing — the
+          column simply holds whichever there is.
+        */}
+        {copy.data && (copy.data.written || copy.data.photos.length > 0) && (
+          <section className="grid items-center gap-8 sm:grid-cols-2">
+            {copy.data.photos.length > 0 && (
+              <Gallery photos={fromPagePhotos(copy.data.photos)} eager aspect="aspect-[4/5]" />
+            )}
+            <Prose
+              heading={copy.data.heading}
+              paragraphs={paragraphs(copy.data.body)}
+              align="left"
+            />
+          </section>
         )}
 
         {/*
@@ -78,7 +90,7 @@ function FindUs() {
         loading="lazy"
         // The map host has no business knowing which page somebody was on.
         referrerPolicy="no-referrer"
-        className="aspect-4/3 w-full rounded-lg border border-neutral-200 bg-neutral-100"
+        className="aspect-4/3 w-full rounded-lg border border-sienna-line bg-sienna"
       />
 
       <a
@@ -127,7 +139,7 @@ function ContactForm() {
 
   if (sent) {
     return (
-      <section className="flex flex-col gap-2 rounded-lg border border-neutral-200 bg-neutral-50 p-6">
+      <section className="flex flex-col gap-2 rounded-lg border border-sienna-line bg-sienna p-6">
         <h2 className="text-2xl font-semibold tracking-tight">Thank you</h2>
         <p className="text-neutral-700">
           We have your message and one of us will write back. If it is urgent, the inn's phone is
@@ -138,7 +150,7 @@ function ContactForm() {
   }
 
   return (
-    <section className="flex flex-col gap-4 rounded-lg border border-neutral-200 p-6">
+    <section className="flex flex-col gap-4 rounded-lg border border-sienna-line bg-sienna p-6">
       <div className="flex flex-col gap-1">
         <h2 className="text-2xl font-semibold tracking-tight">Get in touch</h2>
         <p className="text-sm text-neutral-600">

@@ -43,10 +43,17 @@ export function fromRoomPhotos(
 export function Gallery({
   photos,
   eager = false,
+  aspect = 'aspect-[16/9]',
 }: {
   photos: GalleryPhoto[]
   /** Set on the gallery that is the first thing on its page. */
   eager?: boolean
+  /**
+   * The crop for a lone photograph. 16/9 is right for a page-wide banner and
+   * wrong for a portrait one in a column beside text, which it cuts to a strip
+   * — the About page passes its own.
+   */
+  aspect?: string
 }) {
   const [shown, setShown] = useState(0)
 
@@ -64,7 +71,7 @@ export function Gallery({
         sources={main}
         sizes="(min-width: 1024px) 1024px, 100vw"
         loading={eager ? 'eager' : 'lazy'}
-        className="aspect-[16/9] w-full rounded-lg object-cover"
+        className={`${aspect} w-full rounded-lg object-cover`}
       />
     )
   }
