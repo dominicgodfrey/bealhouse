@@ -77,7 +77,8 @@ func sitemapXML(meta *siteMeta) http.HandlerFunc {
 			{Loc: meta.absolute("/rooms"), Priority: "0.9"},
 			{Loc: meta.absolute("/restaurant"), Priority: "0.8"},
 			{Loc: meta.absolute("/events"), Priority: "0.7"},
-			{Loc: meta.absolute("/about"), Priority: "0.5"},
+			{Loc: meta.absolute("/local-area"), Priority: "0.5"},
+			{Loc: meta.absolute("/policies"), Priority: "0.3"},
 		}
 
 		// One entry per room, from the same read model the rooms index and the

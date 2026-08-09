@@ -2,7 +2,9 @@ package httpx
 
 import (
 	"context"
+	"fmt"
 	"net/http"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/jackc/pgx/v5/pgtype"
@@ -11,6 +13,7 @@ import (
 	"bealhouse/internal/console"
 	db "bealhouse/internal/db/gen"
 	"bealhouse/internal/media"
+	"bealhouse/internal/pricing"
 )
 
 // The marketing site's read endpoints, plus the one write on it.
@@ -184,6 +187,81 @@ func pageCopy(ops *console.Ops) http.HandlerFunc {
 		}
 		writeJSON(w, http.StatusOK, page)
 	}
+}
+
+// attractions serves GET /api/attractions, the local-area page's nearby list.
+func attractions(ops *console.Ops) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		list, err := ops.Attractions(r.Context())
+		if err != nil {
+			consoleError(w, r, err)
+			return
+		}
+		writeJSON(w, http.StatusOK, list)
+	}
+}
+
+// policyTerms is the machine-readable half of the policies page.
+//
+// Every figure here is read from settings or from the pricing package rather
+// than written into the copy, which is the whole point: the page a guest is
+// asked to agree to states what the code will actually do to their money. A
+// deposit rule typed into a text box drifts from `pricing.Quote` the first time
+// somebody changes one and not the other, and the guest has the old one in
+// writing.
+type policyTerms struct {
+	MinStayNights int `json:"minStayNights"`
+	MaxStayNights int `json:"maxStayNights"`
+
+	CheckinTime  string `json:"checkinTime"`
+	CheckoutTime string `json:"checkoutTime"`
+
+	HoldMinutes int `json:"holdMinutes"`
+
+	// Percentages as written, e.g. 8.5 — formatting is the page's job, but the
+	// conversion out of the scaled integer is not something a browser should be
+	// doing to a tax rate.
+	TaxRatePercent           string `json:"taxRatePercent"`
+	RefundProcessingPercent  string `json:"refundProcessingPercent"`
+	DepositPercent           int    `json:"depositPercent"`
+	BalanceLeadDays          int    `json:"balanceLeadDays"`
+	ShortNoticeDays          int    `json:"shortNoticeDays"`
+	FreeCancellationLeadDays int    `json:"freeCancellationLeadDays"`
+}
+
+// policies serves GET /api/policies.
+func policies(q *db.Queries) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		s, err := q.GetSettings(r.Context())
+		if err != nil {
+			serverError(w, r, err)
+			return
+		}
+
+		writeJSON(w, http.StatusOK, policyTerms{
+			MinStayNights: int(s.DefaultMinStay),
+			MaxStayNights: int(s.MaxStayNights),
+			CheckinTime:   hhmm(s.CheckinTime.Microseconds),
+			CheckoutTime:  hhmm(s.CheckoutTime.Microseconds),
+			HoldMinutes:   int(s.HoldTtlMinutes),
+
+			TaxRatePercent:          pricing.Rate(s.TaxRateScaled).Percent(),
+			RefundProcessingPercent: pricing.Rate(s.RefundProcessingRateScaled).Percent(),
+
+			// Half the all-in total, rounded up — pricing.Quote's own rule.
+			DepositPercent:           50,
+			BalanceLeadDays:          pricing.BalanceLeadDays,
+			ShortNoticeDays:          pricing.ShortNoticeDays,
+			FreeCancellationLeadDays: pricing.BalanceLeadDays,
+		})
+	}
+}
+
+// hhmm renders a time-of-day column as "15:00". The console has its own copy
+// for its form fields; this one is for the policies payload.
+func hhmm(micros int64) string {
+	d := time.Duration(micros) * time.Microsecond
+	return fmt.Sprintf("%02d:%02d", int(d.Hours()), int(d.Minutes())%60)
 }
 
 // submitInquiry serves POST /api/inquiries, the events form.

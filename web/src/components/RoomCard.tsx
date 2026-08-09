@@ -87,8 +87,23 @@ export function describeBeds(room: Pick<Room, 'beds'>): string {
   return room.beds
     .map((bed) => {
       const name = bed.type.replace('_', ' ')
-      const label = bed.count > 1 ? `${bed.count} ${name} beds` : `${name} bed`
-      return bed.location ? `${label} (${bed.location})` : label
+      // A daybed is already a bed, and so is a sofa bed. Only the sizes — queen,
+      // king, full, twin — need the noun added.
+      const noun = name.endsWith('bed') ? '' : ' bed'
+      const label = bed.count > 1 ? `${bed.count} ${name}${noun}s` : `${name}${noun}`
+      return capitalise(bed.location ? `${label} (${bed.location})` : label)
     })
     .join(', ')
+}
+
+/**
+ * First letter up.
+ *
+ * Bed types and bed locations are stored lowercase — 'queen', 'sitting room' —
+ * because they are enum-ish values rather than prose. Where they are printed as
+ * a standalone phrase they read as a sentence fragment, so "queen bed" beside a
+ * label was the one lowercase thing on an otherwise capitalised page.
+ */
+function capitalise(s: string): string {
+  return s.charAt(0).toUpperCase() + s.slice(1)
 }

@@ -7,7 +7,7 @@ import { fetchRoom } from '../lib/api'
 import { formatLong } from '../lib/dates'
 import { parseStay, staySearch } from '../lib/stay'
 import { useAsync } from '../lib/useAsync'
-import { Photo } from '../components/Photo'
+import { Gallery, fromRoomPhotos } from '../components/Gallery'
 
 /**
  * One room, with or without dates.
@@ -36,40 +36,46 @@ export function Room() {
 
       {room.data && (
         <article className="flex flex-col gap-8">
-          <header className="flex flex-col gap-2">
+          {/*
+            The header is centred with the rest of the site. What is below it is
+            not: the facts are a definition list and the panel beside them is
+            how the room gets booked, and both read worse centred.
+          */}
+          <header className="flex flex-col items-center gap-2 text-center">
             <h1 className="text-3xl font-semibold tracking-tight">{room.data.name}</h1>
             {room.data.view && <p className="text-neutral-600">{room.data.view}</p>}
           </header>
 
-          <div className="grid gap-3 sm:grid-cols-2">
-            {(room.data.photos.length > 0
-              ? room.data.photos
-              : [{ url: room.data.placeholderPhotoUrl, alt: '' }]
-            ).map((photo, i) => (
-              <Photo
-                key={i}
-                src={photo.url}
-                alt={photo.alt}
-                sources={photo}
-                sizes="(min-width: 640px) 50vw, 100vw"
-                // The room's own photographs are what the page is for, so the
-                // first one is not deferred.
-                loading={i === 0 ? 'eager' : 'lazy'}
-                className="h-64 w-full rounded-lg object-cover"
-              />
-            ))}
-          </div>
+          {/*
+            One large photograph with the rest as a rail, rather than an even
+            grid: the room is what somebody is looking at, and four equal
+            quarters make all four small and none of them the subject. The
+            room's own photographs are what this page is for, so the first is
+            not deferred.
+          */}
+          <Gallery
+            photos={fromRoomPhotos(
+              room.data.photos.length > 0
+                ? room.data.photos
+                : [{ url: room.data.placeholderPhotoUrl, alt: '' }],
+            )}
+            eager
+          />
 
-          <div className="grid gap-8 sm:grid-cols-[2fr_1fr]">
+          {/*
+            Two columns from lg, not sm. At 640px a 2fr/1fr split leaves the
+            booking panel about 190px wide, which is not enough for a price
+            breakdown and a button — the numbers wrapped mid-row and the panel
+            was the most cramped thing on the page. Stacked below that, with
+            the panel under the description where a thumb reaches it.
+          */}
+          <div className="grid gap-8 lg:grid-cols-[2fr_1fr]">
             <div className="flex flex-col gap-4">
               <p className="max-w-prose text-neutral-700">{room.data.description}</p>
 
               <dl className="flex flex-col gap-2 text-sm">
                 <Fact label="Sleeps" value={String(room.data.maxOccupancy)} />
                 <Fact label="Beds" value={describeBeds(room.data)} />
-                {room.data.amenities.length > 0 && (
-                  <Fact label="Amenities" value={room.data.amenities.join(', ')} />
-                )}
                 {room.data.isPetFriendly && (
                   <Fact
                     label="Pets"
@@ -77,6 +83,29 @@ export function Room() {
                   />
                 )}
               </dl>
+
+              {/*
+                Chips rather than a comma-separated line. A room carries a dozen
+                of these — heat, wifi, the toiletries, the jacuzzi where there is
+                one — and thirteen things joined by commas is a paragraph
+                somebody skims past instead of a list they can scan for the one
+                they care about.
+              */}
+              {room.data.amenities.length > 0 && (
+                <div className="flex flex-col gap-2">
+                  <h2 className="text-sm text-neutral-500">In this room</h2>
+                  <ul className="flex flex-wrap gap-2">
+                    {room.data.amenities.map((amenity) => (
+                      <li
+                        key={amenity}
+                        className="rounded-full border border-neutral-200 bg-neutral-50 px-3 py-1 text-sm text-neutral-700"
+                      >
+                        {amenity}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
 
               <p className="rounded-lg bg-neutral-50 px-4 py-3 text-sm text-neutral-600">
                 {room.data.accessibilityNotice}

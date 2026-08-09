@@ -175,7 +175,14 @@ func NewRouter(d Deps) http.Handler {
 			api.Get("/menu", menu(d.Ops))
 			api.Get("/events", events(d.Ops))
 			api.Get("/copy/{slug}", pageCopy(d.Ops))
+			api.Get("/attractions", attractions(d.Ops))
 			api.Post("/inquiries", submitInquiry(d.Ops))
+
+			// The booking and refund rules, read from settings and from
+			// pricing rather than written into the copy — so the page a
+			// guest is asked to agree to cannot drift from what the code
+			// will actually do to their money.
+			api.Get("/policies", policies(q))
 		} else {
 			// Better an honest 503 than a route that silently does not exist.
 			api.Get("/availability", databaseRequired)
@@ -188,6 +195,8 @@ func NewRouter(d Deps) http.Handler {
 			api.Get("/menu", databaseRequired)
 			api.Get("/events", databaseRequired)
 			api.Get("/copy/{slug}", databaseRequired)
+			api.Get("/attractions", databaseRequired)
+			api.Get("/policies", databaseRequired)
 			api.Post("/inquiries", databaseRequired)
 		}
 

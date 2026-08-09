@@ -426,7 +426,8 @@ SELECT id, name, description, sort_order FROM menu_sections ORDER BY sort_order,
 -- Every item in one read, ordered so a caller can group them by walking the
 -- list. Seven or eight sections of a dozen dishes is not worth a query each.
 -- name: ListMenuItems :many
-SELECT i.id, i.section_id, i.name, i.description, i.price_cents, i.is_available, i.sort_order
+SELECT i.id, i.section_id, i.name, i.description, i.price_cents, i.is_available,
+       i.is_gluten_free, i.is_vegan, i.is_vegetarian, i.sort_order
 FROM menu_items i
 JOIN menu_sections s ON s.id = i.section_id
 ORDER BY s.sort_order, s.id, i.sort_order, i.id;
@@ -445,13 +446,19 @@ VALUES (sqlc.arg(name), sqlc.arg(description), sqlc.arg(sort_order))
 RETURNING id;
 
 -- name: CreateMenuItem :exec
-INSERT INTO menu_items (section_id, name, description, price_cents, is_available, sort_order)
+INSERT INTO menu_items (
+  section_id, name, description, price_cents, is_available,
+  is_gluten_free, is_vegan, is_vegetarian, sort_order
+)
 VALUES (
   sqlc.arg(section_id),
   sqlc.arg(name),
   sqlc.arg(description),
   sqlc.arg(price_cents),
   sqlc.arg(is_available),
+  sqlc.arg(is_gluten_free),
+  sqlc.arg(is_vegan),
+  sqlc.arg(is_vegetarian),
   sqlc.arg(sort_order)
 );
 
@@ -501,21 +508,25 @@ VALUES (sqlc.arg(event_id), sqlc.arg(path), sqlc.arg(alt_text), sqlc.arg(sort_or
 -- decision #11 puts event booking out of scope and this is a message, not a
 -- transaction.
 -- name: CreateEventInquiry :one
-INSERT INTO event_inquiries (name, email, phone, event_date, party_size, message)
+INSERT INTO event_inquiries (name, email, phone, event_date, party_size, message, kind)
 VALUES (
   sqlc.arg(name),
   sqlc.arg(email),
   sqlc.arg(phone),
   sqlc.narg(event_date),
   sqlc.narg(party_size),
-  sqlc.arg(message)
+  sqlc.arg(message),
+  sqlc.arg(kind)
 )
 RETURNING id, created_at;
 
+-- Both filters are optional and an empty string means "all", which is how the
+-- console shows one inbox with the events and the contact messages together.
 -- name: ListEventInquiries :many
-SELECT id, name, email, phone, event_date, party_size, message, status, created_at
+SELECT id, name, email, phone, event_date, party_size, message, status, kind, created_at
 FROM event_inquiries
-WHERE sqlc.arg(status)::text = '' OR status = sqlc.arg(status)::text
+WHERE (sqlc.arg(status)::text = '' OR status = sqlc.arg(status)::text)
+  AND (sqlc.arg(kind)::text = '' OR kind = sqlc.arg(kind)::text)
 ORDER BY created_at DESC
 LIMIT sqlc.arg(row_limit)::int;
 
@@ -550,3 +561,44 @@ SET heading    = excluded.heading,
 -- second way to say the same thing.
 -- name: DeletePageCopy :execrows
 DELETE FROM page_copy WHERE slug = sqlc.arg(slug);
+
+-- ---------------------------------------------------------------------------
+-- The photographs on the public pages
+-- ---------------------------------------------------------------------------
+--
+-- Saved as a whole document, the same way a room's photos and the menu are: the
+-- console sends the list it wants the page to have and the transaction replaces
+-- what is there. Reconciling per-row would need a diff on the client whose
+-- failure mode is half a gallery on the public site.
+
+-- name: ListPagePhotos :many
+SELECT slug, path, alt_text, sort_order FROM page_photos
+ORDER BY slug, sort_order, id;
+
+-- name: ListPagePhotosFor :many
+SELECT path, alt_text FROM page_photos
+WHERE slug = sqlc.arg(slug)
+ORDER BY sort_order, id;
+
+-- name: DeletePagePhotos :exec
+DELETE FROM page_photos WHERE slug = sqlc.arg(slug);
+
+-- name: CreatePagePhoto :exec
+INSERT INTO page_photos (slug, path, alt_text, sort_order)
+VALUES (sqlc.arg(slug), sqlc.arg(path), sqlc.arg(alt_text), sqlc.arg(sort_order));
+
+-- ---------------------------------------------------------------------------
+-- What is near the inn
+-- ---------------------------------------------------------------------------
+--
+-- Saved as a whole document, like the menu and the galleries.
+
+-- name: ListLocalAttractions :many
+SELECT name, distance, url FROM local_attractions ORDER BY sort_order, id;
+
+-- name: DeleteLocalAttractions :exec
+DELETE FROM local_attractions;
+
+-- name: CreateLocalAttraction :exec
+INSERT INTO local_attractions (name, distance, url, sort_order)
+VALUES (sqlc.arg(name), sqlc.arg(distance), sqlc.arg(url), sqlc.arg(sort_order));

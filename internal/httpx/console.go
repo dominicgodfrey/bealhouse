@@ -129,6 +129,9 @@ func mountConsole(in chi.Router, ops *console.Ops) {
 
 	in.Get("/copy", consoleCopy(ops))
 	in.Put("/copy/{slug}", consoleSaveCopy(ops))
+	in.Put("/copy/{slug}/photos", consoleSavePagePhotos(ops))
+	in.Get("/attractions", consoleAttractions(ops))
+	in.Put("/attractions", consoleSaveAttractions(ops))
 }
 
 // ---------------------------------------------------------------------------
@@ -655,8 +658,9 @@ func consoleSaveEvents(ops *console.Ops) http.HandlerFunc {
 
 func consoleInquiries(ops *console.Ops) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		q := r.URL.Query()
 		inquiries, err := ops.Inquiries(r.Context(),
-			r.URL.Query().Get("status"), intParam(r.URL.Query().Get("limit")))
+			q.Get("status"), q.Get("kind"), intParam(q.Get("limit")))
 		if err != nil {
 			consoleError(w, r, err)
 			return
@@ -757,6 +761,54 @@ func consoleSaveCopy(ops *console.Ops) http.HandlerFunc {
 		in.Slug = chi.URLParam(r, "slug")
 
 		if err := ops.SaveCopy(r.Context(), in); err != nil {
+			consoleError(w, r, err)
+			return
+		}
+		w.WriteHeader(http.StatusNoContent)
+	}
+}
+
+func consoleAttractions(ops *console.Ops) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		list, err := ops.Attractions(r.Context())
+		if err != nil {
+			consoleError(w, r, err)
+			return
+		}
+		writeJSON(w, http.StatusOK, list)
+	}
+}
+
+func consoleSaveAttractions(ops *console.Ops) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		var in []console.Attraction
+		if err := decodeBody(w, r, &in); err != nil {
+			consoleError(w, r, err)
+			return
+		}
+
+		if err := ops.SaveAttractions(r.Context(), in); err != nil {
+			consoleError(w, r, err)
+			return
+		}
+		w.WriteHeader(http.StatusNoContent)
+	}
+}
+
+// consoleSavePagePhotos replaces one page's gallery.
+//
+// Its own endpoint rather than a field on the copy save, because the two are
+// independent: emptying the prose deletes the page_copy row, and a gallery
+// riding along on that request would go with it.
+func consoleSavePagePhotos(ops *console.Ops) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		var in []console.Photo
+		if err := decodeBody(w, r, &in); err != nil {
+			consoleError(w, r, err)
+			return
+		}
+
+		if err := ops.SavePagePhotos(r.Context(), chi.URLParam(r, "slug"), in); err != nil {
 			consoleError(w, r, err)
 			return
 		}

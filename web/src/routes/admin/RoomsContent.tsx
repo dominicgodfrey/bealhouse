@@ -67,7 +67,7 @@ function RoomEditor({ room, onSaved }: { room: RoomContent; onSaved: () => void 
           Sleeps {room.maxOccupancy} · {room.photos.length}{' '}
           {room.photos.length === 1 ? 'photo' : 'photos'} ·{' '}
           {room.amenities.length || 'no'} amenities
-          {room.isPetFriendly && ' · takes pets'}
+          {room.isPetFriendly && ' · Takes pets'}
         </p>
         {room.description.includes('PLACEHOLDER') && (
           <p className="text-sm text-amber-800">

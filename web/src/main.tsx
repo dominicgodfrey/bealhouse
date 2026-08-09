@@ -20,14 +20,15 @@ import { Rates } from './routes/admin/Rates'
 import { RoomsContent } from './routes/admin/RoomsContent'
 import { SettingsScreen } from './routes/admin/SettingsScreen'
 import { Today } from './routes/admin/Today'
-import { About } from './routes/About'
 import { Confirm } from './routes/Confirm'
 import { Events } from './routes/Events'
 import { Health } from './routes/Health'
 import { Held } from './routes/Held'
 import { Home } from './routes/Home'
+import { LocalArea } from './routes/LocalArea'
 import { Manage } from './routes/Manage'
 import { Pay } from './routes/Pay'
+import { Policies } from './routes/Policies'
 import { Restaurant } from './routes/Restaurant'
 import { Room } from './routes/Room'
 import { Rooms } from './routes/Rooms'
@@ -55,7 +56,15 @@ createRoot(root).render(
         */}
         <Route path="/restaurant" element={<Restaurant />} />
         <Route path="/events" element={<Events />} />
-        <Route path="/about" element={<About />} />
+        <Route path="/local-area" element={<LocalArea />} />
+
+        {/*
+          Indexable, unlike the booking flow it belongs to: a guest looking for
+          the cancellation terms after they have booked must be able to find
+          them, and being asked to agree to something unfindable is what this
+          page exists to stop.
+        */}
+        <Route path="/policies" element={<Policies />} />
 
         {/*
           Both keyed by booking code, unlike /book/:slug above, which is keyed

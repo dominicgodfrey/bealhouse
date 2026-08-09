@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react'
 import { fetchMenu, saveMenu, type MenuItem, type MenuSection } from '../../lib/console'
 import { useAsync } from '../../lib/useAsync'
 import { ErrorNote, Loading } from '../../components/Layout'
+import { DIETS } from '../../components/Diet'
 import { useConsole } from './Console'
 import {
   Aside,
@@ -171,8 +172,45 @@ function Section({
               Remove
             </Button>
           </div>
+
+          {/*
+            Buttons rather than checkboxes, and they show the same badge the
+            guest sees so there is no guessing which letter the menu will print.
+            Off is "not marked", not "contains it" — the hint below says so,
+            because an owner reading these as a negative would tick them all.
+          */}
+          <div className="flex flex-wrap items-center gap-2">
+            {DIETS.map((d) => {
+              const on = item[d.key]
+              return (
+                <button
+                  key={d.key}
+                  type="button"
+                  aria-pressed={on}
+                  onClick={() => setItem(i, { ...item, [d.key]: !on })}
+                  className={`flex items-center gap-2 rounded-lg border px-3 py-1.5 text-sm ${
+                    on
+                      ? 'border-neutral-900 bg-neutral-900 text-white'
+                      : 'border-neutral-300 text-neutral-600'
+                  }`}
+                >
+                  <span
+                    className={`inline-flex h-5 min-w-5 items-center justify-center rounded px-1 text-[10px] font-semibold ring-1 ring-inset ${d.className}`}
+                  >
+                    {d.abbr}
+                  </span>
+                  {d.label}
+                </button>
+              )
+            })}
+          </div>
         </div>
       ))}
+
+      <p className="text-xs text-neutral-500">
+        Leaving one of the three unticked means the dish has not been assessed for it — the menu
+        prints no mark and makes no claim. Only tick what the kitchen can stand behind.
+      </p>
 
       <div className="flex flex-wrap gap-2">
         <Button
@@ -181,7 +219,16 @@ function Section({
               ...section,
               items: [
                 ...section.items,
-                { name: '', description: '', priceCents: 0, available: true },
+                {
+                  name: '',
+                  description: '',
+                  priceCents: 0,
+                  available: true,
+                  // Nothing claimed until somebody ticks it.
+                  glutenFree: false,
+                  vegan: false,
+                  vegetarian: false,
+                },
               ],
             })
           }

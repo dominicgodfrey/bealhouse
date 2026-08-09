@@ -104,7 +104,7 @@ func TestEveryMarketingPageGetsItsOwnHead(t *testing.T) {
 	m, _ := meta(t, "https://bealhouse.test")
 
 	seen := map[string]string{}
-	for _, path := range []string{"/", "/rooms", "/restaurant", "/events", "/about"} {
+	for _, path := range []string{"/", "/rooms", "/restaurant", "/events", "/local-area"} {
 		doc := page(t, m, path)
 
 		title := only(t, titleTag, doc, "<title>")
@@ -132,11 +132,11 @@ func TestEveryMarketingPageGetsItsOwnHead(t *testing.T) {
 func TestTheShellsOwnTitleIsReplacedRatherThanJoined(t *testing.T) {
 	m, _ := meta(t, "https://bealhouse.test")
 
-	doc := page(t, m, "/about")
+	doc := page(t, m, "/local-area")
 	if n := strings.Count(strings.ToLower(doc), "<title>"); n != 1 {
 		t.Fatalf("the document has %d <title> tags, want exactly 1", n)
 	}
-	if title := only(t, titleTag, doc, "<title>"); !strings.HasPrefix(title, "About") {
+	if title := only(t, titleTag, doc, "<title>"); !strings.HasPrefix(title, "Local area") {
 		t.Errorf("title is %q; the shell's static one survived", title)
 	}
 	// ...and the rest of the shell is untouched, or the SPA does not boot.
@@ -182,23 +182,23 @@ func TestAPageWithNoCopyPublishesNoDescription(t *testing.T) {
 	ctx := context.Background()
 
 	// Whatever the developer's database happens to hold, this page has none.
-	if _, err := tx.Exec(ctx, "DELETE FROM page_copy WHERE slug = 'about'"); err != nil {
+	if _, err := tx.Exec(ctx, "DELETE FROM page_copy WHERE slug = 'local-area'"); err != nil {
 		t.Fatalf("clearing the page: %v", err)
 	}
 
-	doc := page(t, m, "/about")
+	doc := page(t, m, "/local-area")
 	if strings.Contains(doc, `name="description"`) {
 		t.Error("a page nobody has written published a description")
 	}
 
 	// ...and the owner's words appear the moment there are some.
 	if err := m.ops.SaveCopy(ctx, console.PageCopy{
-		Slug: "about", Heading: "Our house", Body: "A short history.\n\nAnd a second paragraph.",
+		Slug: "local-area", Heading: "Our house", Body: "A short history.\n\nAnd a second paragraph.",
 	}); err != nil {
 		t.Fatalf("saving the copy: %v", err)
 	}
 
-	doc = page(t, m, "/about")
+	doc = page(t, m, "/local-area")
 	if got := only(t, descrTag, doc, "description"); got != "A short history." {
 		t.Errorf("description is %q, want the first paragraph alone", got)
 	}
@@ -400,7 +400,7 @@ func TestTheSitemapListsEveryRoomAndTheSiteURLsAreAbsolute(t *testing.T) {
 			t.Errorf("the sitemap does not list %s", want)
 		}
 	}
-	for _, page := range []string{"/", "/rooms", "/restaurant", "/events", "/about"} {
+	for _, page := range []string{"/", "/rooms", "/restaurant", "/events", "/local-area"} {
 		if !strings.Contains(body, "<loc>https://bealhouse.test"+page+"</loc>") {
 			t.Errorf("the sitemap does not list %s", page)
 		}

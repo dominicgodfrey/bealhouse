@@ -675,23 +675,23 @@ func TestEmptyingAPageDeletesItsRow(t *testing.T) {
 	ctx := context.Background()
 
 	if err := o.SaveCopy(ctx, console.PageCopy{
-		Slug: "about", Heading: "Our house", Body: "Since 1833.",
+		Slug: "local-area", Heading: "Our house", Body: "Since 1833.",
 	}); err != nil {
 		t.Fatalf("saving: %v", err)
 	}
 
-	page, err := o.PageFor(ctx, "about")
+	page, err := o.PageFor(ctx, "local-area")
 	if err != nil || !page.Written {
 		t.Fatalf("after saving: page = %+v, err = %v", page, err)
 	}
 
-	if err := o.SaveCopy(ctx, console.PageCopy{Slug: "about"}); err != nil {
+	if err := o.SaveCopy(ctx, console.PageCopy{Slug: "local-area"}); err != nil {
 		t.Fatalf("emptying: %v", err)
 	}
 
 	var rows int
 	if err := tx.QueryRow(ctx,
-		`SELECT count(*) FROM page_copy WHERE slug = 'about'`).Scan(&rows); err != nil {
+		`SELECT count(*) FROM page_copy WHERE slug = 'local-area'`).Scan(&rows); err != nil {
 		t.Fatalf("counting: %v", err)
 	}
 	if rows != 0 {
@@ -700,7 +700,7 @@ func TestEmptyingAPageDeletesItsRow(t *testing.T) {
 
 	// And reading it back is not an error: the page exists, it just has nothing
 	// in that slot.
-	page, err = o.PageFor(ctx, "about")
+	page, err = o.PageFor(ctx, "local-area")
 	if err != nil {
 		t.Fatalf("reading an unwritten page: %v", err)
 	}

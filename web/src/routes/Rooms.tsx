@@ -22,8 +22,8 @@ export function Rooms() {
   return (
     <Layout>
       <div className="flex flex-col gap-8">
-        <div className="flex flex-col gap-3">
-          <h1 className="text-4xl font-semibold tracking-tight">The rooms</h1>
+        <div className="flex flex-col items-center gap-3 text-center">
+          <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">The rooms</h1>
           {copy.data && (
             <Prose heading={copy.data.heading} paragraphs={paragraphs(copy.data.body)} />
           )}
@@ -77,7 +77,7 @@ function Card({ room }: { room: RoomCard }) {
       <p className="text-sm text-neutral-600">
         Sleeps {room.maxOccupancy}
         {room.view && ` · ${room.view}`}
-        {room.isPetFriendly && ' · dogs welcome'}
+        {room.isPetFriendly && ' · Dogs welcome'}
       </p>
 
       {room.description && (

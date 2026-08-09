@@ -359,6 +359,14 @@ type MenuItem struct {
 	// Off rather than deleted, so tonight's sold-out dish keeps its description
 	// and its place in the order for tomorrow.
 	Available bool `json:"available"`
+
+	// What the kitchen states the dish suits. False is "unmarked", never
+	// "contains gluten" — the menu shows an icon for what was ticked and claims
+	// nothing about what was not, because a guest with coeliac disease may act
+	// on this and the safe failure is them asking.
+	GlutenFree bool `json:"glutenFree"`
+	Vegan      bool `json:"vegan"`
+	Vegetarian bool `json:"vegetarian"`
 }
 
 // MenuSection is one course.
@@ -399,6 +407,9 @@ func (o *Ops) menu(ctx context.Context, includeUnavailable bool) ([]MenuSection,
 			Description: i.Description,
 			PriceCents:  int64(i.PriceCents),
 			Available:   i.IsAvailable,
+			GlutenFree:  i.IsGlutenFree,
+			Vegan:       i.IsVegan,
+			Vegetarian:  i.IsVegetarian,
 		})
 	}
 
@@ -452,12 +463,15 @@ func (o *Ops) SaveMenu(ctx context.Context, sections []MenuSection) error {
 			}
 			for ii, i := range s.Items {
 				if err := q.CreateMenuItem(ctx, db.CreateMenuItemParams{
-					SectionID:   id,
-					Name:        strings.TrimSpace(i.Name),
-					Description: strings.TrimSpace(i.Description),
-					PriceCents:  int32(i.PriceCents),
-					IsAvailable: i.Available,
-					SortOrder:   int32(ii),
+					SectionID:    id,
+					Name:         strings.TrimSpace(i.Name),
+					Description:  strings.TrimSpace(i.Description),
+					PriceCents:   int32(i.PriceCents),
+					IsAvailable:  i.Available,
+					IsGlutenFree: i.GlutenFree,
+					IsVegan:      i.Vegan,
+					IsVegetarian: i.Vegetarian,
+					SortOrder:    int32(ii),
 				}); err != nil {
 					return fmt.Errorf("console: saving dish %q: %w", i.Name, err)
 				}
@@ -600,7 +614,8 @@ func (o *Ops) SaveEvents(ctx context.Context, events []Event) error {
 	})
 }
 
-// Inquiry is one message from the events form.
+// Inquiry is one message from the public site: an events enquiry, or a note
+// from the contact form on the home page.
 type Inquiry struct {
 	ID        int64  `json:"id"`
 	Name      string `json:"name"`
@@ -611,14 +626,31 @@ type Inquiry struct {
 	Message   string `json:"message"`
 	Status    string `json:"status"`
 
+	// Which form wrote it: "event" or "contact". The console shows one inbox
+	// and labels the rows, because the owner answers both the same way and two
+	// screens would mean two places to forget to look.
+	Kind string `json:"kind"`
+
 	At time.Time `json:"at"`
 }
 
-func (o *Ops) Inquiries(ctx context.Context, status string, limit int) ([]Inquiry, error) {
+// InquiryKinds are the forms that can write to the inbox.
+const (
+	KindEvent   = "event"
+	KindContact = "contact"
+)
+
+// Inquiries lists the inbox. Empty status or kind means "all of them".
+func (o *Ops) Inquiries(ctx context.Context, status, kind string, limit int) ([]Inquiry, error) {
 	switch status {
 	case "", "new", "contacted", "closed":
 	default:
 		return nil, badf("%q is not an inquiry status", status)
+	}
+	switch kind {
+	case "", KindEvent, KindContact:
+	default:
+		return nil, badf("%q is not a kind of message", kind)
 	}
 	if limit <= 0 || limit > 500 {
 		limit = 200
@@ -626,6 +658,7 @@ func (o *Ops) Inquiries(ctx context.Context, status string, limit int) ([]Inquir
 
 	rows, err := o.q.ListEventInquiries(ctx, db.ListEventInquiriesParams{
 		Status:   status,
+		Kind:     kind,
 		RowLimit: int32(limit),
 	})
 	if err != nil {
@@ -642,6 +675,7 @@ func (o *Ops) Inquiries(ctx context.Context, status string, limit int) ([]Inquir
 			EventDate: day(r.EventDate),
 			Message:   r.Message,
 			Status:    r.Status,
+			Kind:      r.Kind,
 			At:        r.CreatedAt,
 		}
 		if r.PartySize != nil {
@@ -652,8 +686,9 @@ func (o *Ops) Inquiries(ctx context.Context, status string, limit int) ([]Inquir
 	return out, nil
 }
 
-// NewInquiry is the events form's submission — the one write on the public site
-// an anonymous visitor performs.
+// NewInquiry is a submission from one of the two public forms — the events
+// enquiry, or the contact box on the home page. These are the only writes an
+// anonymous visitor performs on this site apart from creating a booking.
 type NewInquiry struct {
 	Name      string `json:"name"`
 	Email     string `json:"email"`
@@ -661,13 +696,19 @@ type NewInquiry struct {
 	EventDate string `json:"eventDate"`
 	PartySize int    `json:"partySize"`
 	Message   string `json:"message"`
+
+	// Which form it came from. Anything but "contact" is read as an events
+	// enquiry, which is what every row was before the contact form existed —
+	// so an old client that sends nothing still lands where it always did.
+	Kind string `json:"kind"`
 }
 
-// SubmitInquiry records a message from the events page.
+// SubmitInquiry records a message from the public site.
 //
 // It inserts and does nothing else: no email, no job, no side effect. Decision
 // #11 puts event booking and deposits out of scope, so this is a message the
-// owner answers, and the only thing the system owes it is not to lose it.
+// owner answers, and the only thing the system owes it is not to lose it. The
+// contact form is the same promise with a shorter form in front of it.
 func (o *Ops) SubmitInquiry(ctx context.Context, in NewInquiry) error {
 	name := strings.TrimSpace(in.Name)
 	address := strings.TrimSpace(in.Email)
@@ -692,6 +733,11 @@ func (o *Ops) SubmitInquiry(ctx context.Context, in NewInquiry) error {
 		party = &n
 	}
 
+	kind := KindEvent
+	if in.Kind == KindContact {
+		kind = KindContact
+	}
+
 	if _, err := o.q.CreateEventInquiry(ctx, db.CreateEventInquiryParams{
 		Name:      name,
 		Email:     address,
@@ -699,6 +745,7 @@ func (o *Ops) SubmitInquiry(ctx context.Context, in NewInquiry) error {
 		EventDate: when,
 		PartySize: party,
 		Message:   strings.TrimSpace(in.Message),
+		Kind:      kind,
 	}); err != nil {
 		return fmt.Errorf("console: recording an inquiry: %w", err)
 	}
@@ -740,12 +787,102 @@ type PageCopy struct {
 	// with nothing in the slot. The console has to say that out loud rather than
 	// presenting an empty box as though it were a finished page.
 	Written bool `json:"written"`
+
+	// The page's photographs, from page_photos. A separate table and a separate
+	// save, because pictures and prose are independent: the restaurant page has
+	// had photographs and no sentences all year. Never nil — the front end maps
+	// over it, and a null here is the crash room photos already caused once.
+	Photos []Photo `json:"photos"`
 }
 
 // PageSlugs is which pages have an editable slot, and it is a property of the
 // binary rather than of the table — exactly like email.Names(). A page added in
 // a later release turns up in the editor on its own.
-func PageSlugs() []string { return []string{"home", "rooms", "restaurant", "events", "about"} }
+//
+// "local-area" replaced "about": the owner's story moved onto the home page,
+// where a visitor deciding whether to book actually reads it, and the standalone
+// page became what the inn's current site calls Local Area — what there is to do
+// in Littleton, which is the question a guest is really asking.
+//
+// "policies" is a slot on a page that mostly writes itself: the booking and
+// refund rules there are read from settings and from pricing, so they cannot
+// drift from what the code actually enforces. What this adds is the paragraphs
+// only the owner can write — smoking, children, parking, quiet hours.
+func PageSlugs() []string {
+	return []string{"home", "rooms", "restaurant", "events", "local-area", "policies"}
+}
+
+// ---------------------------------------------------------------------------
+// What is near the inn
+// ---------------------------------------------------------------------------
+
+// Attraction is one entry in the local-area page's nearby list.
+type Attraction struct {
+	Name string `json:"name"`
+	// Free text — "walking distance" is the honest answer for half the list and
+	// is not a number of minutes.
+	Distance string `json:"distance"`
+	// Empty means no link, and the page renders the name as plain text rather
+	// than as an anchor going nowhere.
+	URL string `json:"url"`
+}
+
+func (o *Ops) Attractions(ctx context.Context) ([]Attraction, error) {
+	rows, err := o.q.ListLocalAttractions(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("console: loading local attractions: %w", err)
+	}
+	out := make([]Attraction, 0, len(rows))
+	for _, r := range rows {
+		a := Attraction{Name: r.Name, Distance: r.Distance}
+		if r.Url != nil {
+			a.URL = *r.Url
+		}
+		out = append(out, a)
+	}
+	return out, nil
+}
+
+// SaveAttractions replaces the list wholesale, in one transaction — the same
+// whole-document save the menu and the galleries use.
+func (o *Ops) SaveAttractions(ctx context.Context, list []Attraction) error {
+	for _, a := range list {
+		if strings.TrimSpace(a.Name) == "" {
+			return badf("every entry needs a name")
+		}
+		// The database enforces this too, and that is the one that counts. Here
+		// so the owner gets a sentence rather than a constraint violation.
+		if url := strings.TrimSpace(a.URL); url != "" && !isHTTPURL(url) {
+			return badf("the link for %q must start with http:// or https://", a.Name)
+		}
+	}
+
+	return o.tx(ctx, func(q *db.Queries) error {
+		if err := q.DeleteLocalAttractions(ctx); err != nil {
+			return err
+		}
+		for i, a := range list {
+			var url *string
+			if trimmed := strings.TrimSpace(a.URL); trimmed != "" {
+				url = &trimmed
+			}
+			if err := q.CreateLocalAttraction(ctx, db.CreateLocalAttractionParams{
+				Name:      strings.TrimSpace(a.Name),
+				Distance:  strings.TrimSpace(a.Distance),
+				Url:       url,
+				SortOrder: int32(i),
+			}); err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+}
+
+func isHTTPURL(s string) bool {
+	lower := strings.ToLower(s)
+	return strings.HasPrefix(lower, "http://") || strings.HasPrefix(lower, "https://")
+}
 
 func (o *Ops) Copy(ctx context.Context) ([]PageCopy, error) {
 	rows, err := o.q.ListPageCopy(ctx)
@@ -758,28 +895,89 @@ func (o *Ops) Copy(ctx context.Context) ([]PageCopy, error) {
 		written[r.Slug] = r
 	}
 
+	shots, err := o.q.ListPagePhotos(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("console: loading page photos: %w", err)
+	}
+	bySlug := map[string][]Photo{}
+	for _, s := range shots {
+		bySlug[s.Slug] = append(bySlug[s.Slug],
+			Photo{Path: s.Path, Alt: s.AltText, Ladder: media.Sources(s.Path)})
+	}
+
 	out := make([]PageCopy, 0, len(PageSlugs()))
 	for _, slug := range PageSlugs() {
-		page := PageCopy{Slug: slug}
+		page := PageCopy{Slug: slug, Photos: bySlug[slug]}
 		if row, ok := written[slug]; ok {
 			page.Heading, page.Body, page.Written = row.Heading, row.Body, true
+		}
+		if page.Photos == nil {
+			page.Photos = []Photo{}
 		}
 		out = append(out, page)
 	}
 	return out, nil
 }
 
-// PageFor reads one page's copy for the public site. A missing row is not an
-// error: it is a page with nothing written on it yet.
+// PageFor reads one page's copy and photographs for the public site. A missing
+// row is not an error: it is a page with nothing written on it yet.
 func (o *Ops) PageFor(ctx context.Context, slug string) (PageCopy, error) {
+	page := PageCopy{Slug: slug, Photos: []Photo{}}
+
 	row, err := o.q.GetPageCopy(ctx, slug)
-	if errors.Is(notFound(err), ErrNotFound) {
-		return PageCopy{Slug: slug}, nil
-	}
-	if err != nil {
+	switch {
+	case errors.Is(notFound(err), ErrNotFound):
+		// Nothing written. The photographs below may still exist.
+	case err != nil:
 		return PageCopy{}, fmt.Errorf("console: loading copy for %q: %w", slug, err)
+	default:
+		page.Heading, page.Body, page.Written = row.Heading, row.Body, true
 	}
-	return PageCopy{Slug: row.Slug, Heading: row.Heading, Body: row.Body, Written: true}, nil
+
+	shots, err := o.q.ListPagePhotosFor(ctx, slug)
+	if err != nil {
+		return PageCopy{}, fmt.Errorf("console: loading photos for %q: %w", slug, err)
+	}
+	for _, s := range shots {
+		page.Photos = append(page.Photos,
+			Photo{Path: s.Path, Alt: s.AltText, Ladder: media.Sources(s.Path)})
+	}
+	return page, nil
+}
+
+// SavePagePhotos replaces a page's gallery wholesale, in one transaction.
+//
+// Separate from SaveCopy because the two are independent — emptying the prose
+// is a DELETE of the page_copy row and must not take the photographs with it —
+// and a whole-document save for the same reason the menu and a room's photos
+// are: this is how a gallery is edited, and a half-applied one is on the public
+// site.
+func (o *Ops) SavePagePhotos(ctx context.Context, slug string, photos []Photo) error {
+	if !known(slug, PageSlugs()) {
+		return badf("there is no page called %q", slug)
+	}
+	for _, p := range photos {
+		if strings.TrimSpace(p.Alt) == "" {
+			return badf("every photograph needs alt text describing it")
+		}
+	}
+
+	return o.tx(ctx, func(q *db.Queries) error {
+		if err := q.DeletePagePhotos(ctx, slug); err != nil {
+			return err
+		}
+		for i, p := range photos {
+			if err := q.CreatePagePhoto(ctx, db.CreatePagePhotoParams{
+				Slug:      slug,
+				Path:      p.Path,
+				AltText:   strings.TrimSpace(p.Alt),
+				SortOrder: int32(i),
+			}); err != nil {
+				return err
+			}
+		}
+		return nil
+	})
 }
 
 func (o *Ops) SaveCopy(ctx context.Context, in PageCopy) error {

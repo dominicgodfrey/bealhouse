@@ -340,6 +340,14 @@ func TestAPhotoURLIsTheStoredPathUntouched(t *testing.T) {
 	if err != nil {
 		t.Fatalf("looking up the room: %v", err)
 	}
+	// Whatever the developer's database holds, this room has exactly the one
+	// photograph below. The seed carries real photographs now, and a test that
+	// counted on a room having none was really asserting that nobody had
+	// uploaded any yet. Inside the rolled-back transaction, so the dev database
+	// keeps them.
+	if err := q.DeleteRoomPhotos(ctx, id); err != nil {
+		t.Fatalf("clearing the room's photos: %v", err)
+	}
 	if err := q.CreateRoomPhoto(ctx, db.CreateRoomPhotoParams{
 		RoomID: id, Path: stored, AltText: "The bay window", SortOrder: 0,
 	}); err != nil {

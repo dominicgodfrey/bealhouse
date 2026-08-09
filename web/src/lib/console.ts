@@ -487,6 +487,13 @@ export type MenuItem = {
   /** Zero means no price of its own — market price, or part of a prix fixe. */
   priceCents: number
   available: boolean
+  /**
+   * What the kitchen states the dish suits. Unticked is *unmarked* — the public
+   * menu shows an icon for what was ticked and claims nothing about the rest.
+   */
+  glutenFree: boolean
+  vegan: boolean
+  vegetarian: boolean
 }
 
 export type MenuSection = {
@@ -528,6 +535,8 @@ export function saveEvents(events: EventItem[]): Promise<void> {
 
 export type InquiryStatus = 'new' | 'contacted' | 'closed'
 
+export type InquiryKind = 'event' | 'contact'
+
 export type Inquiry = {
   id: number
   name: string
@@ -537,11 +546,13 @@ export type Inquiry = {
   partySize?: number
   message: string
   status: InquiryStatus
+  /** Which form wrote it — the events enquiry, or the home page contact box. */
+  kind: InquiryKind
   at: string
 }
 
-export function fetchInquiries(status?: string): Promise<Inquiry[]> {
-  return request<Inquiry[]>(`/api/admin/inquiries${query({ status })}`)
+export function fetchInquiries(status?: string, kind?: string): Promise<Inquiry[]> {
+  return request<Inquiry[]>(`/api/admin/inquiries${query({ status, kind })}`)
 }
 
 export function setInquiryStatus(id: number, status: InquiryStatus): Promise<void> {
@@ -597,6 +608,8 @@ export type PageCopy = {
   body: string
   /** False when the page is showing its structure with nothing in the slot. */
   written: boolean
+  /** The page's gallery, from `page_photos`. Saved separately — see below. */
+  photos: Photo[]
 }
 
 export function fetchCopy(): Promise<PageCopy[]> {
@@ -607,5 +620,40 @@ export function savePageCopy(page: PageCopy): Promise<void> {
   return request<void>(`/api/admin/copy/${encodeURIComponent(page.slug)}`, {
     method: 'PUT',
     body: JSON.stringify(page),
+  })
+}
+
+/**
+ * Replaces one page's photographs.
+ *
+ * A separate request from the copy, because the two are independent on the
+ * server: emptying the heading and the body deletes the page_copy row, and a
+ * gallery riding along on that request would go with it. A page may have
+ * pictures and no prose — the restaurant page has, all year.
+ */
+export function savePagePhotos(slug: string, photos: Photo[]): Promise<void> {
+  return request<void>(`/api/admin/copy/${encodeURIComponent(slug)}/photos`, {
+    method: 'PUT',
+    body: JSON.stringify(photos),
+  })
+}
+
+/** One entry in the local-area page's nearby list. */
+export type Attraction = {
+  name: string
+  /** Free text — "Walking distance" is not a number of minutes. */
+  distance: string
+  /** Empty means no link. The page renders the name as plain text. */
+  url: string
+}
+
+export function fetchAttractions(): Promise<Attraction[]> {
+  return request<Attraction[]>('/api/admin/attractions')
+}
+
+export function saveAttractions(list: Attraction[]): Promise<void> {
+  return request<void>('/api/admin/attractions', {
+    method: 'PUT',
+    body: JSON.stringify(list),
   })
 }

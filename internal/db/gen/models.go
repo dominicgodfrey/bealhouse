@@ -38,6 +38,8 @@ type Booking struct {
 	BalanceWarnedAt       pgtype.Timestamptz
 	// Set in the transaction that queues the departure-morning email. NULL means it has not gone out; the scan reads nothing else to decide.
 	CheckoutEmailSentAt pgtype.Timestamptz
+	// When the guest ticked the policies box, stamped server-side. NULL for rows written before the box existed.
+	PoliciesAcceptedAt pgtype.Timestamptz
 }
 
 type BookingRoom struct {
@@ -79,6 +81,8 @@ type EventInquiry struct {
 	Status    string
 	CreatedAt time.Time
 	UpdatedAt time.Time
+	// Which form wrote the row: the events enquiry form, or the general contact form on the home page.
+	Kind string
 }
 
 type EventPhoto struct {
@@ -118,6 +122,16 @@ type Job struct {
 	CreatedAt time.Time
 }
 
+// The nearby-highlights list on the local-area page. Owner-managed; url NULL means the entry renders as plain text.
+type LocalAttraction struct {
+	ID        int64
+	Name      string
+	Distance  string
+	Url       *string
+	SortOrder int32
+	CreatedAt time.Time
+}
+
 type MenuItem struct {
 	ID          int64
 	SectionID   int64
@@ -126,6 +140,10 @@ type MenuItem struct {
 	PriceCents  int32
 	IsAvailable bool
 	SortOrder   int32
+	// The kitchen states this dish is gluten free. False means unmarked, not "contains gluten".
+	IsGlutenFree bool
+	IsVegan      bool
+	IsVegetarian bool
 }
 
 type MenuSection struct {
@@ -142,6 +160,16 @@ type PageCopy struct {
 	Heading   string
 	Body      string
 	UpdatedAt time.Time
+}
+
+// Owner-uploaded photographs for the public pages, keyed by the same slug as page_copy. Independent of it: a page may have pictures and no prose.
+type PagePhoto struct {
+	ID        int64
+	Slug      string
+	Path      string
+	AltText   string
+	SortOrder int32
+	CreatedAt time.Time
 }
 
 // The ledger. bookings.amount_paid_cents is the gross of the succeeded charges here and is never reduced by a refund - pricing.Refund derives from what was collected, so decrementing it would make a second cancellation compute a different answer.

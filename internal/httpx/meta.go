@@ -106,8 +106,10 @@ func (s *siteMeta) forPath(ctx context.Context, path string) headMeta {
 		return s.restaurant(ctx, meta)
 	case path == "/events":
 		return s.events(ctx, meta)
-	case path == "/about":
-		return s.about(ctx, meta)
+	case path == "/local-area":
+		return s.localArea(ctx, meta)
+	case path == "/policies":
+		return s.policyPage(ctx, meta)
 	}
 
 	// The booking flow, the guest's own booking, and the console.
@@ -355,6 +357,13 @@ func menuLD(sections []console.MenuSection) map[string]any {
 					"priceCurrency": "USD",
 				}
 			}
+			// The same three claims the printed menu shows an icon for, in the
+			// vocabulary a search engine reads. Only what was ticked: an
+			// unmarked dish says nothing here either, exactly as it says
+			// nothing on the page.
+			if diets := suitableForDiet(item); len(diets) > 0 {
+				dish["suitableForDiet"] = diets
+			}
 			items = append(items, dish)
 		}
 		course := map[string]any{
@@ -371,6 +380,26 @@ func menuLD(sections []console.MenuSection) map[string]any {
 		return nil
 	}
 	return map[string]any{"@type": "Menu", "hasMenuSection": courses}
+}
+
+// suitableForDiet maps the three flags on a dish to schema.org's RestrictedDiet
+// vocabulary, which is a fixed set of URLs rather than free text.
+//
+// Vegan does not imply vegetarian here, for the same reason the column does not:
+// this reports what the kitchen ticked and nothing it did not, and a dish marked
+// only vegan is a true statement that needs no help from us.
+func suitableForDiet(item console.MenuItem) []any {
+	var out []any
+	if item.GlutenFree {
+		out = append(out, "https://schema.org/GlutenFreeDiet")
+	}
+	if item.Vegan {
+		out = append(out, "https://schema.org/VeganDiet")
+	}
+	if item.Vegetarian {
+		out = append(out, "https://schema.org/VegetarianDiet")
+	}
+	return out
 }
 
 func (s *siteMeta) events(ctx context.Context, meta headMeta) headMeta {
@@ -425,9 +454,19 @@ func (s *siteMeta) events(ctx context.Context, meta headMeta) headMeta {
 	return meta
 }
 
-func (s *siteMeta) about(ctx context.Context, meta headMeta) headMeta {
-	meta.Title = title("About")
-	meta.Description = s.copyFor(ctx, "about")
+func (s *siteMeta) localArea(ctx context.Context, meta headMeta) headMeta {
+	meta.Title = title("Local area")
+	meta.Description = s.copyFor(ctx, "local-area")
+	return meta
+}
+
+// policyPage is indexable on purpose, unlike the booking flow it belongs to. A
+// guest looking for the cancellation terms after they have booked should be
+// able to find them, and being asked to agree to something unfindable is the
+// thing this page exists to stop.
+func (s *siteMeta) policyPage(ctx context.Context, meta headMeta) headMeta {
+	meta.Title = title("Policies")
+	meta.Description = s.copyFor(ctx, "policies")
 	return meta
 }
 

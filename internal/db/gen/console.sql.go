@@ -109,14 +109,15 @@ func (q *Queries) CreateEvent(ctx context.Context, arg CreateEventParams) (int64
 }
 
 const createEventInquiry = `-- name: CreateEventInquiry :one
-INSERT INTO event_inquiries (name, email, phone, event_date, party_size, message)
+INSERT INTO event_inquiries (name, email, phone, event_date, party_size, message, kind)
 VALUES (
   $1,
   $2,
   $3,
   $4,
   $5,
-  $6
+  $6,
+  $7
 )
 RETURNING id, created_at
 `
@@ -128,6 +129,7 @@ type CreateEventInquiryParams struct {
 	EventDate pgtype.Date
 	PartySize *int32
 	Message   string
+	Kind      string
 }
 
 type CreateEventInquiryRow struct {
@@ -147,6 +149,7 @@ func (q *Queries) CreateEventInquiry(ctx context.Context, arg CreateEventInquiry
 		arg.EventDate,
 		arg.PartySize,
 		arg.Message,
+		arg.Kind,
 	)
 	var i CreateEventInquiryRow
 	err := row.Scan(&i.ID, &i.CreatedAt)
@@ -199,25 +202,56 @@ func (q *Queries) CreateGuestNote(ctx context.Context, arg CreateGuestNoteParams
 	return i, err
 }
 
+const createLocalAttraction = `-- name: CreateLocalAttraction :exec
+INSERT INTO local_attractions (name, distance, url, sort_order)
+VALUES ($1, $2, $3, $4)
+`
+
+type CreateLocalAttractionParams struct {
+	Name      string
+	Distance  string
+	Url       *string
+	SortOrder int32
+}
+
+func (q *Queries) CreateLocalAttraction(ctx context.Context, arg CreateLocalAttractionParams) error {
+	_, err := q.db.Exec(ctx, createLocalAttraction,
+		arg.Name,
+		arg.Distance,
+		arg.Url,
+		arg.SortOrder,
+	)
+	return err
+}
+
 const createMenuItem = `-- name: CreateMenuItem :exec
-INSERT INTO menu_items (section_id, name, description, price_cents, is_available, sort_order)
+INSERT INTO menu_items (
+  section_id, name, description, price_cents, is_available,
+  is_gluten_free, is_vegan, is_vegetarian, sort_order
+)
 VALUES (
   $1,
   $2,
   $3,
   $4,
   $5,
-  $6
+  $6,
+  $7,
+  $8,
+  $9
 )
 `
 
 type CreateMenuItemParams struct {
-	SectionID   int64
-	Name        string
-	Description string
-	PriceCents  int32
-	IsAvailable bool
-	SortOrder   int32
+	SectionID    int64
+	Name         string
+	Description  string
+	PriceCents   int32
+	IsAvailable  bool
+	IsGlutenFree bool
+	IsVegan      bool
+	IsVegetarian bool
+	SortOrder    int32
 }
 
 func (q *Queries) CreateMenuItem(ctx context.Context, arg CreateMenuItemParams) error {
@@ -227,6 +261,9 @@ func (q *Queries) CreateMenuItem(ctx context.Context, arg CreateMenuItemParams) 
 		arg.Description,
 		arg.PriceCents,
 		arg.IsAvailable,
+		arg.IsGlutenFree,
+		arg.IsVegan,
+		arg.IsVegetarian,
 		arg.SortOrder,
 	)
 	return err
@@ -249,6 +286,28 @@ func (q *Queries) CreateMenuSection(ctx context.Context, arg CreateMenuSectionPa
 	var id int64
 	err := row.Scan(&id)
 	return id, err
+}
+
+const createPagePhoto = `-- name: CreatePagePhoto :exec
+INSERT INTO page_photos (slug, path, alt_text, sort_order)
+VALUES ($1, $2, $3, $4)
+`
+
+type CreatePagePhotoParams struct {
+	Slug      string
+	Path      string
+	AltText   string
+	SortOrder int32
+}
+
+func (q *Queries) CreatePagePhoto(ctx context.Context, arg CreatePagePhotoParams) error {
+	_, err := q.db.Exec(ctx, createPagePhoto,
+		arg.Slug,
+		arg.Path,
+		arg.AltText,
+		arg.SortOrder,
+	)
+	return err
 }
 
 const createRoomBed = `-- name: CreateRoomBed :exec
@@ -355,6 +414,15 @@ func (q *Queries) DeleteGuestNote(ctx context.Context, arg DeleteGuestNoteParams
 	return result.RowsAffected(), nil
 }
 
+const deleteLocalAttractions = `-- name: DeleteLocalAttractions :exec
+DELETE FROM local_attractions
+`
+
+func (q *Queries) DeleteLocalAttractions(ctx context.Context) error {
+	_, err := q.db.Exec(ctx, deleteLocalAttractions)
+	return err
+}
+
 const deletePageCopy = `-- name: DeletePageCopy :execrows
 DELETE FROM page_copy WHERE slug = $1
 `
@@ -368,6 +436,15 @@ func (q *Queries) DeletePageCopy(ctx context.Context, slug string) (int64, error
 		return 0, err
 	}
 	return result.RowsAffected(), nil
+}
+
+const deletePagePhotos = `-- name: DeletePagePhotos :exec
+DELETE FROM page_photos WHERE slug = $1
+`
+
+func (q *Queries) DeletePagePhotos(ctx context.Context, slug string) error {
+	_, err := q.db.Exec(ctx, deletePagePhotos, slug)
+	return err
 }
 
 const deleteRateSeason = `-- name: DeleteRateSeason :execrows
@@ -467,15 +544,17 @@ func (q *Queries) GetRateHorizon(ctx context.Context) (pgtype.Date, error) {
 }
 
 const listEventInquiries = `-- name: ListEventInquiries :many
-SELECT id, name, email, phone, event_date, party_size, message, status, created_at
+SELECT id, name, email, phone, event_date, party_size, message, status, kind, created_at
 FROM event_inquiries
-WHERE $1::text = '' OR status = $1::text
+WHERE ($1::text = '' OR status = $1::text)
+  AND ($2::text = '' OR kind = $2::text)
 ORDER BY created_at DESC
-LIMIT $2::int
+LIMIT $3::int
 `
 
 type ListEventInquiriesParams struct {
 	Status   string
+	Kind     string
 	RowLimit int32
 }
 
@@ -488,11 +567,14 @@ type ListEventInquiriesRow struct {
 	PartySize *int32
 	Message   string
 	Status    string
+	Kind      string
 	CreatedAt time.Time
 }
 
+// Both filters are optional and an empty string means "all", which is how the
+// console shows one inbox with the events and the contact messages together.
 func (q *Queries) ListEventInquiries(ctx context.Context, arg ListEventInquiriesParams) ([]ListEventInquiriesRow, error) {
-	rows, err := q.db.Query(ctx, listEventInquiries, arg.Status, arg.RowLimit)
+	rows, err := q.db.Query(ctx, listEventInquiries, arg.Status, arg.Kind, arg.RowLimit)
 	if err != nil {
 		return nil, err
 	}
@@ -509,6 +591,7 @@ func (q *Queries) ListEventInquiries(ctx context.Context, arg ListEventInquiries
 			&i.PartySize,
 			&i.Message,
 			&i.Status,
+			&i.Kind,
 			&i.CreatedAt,
 		); err != nil {
 			return nil, err
@@ -717,6 +800,42 @@ func (q *Queries) ListGuestNotes(ctx context.Context, guestID int64) ([]ListGues
 	return items, nil
 }
 
+const listLocalAttractions = `-- name: ListLocalAttractions :many
+
+SELECT name, distance, url FROM local_attractions ORDER BY sort_order, id
+`
+
+type ListLocalAttractionsRow struct {
+	Name     string
+	Distance string
+	Url      *string
+}
+
+// ---------------------------------------------------------------------------
+// What is near the inn
+// ---------------------------------------------------------------------------
+//
+// Saved as a whole document, like the menu and the galleries.
+func (q *Queries) ListLocalAttractions(ctx context.Context) ([]ListLocalAttractionsRow, error) {
+	rows, err := q.db.Query(ctx, listLocalAttractions)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListLocalAttractionsRow{}
+	for rows.Next() {
+		var i ListLocalAttractionsRow
+		if err := rows.Scan(&i.Name, &i.Distance, &i.Url); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listLowestRates = `-- name: ListLowestRates :many
 SELECT room_id, min(price_cents)::int AS from_cents
 FROM rate_calendar
@@ -755,23 +874,37 @@ func (q *Queries) ListLowestRates(ctx context.Context, fromDate pgtype.Date) ([]
 }
 
 const listMenuItems = `-- name: ListMenuItems :many
-SELECT i.id, i.section_id, i.name, i.description, i.price_cents, i.is_available, i.sort_order
+SELECT i.id, i.section_id, i.name, i.description, i.price_cents, i.is_available,
+       i.is_gluten_free, i.is_vegan, i.is_vegetarian, i.sort_order
 FROM menu_items i
 JOIN menu_sections s ON s.id = i.section_id
 ORDER BY s.sort_order, s.id, i.sort_order, i.id
 `
 
+type ListMenuItemsRow struct {
+	ID           int64
+	SectionID    int64
+	Name         string
+	Description  string
+	PriceCents   int32
+	IsAvailable  bool
+	IsGlutenFree bool
+	IsVegan      bool
+	IsVegetarian bool
+	SortOrder    int32
+}
+
 // Every item in one read, ordered so a caller can group them by walking the
 // list. Seven or eight sections of a dozen dishes is not worth a query each.
-func (q *Queries) ListMenuItems(ctx context.Context) ([]MenuItem, error) {
+func (q *Queries) ListMenuItems(ctx context.Context) ([]ListMenuItemsRow, error) {
 	rows, err := q.db.Query(ctx, listMenuItems)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	items := []MenuItem{}
+	items := []ListMenuItemsRow{}
 	for rows.Next() {
-		var i MenuItem
+		var i ListMenuItemsRow
 		if err := rows.Scan(
 			&i.ID,
 			&i.SectionID,
@@ -779,6 +912,9 @@ func (q *Queries) ListMenuItems(ctx context.Context) ([]MenuItem, error) {
 			&i.Description,
 			&i.PriceCents,
 			&i.IsAvailable,
+			&i.IsGlutenFree,
+			&i.IsVegan,
+			&i.IsVegetarian,
 			&i.SortOrder,
 		); err != nil {
 			return nil, err
@@ -935,6 +1071,83 @@ func (q *Queries) ListPageCopy(ctx context.Context) ([]PageCopy, error) {
 			&i.Body,
 			&i.UpdatedAt,
 		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listPagePhotos = `-- name: ListPagePhotos :many
+
+SELECT slug, path, alt_text, sort_order FROM page_photos
+ORDER BY slug, sort_order, id
+`
+
+type ListPagePhotosRow struct {
+	Slug      string
+	Path      string
+	AltText   string
+	SortOrder int32
+}
+
+// ---------------------------------------------------------------------------
+// The photographs on the public pages
+// ---------------------------------------------------------------------------
+//
+// Saved as a whole document, the same way a room's photos and the menu are: the
+// console sends the list it wants the page to have and the transaction replaces
+// what is there. Reconciling per-row would need a diff on the client whose
+// failure mode is half a gallery on the public site.
+func (q *Queries) ListPagePhotos(ctx context.Context) ([]ListPagePhotosRow, error) {
+	rows, err := q.db.Query(ctx, listPagePhotos)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListPagePhotosRow{}
+	for rows.Next() {
+		var i ListPagePhotosRow
+		if err := rows.Scan(
+			&i.Slug,
+			&i.Path,
+			&i.AltText,
+			&i.SortOrder,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listPagePhotosFor = `-- name: ListPagePhotosFor :many
+SELECT path, alt_text FROM page_photos
+WHERE slug = $1
+ORDER BY sort_order, id
+`
+
+type ListPagePhotosForRow struct {
+	Path    string
+	AltText string
+}
+
+func (q *Queries) ListPagePhotosFor(ctx context.Context, slug string) ([]ListPagePhotosForRow, error) {
+	rows, err := q.db.Query(ctx, listPagePhotosFor, slug)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListPagePhotosForRow{}
+	for rows.Next() {
+		var i ListPagePhotosForRow
+		if err := rows.Scan(&i.Path, &i.AltText); err != nil {
 			return nil, err
 		}
 		items = append(items, i)

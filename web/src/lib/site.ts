@@ -44,6 +44,14 @@ export type MenuItem = {
   description: string
   priceCents: number
   available: boolean
+  /**
+   * What the kitchen states the dish suits. False is *unmarked*, never a claim
+   * that the dish contains the thing — the menu shows an icon for what was
+   * ticked and says nothing about what was not.
+   */
+  glutenFree: boolean
+  vegan: boolean
+  vegetarian: boolean
 }
 
 export type MenuSection = {
@@ -67,15 +75,61 @@ export function fetchEvents(): Promise<EventItem[]> {
   return request<EventItem[]>('/api/events')
 }
 
+/** A photograph on a page rather than on a room, from `page_photos`. */
+export type PagePhoto = { path: string; alt: string } & PhotoSources
+
 export type PageCopy = {
   slug: string
   heading: string
   body: string
   written: boolean
+  /**
+   * The page's gallery. Independent of `written`: the restaurant page has had
+   * photographs and no sentences all year, and either can be empty on its own.
+   */
+  photos: PagePhoto[]
 }
 
 export function fetchPageCopy(slug: string): Promise<PageCopy> {
   return request<PageCopy>(`/api/copy/${encodeURIComponent(slug)}`)
+}
+
+/** One entry in the local-area page's nearby list. */
+export type Attraction = {
+  name: string
+  /** Free text: "Walking distance" is the honest answer for half the list. */
+  distance: string
+  /** Empty means no link — the name renders as plain text, not a dead anchor. */
+  url: string
+}
+
+export function fetchAttractions(): Promise<Attraction[]> {
+  return request<Attraction[]>('/api/attractions')
+}
+
+/**
+ * The booking and refund rules, as the server actually applies them.
+ *
+ * Read from settings and from the pricing package rather than typed into the
+ * policy copy, so the page a guest is asked to agree to cannot drift from what
+ * the code will do to their money.
+ */
+export type PolicyTerms = {
+  minStayNights: number
+  maxStayNights: number
+  checkinTime: string
+  checkoutTime: string
+  holdMinutes: number
+  taxRatePercent: string
+  refundProcessingPercent: string
+  depositPercent: number
+  balanceLeadDays: number
+  shortNoticeDays: number
+  freeCancellationLeadDays: number
+}
+
+export function fetchPolicyTerms(): Promise<PolicyTerms> {
+  return request<PolicyTerms>('/api/policies')
 }
 
 export type NewInquiry = {
@@ -85,6 +139,13 @@ export type NewInquiry = {
   eventDate: string
   partySize: number
   message: string
+  /**
+   * Which form sent it. Both land in the same inbox and the owner answers them
+   * the same way; the label is what tells a general question from a wedding
+   * enquiry. Omitted reads as 'event' on the server, which is what every row
+   * was before the contact form existed.
+   */
+  kind?: 'event' | 'contact'
 }
 
 export function submitInquiry(inquiry: NewInquiry): Promise<void> {
