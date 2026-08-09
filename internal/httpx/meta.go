@@ -41,12 +41,9 @@ import (
 // appear only when SITE_URL is set — the same rule the email letterhead
 // follows, and for the same reason: a guessed origin is worse than none.
 //
-// The inn's own contact details are here rather than guessed, which is the one
-// thing the comment above this block used to say could not be done. They are
-// the owner's, taken off the site they run today, and they are duplicated in
-// web/src/lib/contact.ts for the footer and the About page — the two copies are
-// in two languages and there is no build step that could share them, so
-// **change both**. This one is the copy a search engine reads.
+// The contact details are the owner's, taken off the site they run today, and
+// are duplicated in web/src/lib/contact.ts for the footer and the About page.
+// No build step could share them, so **change both**.
 const (
 	innName     = "The Beal House"
 	innStreet   = "2 West Main Street"
@@ -57,17 +54,14 @@ const (
 	innPhone    = "+1-603-444-2661"
 	innEmail    = "info@thebealhouse.com"
 
-	// Where the map pin goes, which is what a structured address is for. From
-	// OpenStreetMap's own record of the building, so it agrees with the map the
-	// About page embeds rather than with a second geocoding of the same street.
+	// From OpenStreetMap's own record of the building, so the pin agrees with
+	// the map the About page embeds.
 	innLatitude  = 44.3086662
 	innLongitude = -71.7815120
 )
 
-// postalAddress is the inn's address as schema.org wants it, in one place: it
-// appears on the lodging business, on the restaurant and on every event, and
-// three hand-written copies is three chances for one of them to keep an old
-// street after a move.
+// postalAddress is the inn's address as schema.org wants it. One copy: it goes
+// on the lodging business, the restaurant and every event.
 func postalAddress() map[string]any {
 	return map[string]any{
 		"@type":           "PostalAddress",
@@ -183,9 +177,7 @@ func (s *siteMeta) home(ctx context.Context, meta headMeta) headMeta {
 		"address":   postalAddress(),
 		"telephone": innPhone,
 		"email":     innEmail,
-		// The coordinates are the same pair the About page's map is centred on,
-		// so the pin a search result drops and the pin the page shows are the
-		// same building.
+		// The same pair the About page's map is centred on.
 		"geo": map[string]any{
 			"@type":     "GeoCoordinates",
 			"latitude":  innLatitude,
@@ -486,13 +478,11 @@ func (s *siteMeta) localArea(ctx context.Context, meta headMeta) headMeta {
 	return meta
 }
 
-// about is the one page that carries the inn's address and telephone in words,
-// so it is the one that carries them as structured data too.
+// about carries the address and telephone in words, so it carries them as
+// structured data too.
 //
-// ContactPage rather than a second LodgingBusiness: there is one inn and it is
-// described on the home page, and two LodgingBusiness blocks at two URLs is how
-// a search engine ends up with two entries for one house. This block says "the
-// page where you find them" and points back at the business.
+// ContactPage rather than a second LodgingBusiness: two of those at two URLs is
+// how a search engine ends up with two entries for one house.
 func (s *siteMeta) about(ctx context.Context, meta headMeta) headMeta {
 	meta.Title = title("About us")
 	meta.Description = s.copyFor(ctx, "about")

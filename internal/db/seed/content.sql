@@ -78,15 +78,12 @@ UPDATE rooms SET amenities = amenities || ARRAY['Jacuzzi', 'Dedicated workspace'
   updated_at = now()
 WHERE slug IN ('mrs-beals-suite', 'garden-suite', 'flume');
 
--- The About page is back, and the owner's story is on it rather than at the
--- foot of the home page. The home page is the booking screen now — header,
--- search, the two other things the inn does, footer, and nothing below the fold
--- because there is no below the fold — so a paragraph there had nowhere to go.
+-- The About page is back and the owner's story is on it. The home page is one
+-- screenful now, so a paragraph there had nowhere to go.
 --
--- The 'home' slot itself stays: its photographs are the backdrop behind the
--- search, and its copy is still what the home page's meta description is built
--- from. What it no longer has is a paragraph rendered on the page, so the row
--- is deleted here and the same words are inserted under 'about' below.
+-- The 'home' slot stays — its photographs are the backdrop and its copy is the
+-- meta description — but it no longer renders a paragraph, so the row is
+-- deleted here and the same words go in under 'about' below.
 DELETE FROM page_copy WHERE slug = 'home';
 
 -- Page prose. Same contract as the console writes: a row is an override, and
@@ -94,12 +91,9 @@ DELETE FROM page_copy WHERE slug = 'home';
 -- already carries an h1 that says the same thing.
 INSERT INTO page_copy (slug, heading, body) VALUES
 
-  -- The owner's own account of themselves, which the current site has on its
-  -- About page and which is where it lives here too. The site's "Welcome to the
-  -- Beal House / we look forward to welcoming the community" banner is
-  -- deliberately not carried over: the home page's search says the inn is open
-  -- and taking bookings, and a second welcome above it pushed the one thing
-  -- that earns money down the screen.
+  -- The owner's own account of themselves, from their About page. Their
+  -- "Welcome to the Beal House" banner is deliberately not carried over: the
+  -- home page's search already says the inn is open and taking bookings.
   --
   -- The heading is blank because the About page carries its own h1.
   ('about', '',

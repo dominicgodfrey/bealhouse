@@ -799,16 +799,12 @@ type PageCopy struct {
 // binary rather than of the table — exactly like email.Names(). A page added in
 // a later release turns up in the editor on its own.
 //
-// "about" and "local-area" are both here and they are different questions. The
-// local-area page is what there is to do in Littleton; About is who runs the
-// inn, where it is and how to reach them. The story used to sit at the foot of
-// the home page and moved off it when that page became the booking screen and
-// nothing else — there is no room below the fold there now, because there is no
-// below the fold.
+// "about" and "local-area" are different questions: local-area is what there is
+// to do in Littleton, About is who runs the inn and where it is. The story moved
+// off the home page when that page became one screenful with no below the fold.
 //
-// "home" keeps its slot even though the home page renders no prose: its
-// photographs are the backdrop behind the search, and its copy is still the
-// page's meta description.
+// "home" keeps its slot even though it renders no prose: its photographs are the
+// backdrop behind the search, and its copy is still the meta description.
 //
 // "policies" is a slot on a page that mostly writes itself: the booking and
 // refund rules there are read from settings and from pricing, so they cannot
@@ -828,10 +824,8 @@ type Attraction struct {
 	// Free text — "walking distance" is the honest answer for half the list and
 	// is not a number of minutes.
 	Distance string `json:"distance"`
-	// A sentence or two about the place, for the guest who has never been to
-	// Littleton and cannot tell from the name whether it is a ski hill or a
-	// sweet shop. Empty renders the row without one rather than with a
-	// placeholder — the same rule page copy follows.
+	// A sentence or two, for the guest who cannot tell from the name whether it
+	// is a ski hill or a sweet shop. Empty renders the row without one.
 	Description string `json:"description"`
 	// Empty means no link, and the page renders the name as plain text rather
 	// than as an anchor going nowhere.

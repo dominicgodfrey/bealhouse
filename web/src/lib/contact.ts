@@ -1,16 +1,13 @@
 /**
  * Where the inn is and how to reach it.
  *
- * This is the front end's copy of the block at the top of `internal/httpx/meta.go`,
- * which carries the same details for the structured data a search engine reads.
- * Two copies in two languages with no build step between them, so **change
- * both** — a footer and a map pin that disagree about the street is the exact
- * failure a guest discovers in a car.
+ * The front end's copy of the block at the top of `internal/httpx/meta.go`, which
+ * carries the same details for the structured data. No build step shares them,
+ * so **change both**.
  *
- * These are not owner-managed content and deliberately not in `page_copy`. An
- * address is site chrome: it belongs in the footer of every page including the
- * ones that render no prose at all, and a page-copy slot that was left empty
- * would take the telephone number off the site.
+ * Deliberately not `page_copy`: an address is site chrome, it belongs in the
+ * footer of pages that render no prose at all, and an empty console field must
+ * not be able to take the telephone number off the site.
  */
 
 export const inn = {
@@ -32,16 +29,13 @@ export const inn = {
 export const innAddressLine = `${inn.street}, ${inn.locality}, ${inn.region} ${inn.postalCode}`
 
 /**
- * The map on the About page.
+ * The map on the About page: OpenStreetMap's embed, an iframe and no
+ * JavaScript. No API key, nothing third-party running on the page that also
+ * has the contact form, and one `frame-src` entry rather than a `script-src`
+ * one too — `internal/httpx/middleware.go` has the matching line.
  *
- * OpenStreetMap's own embed, which is an iframe and no JavaScript: no API key
- * to keep secret, nothing third-party running on a page that also has a contact
- * form on it, and one entry in the CSP's `frame-src` rather than one in
- * `script-src` as well. `internal/httpx/middleware.go` has the matching line.
- *
- * The coordinates are OpenStreetMap's own record of the building, so the marker
- * lands on the house rather than on the middle of the street, and they are the
- * same pair the LodgingBusiness JSON-LD publishes.
+ * The coordinates are OSM's own record of the building, and the same pair the
+ * LodgingBusiness JSON-LD publishes.
  */
 const latitude = 44.3086662
 const longitude = -71.781512

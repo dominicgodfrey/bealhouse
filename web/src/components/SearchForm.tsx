@@ -9,23 +9,17 @@ import { DateRangePicker } from './DateRangePicker'
 const MAX_GUESTS = 4
 
 /**
- * Where the calendar goes when it is not allowed to push the page around.
+ * Where the calendar goes when it may not push the page around.
  *
- * Two arrangements, and the second one is not a phone concession. Given room
- * under the field (`roomy`, in index.css) it hangs off it like any dropdown.
- * Otherwise it is pinned above the bottom of the viewport and scrolls inside
- * itself — because on a 568px-tall screen the field's own bottom edge is 300px
- * down, two months of dates are not going to fit in what is left, and the page
- * underneath is the home page, which cannot scroll to reveal the rest.
+ * Given room under the field (`roomy`, in index.css) it hangs off it like any
+ * dropdown; otherwise it pins above the bottom of the viewport and scrolls
+ * inside itself. Not a phone concession — on a 568px screen the field's bottom
+ * edge is 300px down and the page underneath cannot scroll to reveal the rest.
+ * `dvh` because `vh` counts the strip the address bar sits on.
  *
- * `dvh` rather than `vh`: on a phone `vh` counts the strip the address bar is
- * sitting on.
- *
- * **Nothing between this and the viewport may have a `backdrop-filter` on it.**
- * A blurred ancestor becomes the containing block for `fixed` descendants, and
- * this panel would then be pinned to the bottom of the search card rather than
- * to the bottom of the screen. That is why the card it sits in is plain
- * translucent white — see Home.tsx.
+ * **Nothing between this and the viewport may carry a `backdrop-filter`**: a
+ * blurred ancestor becomes the containing block for `fixed`, and this would pin
+ * itself to the card it is escaping. See Home.tsx.
  */
 const floating =
   'fixed inset-x-3 bottom-3 z-30 max-h-[85dvh] overflow-y-auto overscroll-contain rounded-lg shadow-xl ' +
@@ -35,10 +29,8 @@ type Props = {
   initial?: Partial<Stay>
   /**
    * Float the calendar over the page instead of pushing what is under it down.
-   *
-   * The home page asks for this because it does not scroll: an inline picker
-   * there would grow the column past the viewport and take the footer with it.
-   * Everywhere else the page is a document and the picker is simply part of it.
+   * The home page needs it because it does not scroll; everywhere else the page
+   * is a document and the picker is part of it.
    */
   overlay?: boolean
 }
@@ -47,12 +39,9 @@ type Props = {
  * Dates, party size, and whether a pet is coming.
  *
  * **The calendar starts closed, everywhere.** It used to be pinned open on the
- * home page, where it was the largest thing on the screen before a visitor had
- * asked it anything — twelve months of availability answering a question nobody
- * had put yet. Now the field says "Add your dates" and opens on a tap, and so
- * does Search: a search with no dates has nothing to run, so the button that
- * cannot do its job yet opens the thing that is missing rather than sitting
- * greyed out with no explanation.
+ * home page, answering a question nobody had asked yet. Search opens it too: a
+ * search with no dates has nothing to run, so the button opens the thing that
+ * is missing rather than sitting greyed out with no explanation.
  *
  * The pet box does double duty, as decision #23 describes: it narrows results
  * to the one room that takes pets AND adds the $50. Leaving it unchecked does
@@ -90,12 +79,8 @@ export function SearchForm({ initial, overlay = false }: Props) {
     // relative, so an overlaid calendar is positioned against the form rather
     // than against whatever ancestor happens to be positioned.
     <div className="relative flex flex-col gap-3">
-      {/*
-        Two columns on a phone with the dates spanning both, rather than three
-        stacked rows. That is one field height saved on the screen where it is
-        scarcest — the home page has to fit a header, this, two buttons and a
-        footer into a viewport nobody can scroll.
-      */}
+      {/* Two columns on a phone with the dates spanning both, rather than three
+          stacked rows: one field height saved on the screen with the least. */}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-[1fr_auto_auto]">
         <button
           type="button"
@@ -177,9 +162,7 @@ export function SearchForm({ initial, overlay = false }: Props) {
             onChange={(from, to) => {
               setCheckin(from)
               setCheckout(to)
-              // A completed range closes it. The dates are now in the field
-              // above, and on the home page an open calendar is covering the
-              // photograph it was opened over.
+              // A completed range closes it: the dates are in the field above.
               if (from && to) setOpen(false)
             }}
           />

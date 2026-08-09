@@ -18,17 +18,12 @@ export function Layout({
 }: {
   children: ReactNode
   /**
-   * Locks the page to the viewport: header at the top, footer at the bottom,
-   * and nothing scrolls. The home page and only the home page — every other
-   * page is a document of unknown length, and `h-dvh` on one of those hides
-   * whatever did not fit.
+   * Locks the page to the viewport: nothing scrolls. The home page and only the
+   * home page — every other page is a document of unknown length, and `h-dvh`
+   * on one of those hides whatever did not fit.
    */
   fills?: boolean
-  /**
-   * Rendered edge to edge behind <main>, from where the header ends to where
-   * the footer starts. Only meaningful with `fills`; a backdrop on a page that
-   * scrolls would sit behind the first screenful and stop.
-   */
+  /** Rendered edge to edge behind <main>. Only meaningful with `fills`. */
   backdrop?: ReactNode
 }) {
   return (
@@ -37,9 +32,8 @@ export function Layout({
         fills ? 'h-dvh overflow-hidden' : 'min-h-dvh'
       }`}
     >
-      {/* shrink-0 on both bars: in a fixed-height column a header whose nav
-          wraps would otherwise be compressed rather than allowed its two
-          lines, and it is main that has room to give. */}
+      {/* shrink-0 on both bars: in a fixed-height column it is main that has
+          room to give, not a header whose nav has wrapped. */}
       <header className="shrink-0 border-b border-neutral-200">
         {/*
           gap-x-6 with a smaller gap-y: when the nav wraps under the wordmark on
@@ -83,9 +77,8 @@ export function Layout({
       <main
         className={
           fills
-            ? // isolate so the backdrop's -z-10 stacks against this element and
-              // not against the page, where it would go behind the white body
-              // and disappear.
+            ? // isolate, or the backdrop's -z-10 stacks against the page and
+              // disappears behind the white body.
               'relative isolate min-h-0 flex-1'
             : 'mx-auto w-full max-w-5xl flex-1 px-4 py-8 sm:px-6'
         }
@@ -94,26 +87,21 @@ export function Layout({
         {children}
       </main>
 
-      {/*
-        The address and the telephone are on every page, which is the whole
-        argument for their being here rather than only on the About page: a
-        guest looking up how to reach the inn is on whichever page they happen
-        to be on, and most of them are looking for the phone number.
-      */}
+      {/* The address and telephone are on every page: somebody looking up how
+          to reach the inn is on whichever page they happen to be on. */}
       <footer className="shrink-0 border-t border-neutral-200 bg-white">
         <div className="mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-x-6 gap-y-1 px-4 py-3 text-xs text-neutral-500 sm:px-6 sm:py-4 sm:text-sm">
           <p className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
             <span className="font-medium text-neutral-700">{inn.name}</span>
             <span aria-hidden="true">·</span>
-            {/* A postal address is one thing and wraps as one thing, so a
-                narrow screen breaks it before the street rather than inside
-                it. */}
+            {/* Wraps as one thing, so a narrow screen breaks before the
+                street rather than inside it. */}
             <span className="whitespace-nowrap">{innAddressLine}</span>
           </p>
 
           <nav className="flex flex-wrap items-center gap-x-4 gap-y-0.5">
-            {/* A real tel: link — on the device most of this site is read on,
-                the phone number is the button. */}
+            {/* On the device most of this site is read on, the number is the
+                button. */}
             <a href={inn.phoneHref} className="whitespace-nowrap hover:text-neutral-900">
               {inn.phone}
             </a>

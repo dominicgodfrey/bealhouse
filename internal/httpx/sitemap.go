@@ -78,8 +78,6 @@ func sitemapXML(meta *siteMeta) http.HandlerFunc {
 			{Loc: meta.absolute("/restaurant"), Priority: "0.8"},
 			{Loc: meta.absolute("/events"), Priority: "0.7"},
 			{Loc: meta.absolute("/local-area"), Priority: "0.5"},
-			// The page carrying the address and the telephone, which is what
-			// somebody searching for the inn by name most often wants.
 			{Loc: meta.absolute("/about"), Priority: "0.5"},
 			{Loc: meta.absolute("/policies"), Priority: "0.3"},
 		}

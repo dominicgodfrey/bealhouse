@@ -40,16 +40,12 @@ export function LocalArea() {
             <h2 className="text-2xl font-semibold tracking-tight">Nearby highlights</h2>
 
             {/*
-              Two columns on anything but a phone, so the distances line up
-              down the right and the eye can scan them — which was the whole
-              complaint about the run-on paragraph this replaced.
+              Two columns off a phone, so the distances line up down the right
+              and the eye can scan them.
 
-              This was a <dl> while an entry was a place and a distance and
-              nothing else. It stopped being one when the entries got a
-              sentence each: a term with a definition and an optional second
-              definition is not what a description list means, and an entry the
-              owner has not described yet would have been a <dt> with no <dd>
-              at all.
+              This was a <dl> while an entry was a place and a distance. It
+              stopped being one when entries got a sentence each: an entry
+              nobody has described yet would be a <dt> with no <dd>.
             */}
             <div className="grid w-full max-w-3xl gap-x-10 gap-y-5 sm:grid-cols-2">
               {nearby.data.map((place) => (
@@ -90,12 +86,8 @@ function Nearby({ place }: { place: Attraction }) {
         <p className="shrink-0 text-sm text-neutral-500">{place.distance}</p>
       </div>
 
-      {/*
-        Nothing at all for a place nobody has described yet — the same rule the
-        prose slots follow. A row that is a name and a distance is what every
-        row was until this column existed, and it still reads correctly beside
-        one that has a sentence.
-      */}
+      {/* Nothing at all where nobody has written one — the same rule the prose
+          slots follow, and what every row looked like before the column. */}
       {place.description && (
         <p className="mt-1 text-sm text-neutral-600">{place.description}</p>
       )}

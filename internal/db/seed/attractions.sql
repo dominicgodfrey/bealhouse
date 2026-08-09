@@ -10,15 +10,11 @@
 -- which one the owner means is not something to decide for them. The row
 -- renders as plain text until they say. That is what a NULL url is for.
 --
--- THE DESCRIPTIONS ARE NOT THE OWNER'S. Their site lists these as names and
--- distances alone, and a name plus a distance only helps somebody who already
--- knows what Chutters is — which is nobody the local-area page is written for.
--- Each sentence below states what the place is, checked against that place's
--- own site rather than recalled, and says nothing about whether it is worth
--- going to: a recommendation is the owner's to make and this is a label.
---
--- They are, along with the links, the lines most worth the owner's review, and
--- the console can now edit them. Nothing here describes the inn.
+-- THE DESCRIPTIONS ARE NOT THE OWNER'S. Their site lists names and distances
+-- alone. Each sentence states what the place is, checked against that place's
+-- own site, and says nothing about whether it is worth going to — a
+-- recommendation is the owner's to make and this is a label. They are, with the
+-- links, the lines most worth their review, and the console can edit them.
 --
 -- Re-runnable: the list is replaced wholesale.
 

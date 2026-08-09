@@ -9,18 +9,11 @@ import { Gallery, fromPagePhotos } from '../components/Gallery'
 /**
  * Who runs the inn, where it is, and how to reach them.
  *
- * This is where the home page's story went when the home page became one
- * screenful that does not scroll. It is not a reinstatement of the old About
- * page that /local-area replaced: that one was the owner's prose and nothing
- * else, which is why it lost to a page answering "what is there to do here".
- * This one is the three things a visitor comes looking for when they have
- * decided they are interested — who these people are, where the house is, and
- * how to ask a question — and the last two are facts about the inn rather than
- * copy somebody has to write.
- *
- * So the page is never empty. With nothing written in the console it still has
- * an address, a telephone number, a map and a form; the paragraphs appear when
- * the owner has some, exactly as on every other page.
+ * Where the home page's story went when that page became one screenful. Not a
+ * reinstatement of the About page /local-area replaced: that one was prose and
+ * nothing else, which is why it lost. **This one is never empty** — with
+ * nothing written in the console it still has an address, a telephone number, a
+ * map and a form, and the paragraphs appear when the owner has some.
  */
 export function About() {
   const copy = useAsync(() => fetchPageCopy('about'), [])
@@ -51,22 +44,14 @@ export function About() {
   )
 }
 
-/**
- * The address, the telephone, the email, and a map with the house on it.
- *
- * The map is OpenStreetMap's embed — an iframe and no JavaScript. A key-free
- * map that cannot run code on a page that also has a contact form on it is
- * worth more here than a prettier one that can, and it is one line of CSP
- * (`frame-src`) rather than two.
- */
+/** The address, the telephone, the email, and a map with the house on it. */
 function FindUs() {
   return (
     <section className="flex flex-col gap-4">
       <h2 className="text-2xl font-semibold tracking-tight">Where to find us</h2>
 
       <address className="flex flex-col gap-2 not-italic text-neutral-700">
-        {/* The postal address as it would be written on an envelope, which is
-            also how it should be read aloud over the telephone. */}
+        {/* As it would be written on an envelope. */}
         <p>
           {inn.street}
           <br />
@@ -86,15 +71,12 @@ function FindUs() {
       </address>
 
       <iframe
-        // The title is what a screen reader announces in place of the map, and
-        // for anybody who cannot use a map it is the only thing this element
-        // says — so it states the address rather than the word "map".
+        // Announced in place of the map, so it states the address rather than
+        // the word "map".
         title={`Map showing ${inn.name} at ${inn.street}, ${inn.locality}, ${inn.region}`}
         src={mapEmbedUrl}
         loading="lazy"
-        // No referrer: the map host has no business knowing which page of the
-        // inn's site somebody was reading, and this is the only third-party
-        // request the public site makes at all.
+        // The map host has no business knowing which page somebody was on.
         referrerPolicy="no-referrer"
         className="aspect-4/3 w-full rounded-lg border border-neutral-200 bg-neutral-100"
       />
@@ -112,16 +94,12 @@ function FindUs() {
 }
 
 /**
- * A way to write to the inn.
+ * A way to write to the inn. Same inbox as the events form, marked `contact` so
+ * the owner can tell a general question from a wedding enquiry — two inboxes is
+ * two places to forget to look.
  *
- * It lands in the same inbox the events form does, marked `contact` so the
- * owner can tell a general question from a wedding enquiry. One table and one
- * screen, because both are messages a person reads and answers the same way,
- * and two inboxes is two places to forget to look.
- *
- * Like the events form it inserts a row and stops: no email, no ticket, no
- * auto-reply. The honest promise is that somebody reads it, and the thank-you
- * says exactly that and nothing more.
+ * It inserts a row and stops: no email, no ticket, no auto-reply. The honest
+ * promise is that somebody reads it, and the thank-you says exactly that.
  */
 function ContactForm() {
   const [form, setForm] = useState({ name: '', email: '', phone: '', message: '' })

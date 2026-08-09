@@ -32,11 +32,10 @@ export default defineConfig({
   // web/public — so without this every photograph on the dev site is a broken
   // image, which looks exactly like a bug in the srcset.
   //
-  // Both ports are overridable by environment, and neither normally is. It is
-  // for the case of two checkouts of this repository running at once: the
-  // second one's Vite cannot have 5173 and — the part that actually bites —
-  // must not proxy its API to the *first* one's Go binary, which is a different
-  // build. That failure looks like a page whose new field is silently missing.
+  // Both are overridable by environment, for two checkouts running at once: the
+  // second one's Vite cannot have 5173 and must not proxy its API to the first
+  // one's Go binary, which is a different build. That failure looks like a page
+  // whose new field is silently missing.
   server: {
     port: Number(process.env.PORT) || 5173,
     proxy: {
