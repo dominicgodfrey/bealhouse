@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 
 import { fetchCalendar } from '../lib/api'
 import { addMonths, dayOfMonth, formatMonth, monthGrid, startOfMonth, today } from '../lib/dates'
@@ -9,6 +9,32 @@ const WEEKDAYS = ['S', 'M', 'T', 'W', 'T', 'F', 'S']
 
 /** How far ahead the picker will let a guest browse. */
 const MONTHS_AHEAD = 12
+
+/**
+ * How many months are on screen at once.
+ *
+ * One on a phone. Two stacked was two thumb-scrolls of calendar inside a sheet
+ * that already scrolls, and the arrows — the obvious way to move — appeared to
+ * skip a month, because tapping "next" replaced a pair. One month makes the
+ * arrow mean what it looks like it means.
+ *
+ * A media query in JS rather than `hidden sm:block` on the second month,
+ * because this number is also what bounds the "next" arrow: rendering two and
+ * hiding one would stop a phone reaching the last month of the twelve.
+ */
+function useMonthsShown() {
+  const query = '(min-width: 640px)'
+  const [wide, setWide] = useState(() => window.matchMedia(query).matches)
+
+  useEffect(() => {
+    const mq = window.matchMedia(query)
+    const onChange = () => setWide(mq.matches)
+    mq.addEventListener('change', onChange)
+    return () => mq.removeEventListener('change', onChange)
+  }, [])
+
+  return wide ? 2 : 1
+}
 
 type Props = {
   checkin: string | null
@@ -33,7 +59,10 @@ type Props = {
  */
 export function DateRangePicker({ checkin, checkout, guests, withPet, onChange }: Props) {
   const start = today()
-  const lastMonth = startOfMonth(addMonths(start, MONTHS_AHEAD - 1))
+  const shown = useMonthsShown()
+  // The first month the arrows may land on: far enough back that the last month
+  // on screen is the twelfth and no further.
+  const lastMonth = startOfMonth(addMonths(start, MONTHS_AHEAD - shown))
 
   const [month, setMonth] = useState(() => startOfMonth(checkin ?? start))
 
@@ -71,7 +100,7 @@ export function DateRangePicker({ checkin, checkout, guests, withPet, onChange }
     return choosing === 'checkout' ? departures.has(date) : index.arrivals.has(date)
   }
 
-  const months = [month, addMonths(month, 1)]
+  const months = Array.from({ length: shown }, (_, i) => addMonths(month, i))
 
   return (
     // Same tint as the card it opens out of; a white panel hanging off a
@@ -95,7 +124,7 @@ export function DateRangePicker({ checkin, checkout, guests, withPet, onChange }
         <button
           type="button"
           className="flex size-11 shrink-0 items-center justify-center rounded text-base text-neutral-600 hover:bg-black/5 disabled:invisible"
-          disabled={addMonths(month, 1) >= lastMonth}
+          disabled={month >= lastMonth}
           onClick={() => setMonth(addMonths(month, 1))}
           aria-label="Next month"
         >
