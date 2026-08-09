@@ -76,17 +76,27 @@ export function Gallery({
         at sm. In source order the big picture is the first thing a screen
         reader and a keyboard reach, which is the right order however it is
         arranged on screen.
+
+        The ordering and sizing live on this DIV and not on the Photo, because
+        Photo puts its className on the <img> while the flex child is the
+        <picture> wrapping it. Classes like sm:order-2 and sm:flex-1 land on the
+        wrong element there and silently do nothing — which is how the rail
+        ended up on the right, order-1 being the only one of the pair that
+        applied. min-w-0 lets the column shrink below the image's intrinsic
+        width instead of forcing the row wider than its container.
       */}
-      <Photo
-        src={main.src}
-        alt={main.alt}
-        sources={main}
-        // The main image is most of the width on a phone and about two thirds
-        // of a wide layout once the rail is beside it.
-        sizes="(min-width: 640px) 66vw, 100vw"
-        loading={eager ? 'eager' : 'lazy'}
-        className="aspect-[4/3] w-full rounded-lg object-cover sm:order-2 sm:flex-1"
-      />
+      <div className="min-w-0 sm:order-2 sm:flex-1">
+        <Photo
+          src={main.src}
+          alt={main.alt}
+          sources={main}
+          // The main image is most of the width on a phone and about two thirds
+          // of a wide layout once the rail is beside it.
+          sizes="(min-width: 640px) 66vw, 100vw"
+          loading={eager ? 'eager' : 'lazy'}
+          className="aspect-[4/3] w-full rounded-lg object-cover"
+        />
+      </div>
 
       <ul
         className={
