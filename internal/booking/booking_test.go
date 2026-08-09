@@ -8,6 +8,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/jackc/pgx/v5"
+
 	"bealhouse/internal/availability"
 	"bealhouse/internal/civil"
 	db "bealhouse/internal/db/gen"
@@ -42,6 +44,10 @@ func request() Request {
 		Checkout: day(202),
 		Guests:   2,
 		Guest:    Guest{Name: "Ada Lovelace", Email: "ada@example.com", Phone: "603-555-0100"},
+		// Every test here is about something else, and a bookable request is
+		// one that accepted the policies. TestPoliciesMustBeAccepted is where
+		// the refusal itself is asserted.
+		AcceptedPolicies: true,
 	}
 }
 
@@ -472,4 +478,52 @@ func expireHold(ctx context.Context, b Beginner, code string) error {
 		return err
 	}
 	return tx.Commit(ctx)
+}
+
+// The tick-box on the confirm page disables a button. This is what actually
+// stops the booking, because a disabled button is a suggestion to anything that
+// is not a browser — curl, a stale bundle, a script.
+//
+// The second half is the point of recording it at all: a stay that was booked
+// carries the moment its terms were accepted, stamped with the database's clock
+// rather than the caller's, so it cannot be back-dated by a client that fancies
+// it.
+func TestABookingCannotSkipThePolicies(t *testing.T) {
+	ctx, _, b := setup(t)
+
+	// b is the test's own pgx.Tx, which is what can run raw SQL — db.Queries
+	// only exposes the generated ones, and neither column below has a query of
+	// its own outside this assertion.
+	tx := b.(pgx.Tx)
+
+	refused := request()
+	refused.AcceptedPolicies = false
+	if _, err := Create(ctx, b, refused); !errors.Is(err, ErrPoliciesNotAccepted) {
+		t.Fatalf("a booking that accepted nothing got %v, want ErrPoliciesNotAccepted", err)
+	}
+
+	// ...and nothing was written. A refusal that still took the room off sale
+	// would be worse than no check at all.
+	var held int
+	if err := tx.QueryRow(ctx,
+		`SELECT count(*) FROM bookings WHERE checkin = $1`, day(200)).Scan(&held); err != nil {
+		t.Fatalf("counting bookings: %v", err)
+	}
+	if held != 0 {
+		t.Fatalf("%d bookings exist after a refusal; want none", held)
+	}
+
+	made := create(t, ctx, b, request())
+
+	var acceptedAt *time.Time
+	if err := tx.QueryRow(ctx,
+		`SELECT policies_accepted_at FROM bookings WHERE code = $1`, made.Code).Scan(&acceptedAt); err != nil {
+		t.Fatalf("reading the acceptance: %v", err)
+	}
+	if acceptedAt == nil {
+		t.Fatal("the booking records no acceptance; the tick-box is decoration")
+	}
+	if since := time.Since(*acceptedAt); since < 0 || since > time.Minute {
+		t.Errorf("accepted at %v, which is %v ago — that is not this transaction's clock", *acceptedAt, since)
+	}
 }

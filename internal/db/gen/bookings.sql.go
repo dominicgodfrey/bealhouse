@@ -16,7 +16,8 @@ const createBooking = `-- name: CreateBooking :one
 INSERT INTO bookings (
   code, guest_id, status, checkin, checkout, guests, with_pet,
   room_subtotal_cents, pet_fee_cents, tax_cents, tax_rate_snapshot,
-  total_cents, deposit_cents, balance_due_cents, balance_charge_at
+  total_cents, deposit_cents, balance_due_cents, balance_charge_at,
+  policies_accepted_at
 )
 VALUES (
   $1,
@@ -33,7 +34,11 @@ VALUES (
   $12,
   $13,
   $14,
-  $15
+  $15,
+  -- The database's clock, not Go's and certainly not the browser's. Inside the
+  -- inserting transaction this is the transaction's start time, so it agrees
+  -- with created_at and cannot be back-dated by a client.
+  CASE WHEN $16::boolean THEN now() END
 )
 RETURNING id
 `
@@ -54,6 +59,7 @@ type CreateBookingParams struct {
 	DepositCents      int64
 	BalanceDueCents   int64
 	BalanceChargeAt   pgtype.Date
+	PoliciesAccepted  bool
 }
 
 func (q *Queries) CreateBooking(ctx context.Context, arg CreateBookingParams) (int64, error) {
@@ -73,6 +79,7 @@ func (q *Queries) CreateBooking(ctx context.Context, arg CreateBookingParams) (i
 		arg.DepositCents,
 		arg.BalanceDueCents,
 		arg.BalanceChargeAt,
+		arg.PoliciesAccepted,
 	)
 	var id int64
 	err := row.Scan(&id)

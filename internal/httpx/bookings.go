@@ -28,6 +28,11 @@ type bookingRequest struct {
 	WithPet            bool          `json:"withPet"`
 	ExpectedTotalCents int64         `json:"expectedTotalCents"`
 	Guest              booking.Guest `json:"guest"`
+
+	// The guest ticking the policies box. What is stored is a server-side
+	// timestamp, never this value — a client cannot claim to have agreed at a
+	// time of its choosing, only that it agreed now.
+	AcceptedPolicies bool `json:"acceptedPolicies"`
 }
 
 // createBooking serves POST /api/bookings: it books a room and holds it.
@@ -64,6 +69,7 @@ func createBooking(beginner booking.Beginner) http.HandlerFunc {
 			WithPet:            body.WithPet,
 			Guest:              body.Guest,
 			ExpectedTotalCents: body.ExpectedTotalCents,
+			AcceptedPolicies:   body.AcceptedPolicies,
 		})
 		if err != nil {
 			bookingProblem(w, r, err)
@@ -124,6 +130,8 @@ func bookingProblem(w http.ResponseWriter, r *http.Request, err error) {
 		badRequest(w, "a name is required")
 	case errors.Is(err, booking.ErrGuestEmailRequired):
 		badRequest(w, "a valid email address is required")
+	case errors.Is(err, booking.ErrPoliciesNotAccepted):
+		badRequest(w, "the Beal House policies have to be accepted before booking")
 	default:
 		if reason, ok := searchProblem(err); ok {
 			badRequest(w, reason)

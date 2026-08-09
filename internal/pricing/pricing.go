@@ -9,7 +9,12 @@
 // arithmetic exhaustively testable in isolation.
 package pricing
 
-import "time"
+import (
+	"fmt"
+	"strconv"
+	"strings"
+	"time"
+)
 
 // Rate is a tax rate in hundred-thousandths, mirroring settings.tax_rate's
 // numeric(6,5) so the two can never drift. NH Meals & Rooms at 8.5% is
@@ -28,6 +33,26 @@ const (
 )
 
 const rateScale = 100_000
+
+// Percent renders the rate the way a person writes it — Rate(8500) is "8.5" —
+// with trailing zeros trimmed so a whole percent is "3" rather than "3.000".
+//
+// For display only, and it stays here beside the scale it divides by rather
+// than in whichever handler happens to need it. No float is produced: the
+// integer and fractional parts are formatted separately, for exactly the reason
+// this type exists at all.
+func (r Rate) Percent() string {
+	whole := int64(r) / (rateScale / 100)
+	frac := int64(r) % (rateScale / 100)
+
+	out := strconv.FormatInt(whole, 10)
+	if frac == 0 {
+		return out
+	}
+	// Three decimal places is everything numeric(6,5) can hold once it is a
+	// percentage, and the zeros come off the right.
+	return out + "." + strings.TrimRight(fmt.Sprintf("%03d", frac), "0")
+}
 
 // IsShortNotice reports whether an arrival is too close for the balance to be
 // charged on schedule.

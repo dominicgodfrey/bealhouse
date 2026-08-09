@@ -45,11 +45,12 @@ func TestMoneyForAResoldRoomIsQueuedForRefund(t *testing.T) {
 	// still on the card form.
 	sweepHold(t, ctx, q, tx, made.Code)
 	if _, err := booking.Create(ctx, tx, booking.Request{
-		RoomSlug: "rose-chamber",
-		Checkin:  day(stayStart),
-		Checkout: day(stayEnd),
-		Guests:   2,
-		Guest:    booking.Guest{Name: "Grace Hopper", Email: "grace@example.com"},
+		RoomSlug:         "rose-chamber",
+		Checkin:          day(stayStart),
+		Checkout:         day(stayEnd),
+		Guests:           2,
+		Guest:            booking.Guest{Name: "Grace Hopper", Email: "grace@example.com"},
+		AcceptedPolicies: true,
 	}); err != nil {
 		t.Fatalf("selling the room to somebody else: %v", err)
 	}
@@ -113,11 +114,12 @@ func TestRefundingTwiceReturnsTheMoneyOnce(t *testing.T) {
 
 	sweepHold(t, ctx, q, tx, made.Code)
 	if _, err := booking.Create(ctx, tx, booking.Request{
-		RoomSlug: "rose-chamber",
-		Checkin:  day(stayStart),
-		Checkout: day(stayEnd),
-		Guests:   2,
-		Guest:    booking.Guest{Name: "Grace Hopper", Email: "grace@example.com"},
+		RoomSlug:         "rose-chamber",
+		Checkin:          day(stayStart),
+		Checkout:         day(stayEnd),
+		Guests:           2,
+		Guest:            booking.Guest{Name: "Grace Hopper", Email: "grace@example.com"},
+		AcceptedPolicies: true,
 	}); err != nil {
 		t.Fatalf("selling the room to somebody else: %v", err)
 	}
@@ -160,11 +162,12 @@ func TestAFailedRefundStaysOwed(t *testing.T) {
 
 	sweepHold(t, ctx, q, tx, made.Code)
 	if _, err := booking.Create(ctx, tx, booking.Request{
-		RoomSlug: "rose-chamber",
-		Checkin:  day(stayStart),
-		Checkout: day(stayEnd),
-		Guests:   2,
-		Guest:    booking.Guest{Name: "Grace Hopper", Email: "grace@example.com"},
+		RoomSlug:         "rose-chamber",
+		Checkin:          day(stayStart),
+		Checkout:         day(stayEnd),
+		Guests:           2,
+		Guest:            booking.Guest{Name: "Grace Hopper", Email: "grace@example.com"},
+		AcceptedPolicies: true,
 	}); err != nil {
 		t.Fatalf("selling the room to somebody else: %v", err)
 	}

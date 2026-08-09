@@ -657,6 +657,13 @@ func (o *Ops) CreateBooking(ctx context.Context, in ManualBooking) (booking.Book
 		Guests:   in.Guests,
 		WithPet:  in.WithPet,
 		Manual:   true,
+
+		// A phone booking accepts the policies too. The owner taking the
+		// reservation is the one telling the guest the cancellation terms, so
+		// the acceptance is real — spoken rather than clicked — and a stay with
+		// no record of it at all is the worse outcome of the two.
+		AcceptedPolicies: true,
+
 		Guest: booking.Guest{
 			Name:  strings.TrimSpace(in.Name),
 			Email: strings.TrimSpace(in.Email),

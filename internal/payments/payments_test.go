@@ -45,11 +45,12 @@ func held(t *testing.T, ctx context.Context, b booking.Beginner) booking.Booking
 	t.Helper()
 
 	made, err := booking.Create(ctx, b, booking.Request{
-		RoomSlug: "rose-chamber",
-		Checkin:  day(stayStart),
-		Checkout: day(stayEnd),
-		Guests:   2,
-		Guest:    booking.Guest{Name: "Ada Lovelace", Email: "ada@example.com"},
+		RoomSlug:         "rose-chamber",
+		Checkin:          day(stayStart),
+		Checkout:         day(stayEnd),
+		Guests:           2,
+		Guest:            booking.Guest{Name: "Ada Lovelace", Email: "ada@example.com"},
+		AcceptedPolicies: true,
 	})
 	if err != nil {
 		t.Fatalf("holding a room: %v", err)
@@ -771,11 +772,12 @@ func TestShortNoticeStaysNeverAppearInTheBalanceScan(t *testing.T) {
 	ctx, q, tx := setup(t)
 
 	made, err := booking.Create(ctx, tx, booking.Request{
-		RoomSlug: "rose-chamber",
-		Checkin:  day(2),
-		Checkout: day(4),
-		Guests:   2,
-		Guest:    booking.Guest{Name: "Grace Hopper", Email: "grace@example.com"},
+		RoomSlug:         "rose-chamber",
+		Checkin:          day(2),
+		Checkout:         day(4),
+		Guests:           2,
+		Guest:            booking.Guest{Name: "Grace Hopper", Email: "grace@example.com"},
+		AcceptedPolicies: true,
 	})
 	if err != nil {
 		t.Fatalf("holding a short-notice room: %v", err)
@@ -842,11 +844,12 @@ func TestLateCancellationForfeitsTheDepositAndNoMore(t *testing.T) {
 	// A stay arriving in four days is inside the cancellation window, and is
 	// charged in full at booking (decision #7).
 	made, err := booking.Create(ctx, tx, booking.Request{
-		RoomSlug: "rose-chamber",
-		Checkin:  day(4),
-		Checkout: day(6),
-		Guests:   2,
-		Guest:    booking.Guest{Name: "Grace Hopper", Email: "grace@example.com"},
+		RoomSlug:         "rose-chamber",
+		Checkin:          day(4),
+		Checkout:         day(6),
+		Guests:           2,
+		Guest:            booking.Guest{Name: "Grace Hopper", Email: "grace@example.com"},
+		AcceptedPolicies: true,
 	})
 	if err != nil {
 		t.Fatalf("booking: %v", err)

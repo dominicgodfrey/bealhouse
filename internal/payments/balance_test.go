@@ -131,11 +131,12 @@ func shortNotice(t *testing.T, ctx context.Context, b booking.Beginner) booking.
 	t.Helper()
 
 	made, err := booking.Create(ctx, b, booking.Request{
-		RoomSlug: "rose-chamber",
-		Checkin:  day(2),
-		Checkout: day(4),
-		Guests:   2,
-		Guest:    booking.Guest{Name: "Grace Hopper", Email: "grace@example.com"},
+		RoomSlug:         "rose-chamber",
+		Checkin:          day(2),
+		Checkout:         day(4),
+		Guests:           2,
+		Guest:            booking.Guest{Name: "Grace Hopper", Email: "grace@example.com"},
+		AcceptedPolicies: true,
 	})
 	if err != nil {
 		t.Fatalf("holding a short-notice room: %v", err)

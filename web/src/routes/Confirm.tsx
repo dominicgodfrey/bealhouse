@@ -47,6 +47,7 @@ function ConfirmForm({ room, stay }: { room: RoomDetail; stay: Stay }) {
   const [phone, setPhone] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
+  const [agreed, setAgreed] = useState(false)
 
   if (!room.available) {
     return (
@@ -83,6 +84,10 @@ function ConfirmForm({ room, stay }: { room: RoomDetail; stay: Stay }) {
         // number they were never shown.
         expectedTotalCents: room.quote.totalCents,
         guest: { name, email, phone },
+        // The tick-box above. The server refuses the booking without it and
+        // stamps its own clock on the record, so this says "agreed now" and
+        // nothing about when.
+        acceptedPolicies: agreed,
       })
       navigate(`/bookings/${booking.code}`)
     } catch (e) {
@@ -95,7 +100,9 @@ function ConfirmForm({ room, stay }: { room: RoomDetail; stay: Stay }) {
     <div className="flex flex-col gap-8">
       <h1 className="text-2xl font-semibold tracking-tight">Confirm your stay</h1>
 
-      <div className="grid gap-8 sm:grid-cols-[1fr_1fr]">
+      {/* Side by side from lg. Below that the summary reads first and the form
+          follows it, which is the order somebody fills them in anyway. */}
+      <div className="grid gap-8 lg:grid-cols-2">
         <section className="flex flex-col gap-4 rounded-lg border border-neutral-200 p-4">
           <div>
             <h2 className="font-medium">{room.name}</h2>
@@ -135,11 +142,44 @@ function ConfirmForm({ room, stay }: { room: RoomDetail; stay: Stay }) {
             hint="Optional, in case we need to reach you about your arrival."
           />
 
+          {/*
+            The policies have to be accepted before the room can be held.
+
+            `required` on the input is what enforces it — the browser's own
+            validation, so the form cannot be submitted by pressing return in a
+            text field either, which is what a disabled button alone would miss.
+
+            The link opens in a new tab on purpose: sending somebody away from a
+            half-filled booking form to read the terms, and losing what they had
+            typed, is how a booking becomes an abandoned one.
+          */}
+          <label className="flex items-start gap-3 rounded-lg border border-neutral-200 bg-neutral-50 p-4 text-sm">
+            <input
+              type="checkbox"
+              required
+              checked={agreed}
+              onChange={(e) => setAgreed(e.target.checked)}
+              className="mt-0.5 size-4 shrink-0"
+            />
+            <span className="text-neutral-700">
+              I have read and agree to the{' '}
+              <Link
+                to="/policies"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="underline underline-offset-4 hover:text-neutral-900"
+              >
+                Beal House policies
+              </Link>
+              , including the deposit and cancellation terms.
+            </span>
+          </label>
+
           {error && <ErrorNote error={new Error(error)} />}
 
           <button
             type="submit"
-            disabled={submitting}
+            disabled={submitting || !agreed}
             className="rounded-lg bg-neutral-900 px-4 py-3 text-sm font-medium text-white hover:bg-neutral-700 disabled:bg-neutral-300"
           >
             {submitting ? 'Holding the room…' : 'Hold this room'}
@@ -172,7 +212,7 @@ function Field({ label, value, onChange, type = 'text', autoComplete, required, 
         {!required && <span className="font-normal text-neutral-500"> (optional)</span>}
       </span>
       <input
-        className="rounded-lg border border-neutral-300 px-3 py-2 text-sm outline-none focus:border-neutral-900"
+        className="rounded-lg border border-neutral-300 px-3 py-3 text-base outline-none focus:border-neutral-900"
         value={value}
         onChange={(e) => onChange(e.target.value)}
         type={type}

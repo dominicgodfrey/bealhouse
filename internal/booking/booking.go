@@ -42,6 +42,11 @@ var (
 	ErrGuestNameRequired  = errors.New("booking: a name is required")
 	ErrGuestEmailRequired = errors.New("booking: an email address is required")
 
+	// ErrPoliciesNotAccepted is a booking that did not agree to the terms.
+	// Server-side on purpose: the tick-box disables a button, and a disabled
+	// button is a suggestion to anything that is not a browser.
+	ErrPoliciesNotAccepted = errors.New("booking: the policies have to be accepted")
+
 	// ErrNotFound is an unknown booking code.
 	ErrNotFound = errors.New("booking: no such booking")
 )
@@ -115,6 +120,22 @@ type Request struct {
 	// The money is collected outside this system, so amount_paid_cents stays
 	// zero and the console shows the whole total as outstanding.
 	Manual bool
+
+	// AcceptedPolicies is the guest ticking the policies box on the confirm
+	// step, and it is required: Create refuses without it.
+	//
+	// The tick-box in the browser is a courtesy — it stops somebody booking
+	// without having been shown the terms. This is the enforcement, because a
+	// disabled button is a suggestion to anything that is not a browser. What
+	// gets stored is a server-side timestamp (`policies_accepted_at`, stamped
+	// with the database's clock inside this transaction); the boolean never
+	// reaches a column, so a client cannot claim to have agreed last Tuesday.
+	//
+	// Manual bookings set it too. The owner taking a reservation over the
+	// telephone is the one telling the guest the cancellation terms, so the
+	// acceptance is real — it is simply spoken rather than clicked, and a stay
+	// with no record of it at all would be worse.
+	AcceptedPolicies bool
 
 	// AfterCreate runs inside the transaction that wrote the booking, just
 	// before it commits, with the booking's code.
@@ -411,6 +432,7 @@ func insertBooking(
 			DepositCents:      room.Quote.DepositCents,
 			BalanceDueCents:   room.Quote.BalanceCents,
 			BalanceChargeAt:   chargeAt,
+			PoliciesAccepted:  req.AcceptedPolicies,
 		})
 		if err == nil {
 			return code, id, nil
@@ -482,6 +504,12 @@ func (r Request) validate() error {
 	email := strings.TrimSpace(r.Guest.Email)
 	if !strings.Contains(email, "@") || strings.HasPrefix(email, "@") || strings.HasSuffix(email, "@") {
 		return ErrGuestEmailRequired
+	}
+	// The tick-box in the browser disables a button; this refuses the booking.
+	// One of those is enforcement and the other is a courtesy, and the guest is
+	// agreeing to the terms under which their money is kept.
+	if !r.AcceptedPolicies {
+		return ErrPoliciesNotAccepted
 	}
 	return nil
 }

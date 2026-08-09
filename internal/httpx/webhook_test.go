@@ -86,11 +86,12 @@ func TestSignedDeliveryConfirmsAHeldBooking(t *testing.T) {
 	q := db.New(tx)
 
 	made, err := booking.Create(ctx, tx, booking.Request{
-		RoomSlug: "rose-chamber",
-		Checkin:  civil.AddDays(civil.Today(), stayStart),
-		Checkout: civil.AddDays(civil.Today(), stayEnd),
-		Guests:   2,
-		Guest:    booking.Guest{Name: "Ada Lovelace", Email: "ada@example.com"},
+		RoomSlug:         "rose-chamber",
+		Checkin:          civil.AddDays(civil.Today(), stayStart),
+		Checkout:         civil.AddDays(civil.Today(), stayEnd),
+		Guests:           2,
+		Guest:            booking.Guest{Name: "Ada Lovelace", Email: "ada@example.com"},
+		AcceptedPolicies: true,
 	})
 	if err != nil {
 		t.Fatalf("holding a room: %v", err)

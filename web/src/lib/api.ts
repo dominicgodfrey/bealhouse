@@ -279,6 +279,13 @@ export function createBooking(body: {
   withPet: boolean
   expectedTotalCents: number
   guest: { name: string; email: string; phone: string }
+  /**
+   * The policies tick-box. Required — the server refuses the booking without
+   * it, because a disabled button is a suggestion to anything that is not a
+   * browser. What gets stored is the server's own timestamp, never a value
+   * from here.
+   */
+  acceptedPolicies: boolean
 }): Promise<Booking> {
   return request<Booking>('/api/bookings', {
     method: 'POST',

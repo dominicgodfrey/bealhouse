@@ -72,11 +72,12 @@ func bookAnotherRoom(t *testing.T, ctx context.Context, tx pgx.Tx) string {
 	t.Helper()
 
 	made, err := booking.Create(ctx, tx, booking.Request{
-		RoomSlug: "blue-room",
-		Checkin:  day(stayStart),
-		Checkout: day(stayEnd),
-		Guests:   2,
-		Guest:    booking.Guest{Name: "Grace Hopper", Email: "grace@example.com"},
+		RoomSlug:         "blue-room",
+		Checkin:          day(stayStart),
+		Checkout:         day(stayEnd),
+		Guests:           2,
+		Guest:            booking.Guest{Name: "Grace Hopper", Email: "grace@example.com"},
+		AcceptedPolicies: true,
 	})
 	if err != nil {
 		t.Fatalf("holding a second room: %v", err)

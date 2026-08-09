@@ -19,7 +19,8 @@ RETURNING id;
 INSERT INTO bookings (
   code, guest_id, status, checkin, checkout, guests, with_pet,
   room_subtotal_cents, pet_fee_cents, tax_cents, tax_rate_snapshot,
-  total_cents, deposit_cents, balance_due_cents, balance_charge_at
+  total_cents, deposit_cents, balance_due_cents, balance_charge_at,
+  policies_accepted_at
 )
 VALUES (
   sqlc.arg(code),
@@ -36,7 +37,11 @@ VALUES (
   sqlc.arg(total_cents),
   sqlc.arg(deposit_cents),
   sqlc.arg(balance_due_cents),
-  sqlc.narg(balance_charge_at)
+  sqlc.narg(balance_charge_at),
+  -- The database's clock, not Go's and certainly not the browser's. Inside the
+  -- inserting transaction this is the transaction's start time, so it agrees
+  -- with created_at and cannot be back-dated by a client.
+  CASE WHEN sqlc.arg(policies_accepted)::boolean THEN now() END
 )
 RETURNING id;
 
