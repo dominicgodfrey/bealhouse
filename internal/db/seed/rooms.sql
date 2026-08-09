@@ -19,7 +19,9 @@
 -- carries the disclaimer shown to guests instead.
 --
 -- Descriptions are marked placeholders on purpose: if one ever reaches the
--- live site it should be unmistakable rather than plausible.
+-- live site it should be unmistakable rather than plausible. content.sql, run
+-- after this file, replaces them with what the inn's current site actually
+-- says — which is one description for one room and nothing for the other six.
 
 BEGIN;
 
