@@ -31,14 +31,14 @@ export function About() {
         */}
         {copy.data && (copy.data.written || copy.data.photos.length > 0) && (
           <section className="grid items-center gap-8 sm:grid-cols-2">
-            {copy.data.photos.length > 0 && (
-              <Gallery photos={fromPagePhotos(copy.data.photos)} eager aspect="aspect-[4/5]" />
-            )}
             <Prose
               heading={copy.data.heading}
               paragraphs={paragraphs(copy.data.body)}
               align="left"
             />
+            {copy.data.photos.length > 0 && (
+              <Gallery photos={fromPagePhotos(copy.data.photos)} eager aspect="aspect-[4/5]" />
+            )}
           </section>
         )}
 
