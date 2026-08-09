@@ -1,55 +1,48 @@
 @import 'tailwindcss';
 
 /*
- * The site's typeface.
+ * A humanist sans: the ground between the UI stack this started in, which read
+ * like a dashboard for an 1833 house, and the transitional serif that replaced
+ * it, which read a degree more formal than the inn does. Same broad-nib
+ * calligraphy as the old serifs, with the serifs left off.
  *
- * A transitional serif rather than the UI sans Tailwind ships with: this is an
- * 1833 house in a New England town, and the default system stack reads like a
- * dashboard. Serifs at body size are what a printed menu and a letter from an
- * inn look like, which is the register the whole site is trying to hold.
- *
- * NO WEBFONT, and that is deliberate rather than a shortcut. The CSP allows
- * `font-src 'self'`, so a self-hosted file would work — but it would be 100 KB
- * or so per weight on a page whose whole job is to load on mountain mobile
- * data, plus a flash of unstyled text on every first visit. Every family named
- * below is already installed on the machines that will read this site, so the
- * cost is zero bytes and there is no FOUT to manage.
- *
- * The order walks from best to most available: Iowan and Charter ship with
- * Apple systems, Palatino and Georgia are on effectively every desktop, and
- * `ui-serif`/`serif` catch the rest. Georgia is the one most visitors will
- * actually see, and it was drawn for screens — which is the property that
- * matters here, not pedigree.
+ * NO WEBFONT. Every family below is already on the machines that will read this
+ * site, so it costs zero bytes and there is no FOUT — where a self-hosted file
+ * would be ~100 KB per weight on a page meant to load on mountain mobile data.
+ * Optima is the Apple one and the one this was chosen for; Candara is
+ * Microsoft's answer to it and is what most visitors will see.
  */
-/*
- * "There is room under the field for a dropdown."
- *
- * Width alone is the wrong test and was the first thing tried: a 1280×600
- * browser window is a wide screen with no room in it, and the calendar hung off
- * the search field and off the bottom of a page that is not allowed to scroll.
- * Height alone is wrong too — a tall narrow phone has the pixels and not the
- * width for two months side by side. Both, or the picker becomes a sheet
- * against the bottom of the viewport instead.
- *
- * 760px is the height at which the home page's header, search card and footer
- * still leave a two-month calendar somewhere to go.
- */
-@custom-variant roomy (@media (min-width: 640px) and (min-height: 760px));
-
 @theme {
   --font-sans:
-    'Iowan Old Style', 'Palatino Linotype', Palatino, Charter, Georgia, ui-serif, Cambria,
-    'Times New Roman', serif;
+    Optima, Candara, 'Gill Sans', 'Gill Sans MT', 'Trebuchet MS', 'Segoe UI', ui-sans-serif,
+    system-ui, sans-serif;
 
+  /* One family everywhere: the alias stops a stray `font-serif` dropping to Times. */
   --font-serif: var(--font-sans);
+
+  /*
+   * The tint on the home page's panels — burnt sienna, taken most of the way to
+   * white. Full strength fights the red house behind it; this stays quiet over
+   * a photograph and still reads as a colour rather than as dirty white.
+   */
+  --color-sienna: #f2ddd0;
 }
 
 /*
- * Numbers line up in columns wherever they are compared — prices down a menu,
- * a total against a subtotal, nightly rates in a breakdown. Georgia's default
- * figures are old-style (the 3, 4, 5, 7 and 9 drop below the baseline), which
- * is handsome in a sentence and unreadable in a column, so the lining set is
- * asked for wherever the layout already asks for tabular figures.
+ * "There is room under the field for a dropdown."
+ *
+ * Width alone is the wrong test: a 1280×600 window is wide and has no room in
+ * it, and the calendar hung off the bottom of a page that cannot scroll. Height
+ * alone is wrong too — a tall phone has the pixels and not the width for two
+ * months side by side. Below both, the picker becomes a sheet against the
+ * bottom of the viewport instead.
+ */
+@custom-variant roomy (@media (min-width: 640px) and (min-height: 760px));
+
+/*
+ * Numbers line up wherever they are compared. Written for Georgia and still
+ * needed for Candara, whose default figures are old-style — handsome in a
+ * sentence, unreadable in a column of money.
  */
 .tabular-nums {
   font-variant-numeric: lining-nums tabular-nums;

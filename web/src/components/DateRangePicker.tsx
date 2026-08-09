@@ -74,17 +74,15 @@ export function DateRangePicker({ checkin, checkout, guests, withPet, onChange }
   const months = [month, addMonths(month, 1)]
 
   return (
-    <div className="rounded-lg border border-neutral-200 bg-white p-4">
-      {/*
-        size-11 is 44px, which is the smallest thing a thumb reliably hits.
-        These were 28px — the two controls somebody uses most on a phone,
-        and the ones most likely to be missed and take a stray tap on a date
-        instead.
-      */}
+    // Same tint as the card it opens out of; a white panel hanging off a
+    // coloured one read as a different control.
+    <div className="rounded-lg border border-neutral-300 bg-sienna/90 p-4">
+      {/* size-11 is 44px: the smallest thing a thumb reliably hits. These were
+          28px, and a miss lands on a date. */}
       <div className="mb-3 flex items-center justify-between gap-2">
         <button
           type="button"
-          className="flex size-11 shrink-0 items-center justify-center rounded text-base text-neutral-600 hover:bg-neutral-100 disabled:invisible"
+          className="flex size-11 shrink-0 items-center justify-center rounded text-base text-neutral-600 hover:bg-black/5 disabled:invisible"
           disabled={month <= startOfMonth(start)}
           onClick={() => setMonth(addMonths(month, -1))}
           aria-label="Previous month"
@@ -96,7 +94,7 @@ export function DateRangePicker({ checkin, checkout, guests, withPet, onChange }
         </p>
         <button
           type="button"
-          className="flex size-11 shrink-0 items-center justify-center rounded text-base text-neutral-600 hover:bg-neutral-100 disabled:invisible"
+          className="flex size-11 shrink-0 items-center justify-center rounded text-base text-neutral-600 hover:bg-black/5 disabled:invisible"
           disabled={addMonths(month, 1) >= lastMonth}
           onClick={() => setMonth(addMonths(month, 1))}
           aria-label="Next month"
@@ -115,7 +113,7 @@ export function DateRangePicker({ checkin, checkout, guests, withPet, onChange }
 
       {calendar.data && (
         <>
-          <div className="grid gap-6 sm:grid-cols-2">
+          <div className="grid gap-4 sm:grid-cols-2">
             {months.map((m) => (
               <Month
                 key={m}
@@ -176,7 +174,11 @@ type MonthProps = {
 
 function Month({ month, checkin, checkout, selectable, onSelect }: MonthProps) {
   return (
-    <div>
+    // Each month is boxed, which is what makes the grid readable while the
+    // panel stays translucent: the border gives the dates an edge to sit
+    // against, and the second layer of tint over the first puts the numbers on
+    // something nearer opaque without the whole sheet going solid.
+    <div className="rounded-lg border border-neutral-300 bg-sienna/60 p-3">
       <p className="mb-2 text-center text-sm font-medium">{formatMonth(month)}</p>
 
       <div className="grid grid-cols-7 gap-px">
@@ -223,9 +225,9 @@ function Day({ date, checkin, checkout, selectable, onSelect }: DayProps) {
   if (isEndpoint) {
     tone = 'bg-neutral-900 font-medium text-white'
   } else if (inRange) {
-    tone = 'bg-neutral-100 text-neutral-900'
+    tone = 'bg-black/5 text-neutral-900'
   } else if (selectable) {
-    tone = 'text-neutral-900 hover:bg-neutral-100'
+    tone = 'text-neutral-900 hover:bg-black/5'
   }
 
   return (
