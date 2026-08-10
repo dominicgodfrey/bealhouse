@@ -202,6 +202,7 @@ them in parallel against one shared database, so:
   | payments | today+300 |
   | httpx — webhook and manage tests | today+400 |
   | console | today+500 |
+  | **Playwright** (`web/e2e/`) | today+600, sixty days of it |
 
 - **A package whose fixture claims more than one room per transaction takes
   `Exclusive` too**, and that one is about locks rather than rows.
@@ -218,6 +219,37 @@ them in parallel against one shared database, so:
   it, and the availability search tests then fail with a room mysteriously
   missing. If those tests fail that way and pass in isolation, look for a stray
   `pending` booking before suspecting the code.
+
+### The browser suite — `web/e2e/`
+
+```bash
+cd web && npx playwright test
+```
+
+Playwright, over the real binary and the real database. It **repeats nothing the
+Go suite can assert more cheaply** — what it covers is the joins nothing else
+can see: that the five screens of the booking flow actually connect, that the
+total a guest agreed to is the one the hold is written with, that the `<head>`
+the Go server writes reaches the document a crawler fetches, and that the
+console's gate is a sign-in rather than the SPA's index page.
+
+- **It starts the server itself**, with `go run ./cmd/server` on `:8099` and
+  `STRIPE_FAKE=true`. `go run` and not `bin/bealhouse`, for both reasons the
+  environment notes above give: the built file has no extension and a Windows
+  shell will not execute it, and a stale `bin/bealhouse.exe` beside it is a
+  documented afternoon.
+- **It reuses a server already on :8099** outside CI, which is convenient and is
+  also a trap — a stray one left from something else means the whole suite runs
+  against the wrong configuration and fails in ways that look like application
+  bugs (no database, the wrong `SITE_URL` in every canonical). If most of it
+  fails at once, check what is on that port before reading the diffs.
+- **It books real rooms and clears up after itself**, in the today+600 window
+  above. The cleanup runs as globalSetup *and* globalTeardown: a run killed
+  partway leaves committed bookings that take rooms off sale for good, and the
+  next run then finds nothing available.
+- **A booking code is `BH-` and six characters** over an alphabet with no I, O,
+  0 or 1 (`internal/booking/code.go`) — not six characters flat, which is what
+  the first version of the journey test asserted.
 
 ## Content is the owner's, not ours
 

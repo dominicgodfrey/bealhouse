@@ -13,7 +13,11 @@
     "noUnusedLocals": true,
     "noUnusedParameters": true,
     "noFallthroughCasesInSwitch": true,
-    "types": ["vite/client"]
+    // "node" is here for the two files that run in it — vite.config.ts and the
+    // Playwright config and specs, which read process.env. One tsconfig rather
+    // than a second one for four files; Vite fails the build on a node import
+    // reaching the bundle, which is the check that actually matters.
+    "types": ["vite/client", "node"]
   },
-  "include": ["src", "vite.config.ts"]
+  "include": ["src", "vite.config.ts", "playwright.config.ts", "e2e"]
 }

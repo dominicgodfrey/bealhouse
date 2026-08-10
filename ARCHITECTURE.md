@@ -813,9 +813,31 @@ delivery. Critically, use **Stripe Test Clocks** to fast-forward a real test boo
 T-7 and verify the warning email, the off-session charge, and the failure path — this is the only
 honest way to test decision #6 without waiting a week.
 
-**End-to-end** — Playwright over the full guest journey: search → room → confirm → test card → webhook
-→ confirmation page → PDF downloads → email queued. Then the self-service cancel link, asserting the
-refund amount matches policy on both sides of the 7-day boundary.
+**End-to-end** *(built, less the parts that need an account)* — Playwright in `web/e2e/`, run by CI
+after `go test`. It deliberately repeats nothing the Go suite can assert more cheaply; what it covers
+is the joins nothing else can see.
+
+- **The guest journey**: search → results → room → confirm → hold → pay → confirmed, through the
+  stand-in processor, with the **total carried from screen to screen and compared at each one**. A
+  quote that changed between the room page and the hold is the failure this exists to catch, and it
+  is invisible to any test looking at one screen.
+- **The head a crawler gets**, fetched as a document rather than driven as a page: one `<title>` per
+  route and never two, no two pages sharing one, a canonical on each, a room's `HotelRoom` offer,
+  an absolute `sitemap.xml` listing every room, and `/book` and `/bookings` `noindex` and
+  `Disallow`ed. `robots.txt` served as `text/plain` and a missing photograph as a 404, because both
+  answered by the SPA fallback would be HTML with a 200.
+- **The console's gate**: `/admin` is a sign-in and not the SPA's index, the URL survives it, every
+  `/api/admin/*` route answers 401 as JSON, and a POST to an unrouted path is not answered with the
+  SPA.
+
+It books real rooms in its own stretch of the calendar (today+600) and clears that stretch before
+and after the run — before as well, because a run killed partway leaves exactly the bookings that
+would make the next one find nothing available.
+
+**Still needing an account or a handset:** the test card and 3-D Secure, the PDF download and the
+self-service cancel link — both of which sit behind a token that reaches the guest by email, so
+proving them in a browser means reading the inn's outbox — and the console's authenticated screens,
+which need an enrolled phone.
 
 **Manual** — admin console driven entirely on a real phone; run the whole booking flow on mobile;
 Lighthouse ≥ 90 on home and room pages; validate JSON-LD in Google's Rich Results Test; confirm

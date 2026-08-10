@@ -11,3 +11,9 @@ web/node_modules/
 
 # Uploaded media (served from disk in production)
 /media/
+
+# Playwright: its reports, its traces, and the media directory the server under
+# test is pointed at so an upload cannot land in the repository.
+web/playwright-report/
+web/test-results/
+web/e2e/.media/

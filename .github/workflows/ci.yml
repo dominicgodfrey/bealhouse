@@ -104,6 +104,30 @@ jobs:
         # hardest properties are about concurrency.
         run: go test -race -count=1 ./...
 
+      - name: Install a browser
+        # Chromium only. The suite asserts the SPA joins up and that the head
+        # the Go server writes reaches the document; none of that is
+        # engine-specific, and three browsers would be three downloads to prove
+        # the same thing.
+        run: cd web && npx playwright install --with-deps chromium
+
+      - name: End-to-end
+        # After go test, because it is the slower and less specific signal: a
+        # broken exclusion constraint should be reported by the test named after
+        # it, not by a browser failing to find a heading.
+        #
+        # It books real rooms in this job's database, in its own stretch of the
+        # calendar — see web/e2e/support/window.ts.
+        run: cd web && npx playwright test
+
+      - name: Keep what a failure left behind
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: web/playwright-report/
+          retention-days: 7
+
   # The concurrency suite, hard. Minutes rather than seconds, so it does not
   # gate every push: CLAUDE.md's rule is to run it whenever room_occupancy,
   # occupancy.Create or booking.Create is touched, and nightly catches the rest.

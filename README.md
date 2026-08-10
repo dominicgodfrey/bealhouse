@@ -129,6 +129,18 @@ Tests need Postgres running and seeded; they skip cleanly when it is not
 reachable. Tests that rewrite reference data run inside a rolled-back
 transaction, so `go test ./...` never leaves the dev database altered.
 
+The browser suite is Playwright, and it starts the binary itself:
+
+```bash
+cd web && npx playwright install chromium && npx playwright test
+```
+
+It covers what only a browser can — that the booking flow's screens join up and
+carry one total between them, that the `<head>` the Go server writes reaches the
+document, and that the console's gate holds — against the stand-in payment
+processor, so it needs no Stripe account. It books real rooms in its own stretch
+of the calendar and clears them before and after the run.
+
 `web/dist/` is committed with an empty `.gitkeep` because `//go:embed all:dist`
 will not compile against a missing directory. Vite's `emptyOutDir` deletes it on
 every build, so a small plugin in `vite.config.ts` writes it back.
