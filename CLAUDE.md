@@ -272,6 +272,11 @@ whose numbers charge a card.
 than seeded rows — a placeholder in the database is one somebody has to remember
 to delete.
 
+**What is still the owner's to write is tracked in [OWNER-SETUP.md](OWNER-SETUP.md)**,
+screen by screen, with what is placeholder in the database today. Keep it true
+when the seed or the console changes; it is the document somebody hands to the
+owner, and a stale line in it is a job nobody does or one they do twice.
+
 **Email copy** (`internal/email/templates/`) shipped blank on the same reasoning
 and no longer does: the owner asked for a starting point rather than eight empty
 files, so all eight now carry real sentences. **They are written to be edited,

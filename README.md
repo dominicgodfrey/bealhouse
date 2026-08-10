@@ -159,6 +159,9 @@ one is described on the site it came from. `menu-mock.sql` is invented structure
 for exercising the editor and must not reach production. `rates.sql` is a single
 flat placeholder season, and it is the one seed whose numbers charge a card.
 
+**[OWNER-SETUP.md](OWNER-SETUP.md) is the checklist**: every screen that still
+needs the owner, where it is, and what is placeholder in the database today.
+
 ## Not yet built
 
 Step 8, launch, and most of what is left there is an account or a decision
@@ -173,10 +176,10 @@ test cards, 3-D Secure, `stripe listen`, Test Clocks — which cannot be faked.
 Push notifications need no account, only a `bealhouse vapid` key pair.
 
 What needs the owner: real rate seasons, room descriptions, photographs, the
-menu, the page prose, and a pass over the eight email messages. Everything but
-the rates renders as *nothing* until written, rather than as a placeholder
-somebody has to remember to delete — the rates are the exception, because a
-placeholder price still charges a card.
+menu, the page prose, and a pass over the eight email messages — all of it in
+[OWNER-SETUP.md](OWNER-SETUP.md). Everything but the rates renders as *nothing*
+until written, rather than as a placeholder somebody has to remember to delete;
+the rates are the exception, because a placeholder price still charges a card.
 
 Also outstanding: AVIF (decision #16). Photographs already ship as a ladder of
 four widths in JPEG and WebP; AVIF is feasible with no cgo and deferred because

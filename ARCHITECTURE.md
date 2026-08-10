@@ -502,6 +502,7 @@ Dependency-ordered, not deadline-driven (single launch).
    **Still to do:** the Resend account itself — DNS for SPF/DKIM/DMARC (decision #17) and a first
    real send — a `PUSH_VAPID_*` pair from `bealhouse vapid`, and the owner's pass over the eight
    messages in the console, which is a review of words that already work rather than a blank page.
+   The owner's side of all of this is [OWNER-SETUP.md](OWNER-SETUP.md).
 6. **Admin** ← **IN PROGRESS.** **Auth is built** (decision #15, revised): passkeys, no passwords,
    `internal/admin` plus the `/api/admin/auth/*` routes and the session middleware everything else
    will sit behind. `bealhouse enroll` is the bootstrap. The tests are written adversarially rather
