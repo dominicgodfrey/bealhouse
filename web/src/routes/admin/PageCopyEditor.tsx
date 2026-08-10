@@ -37,17 +37,31 @@ export function PageCopyEditor() {
   const [nonce, reload] = useReload()
   const pages = useAsync(fetchCopy, [nonce])
 
+  // Which page is open, by slug. One at a time: this screen carries every page
+  // on the site, and rendering all of their boxes at once made it a wall to
+  // scroll through on a phone to reach the one being edited.
+  const [open, setOpen] = useState<string | null>(null)
+
   return (
     <Screen title="Pages" subtitle="What the site says and shows about the inn.">
       {pages.loading && <Loading what="the pages" />}
       {pages.error && <ErrorNote error={pages.error} />}
 
       <Aside>
-        A blank heading and a blank body empties the page again — the section simply does not
-        render, rather than showing an empty box to a visitor. The same goes for the photographs.
+        Pick a page to edit it. Emptying the words empties the page again — the section simply does
+        not render, rather than showing an empty box to a visitor. The same goes for the
+        photographs.
       </Aside>
 
-      {pages.data?.map((page) => <Page key={page.slug} page={page} onSaved={reload} />)}
+      {pages.data?.map((page) => (
+        <Page
+          key={page.slug}
+          page={page}
+          open={open === page.slug}
+          onToggle={() => setOpen(open === page.slug ? null : page.slug)}
+          onSaved={reload}
+        />
+      ))}
 
       <Nearby />
     </Screen>
@@ -167,11 +181,11 @@ function Nearby() {
 }
 
 const titles: Record<string, string> = {
-  // The home page renders no paragraph — it is one screenful of search over a
-  // photograph. Its photographs ARE that photograph, and its words are what a
-  // search engine shows under the inn's name, so the slot is still worth having
-  // and worth labelling honestly.
-  home: 'Home (the backdrop photo, and what search engines show)',
+  // The home page is one screenful of search over a photograph and renders no
+  // prose at all, so the only thing here worth an owner's attention is which
+  // photograph. Its stored words still feed the description a search engine
+  // shows under the inn's name; that is not edited from here.
+  home: 'Home (the backdrop photo)',
   rooms: 'The rooms page',
   restaurant: 'The restaurant',
   events: 'Events',
@@ -180,70 +194,108 @@ const titles: Record<string, string> = {
   policies: 'Policies',
 }
 
-function Page({ page, onSaved }: { page: PageCopy; onSaved: () => void }) {
+// The home page takes photographs and nothing else. Kept as a list rather than
+// a flag on the row, because it is a fact about how this site is built — the
+// page has no prose slot to fill — and not something an owner should be able to
+// switch on from a screen and then wonder why nothing appears.
+const photosOnly = new Set(['home'])
+
+function Page({
+  page,
+  open,
+  onToggle,
+  onSaved,
+}: {
+  page: PageCopy
+  open: boolean
+  onToggle: () => void
+  onSaved: () => void
+}) {
   const { refresh } = useConsole()
   const [draft, setDraft] = useState(page)
   const saving = useSaving(refresh)
 
+  const photos = photosOnly.has(page.slug)
+
   return (
     <Card>
-      <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <span className="font-medium">{titles[page.slug] ?? page.slug}</span>
-        {!page.written && (
-          <span className="rounded bg-neutral-200 px-2 py-0.5 text-xs text-neutral-700">
-            nothing written
-          </span>
-        )}
-      </div>
-
-      {saving.error && <ErrorNote error={saving.error} />}
-      {saving.saved && <Saved>Saved. The page shows it now.</Saved>}
-
-      <Field label="Heading">
-        <Input
-          value={draft.heading}
-          onChange={(e) => {
-            setDraft({ ...draft, heading: e.target.value })
-            saving.clear()
-          }}
-        />
-      </Field>
-
-      <Field label="Words" hint="Leave a blank line between paragraphs.">
-        <Textarea
-          rows={8}
-          value={draft.body}
-          onChange={(e) => {
-            setDraft({ ...draft, body: e.target.value })
-            saving.clear()
-          }}
-        />
-      </Field>
-
-      <Photos
-        photos={draft.photos}
-        onChange={(photos) => {
-          setDraft({ ...draft, photos })
-          saving.clear()
-        }}
-      />
-
-      <Button
-        kind="primary"
-        onClick={() =>
-          saving.run(async () => {
-            // Two requests, one button. The photographs go second so a page
-            // being emptied of prose — which deletes its row — still ends with
-            // the gallery the owner left in place.
-            await savePageCopy(draft)
-            await savePagePhotos(draft.slug, draft.photos)
-            onSaved()
-          })
-        }
-        disabled={saving.working}
+      {/*
+        The whole header is the control. A row that expands needs the tap target
+        to be the row, not a chevron at the end of it — on a phone the latter is
+        a miss waiting to happen.
+      */}
+      <button
+        type="button"
+        onClick={onToggle}
+        className="flex w-full flex-wrap items-baseline justify-between gap-2 text-left"
       >
-        {saving.working ? 'Saving…' : 'Save'}
-      </Button>
+        <span className="font-medium">{titles[page.slug] ?? page.slug}</span>
+        <span className="flex items-center gap-2">
+          {!photos && !page.written && (
+            <span className="rounded bg-neutral-200 px-2 py-0.5 text-xs text-neutral-700">
+              nothing written
+            </span>
+          )}
+          <span aria-hidden className="text-neutral-400">
+            {open ? '▾' : '▸'}
+          </span>
+        </span>
+      </button>
+
+      {open && (
+        <>
+          {saving.error && <ErrorNote error={saving.error} />}
+          {saving.saved && <Saved>Saved. The page shows it now.</Saved>}
+
+          {/*
+            No heading box. The console edits the words a page already has; a
+            second field that every page but one left blank was one more thing
+            to scroll past and nothing to gain by filling in.
+          */}
+          {!photos && (
+            <Field label="Words" hint="Leave a blank line between paragraphs.">
+              <Textarea
+                rows={8}
+                value={draft.body}
+                onChange={(e) => {
+                  setDraft({ ...draft, body: e.target.value })
+                  saving.clear()
+                }}
+              />
+            </Field>
+          )}
+
+          <Photos
+            photos={draft.photos}
+            onChange={(photos) => {
+              setDraft({ ...draft, photos })
+              saving.clear()
+            }}
+          />
+
+          <Button
+            kind="primary"
+            onClick={() =>
+              saving.run(async () => {
+                // Two requests, one button. The photographs go second so a page
+                // being emptied of prose — which deletes its row — still ends
+                // with the gallery the owner left in place.
+                //
+                // A photographs-only page skips the first entirely rather than
+                // sending back what it never showed: posting an untouched draft
+                // is how a screen that cannot edit the words ends up rewriting
+                // them anyway.
+                if (!photos) await savePageCopy(draft)
+                await savePagePhotos(draft.slug, draft.photos)
+                onSaved()
+              })
+            }
+            disabled={saving.working}
+          >
+            {saving.working ? 'Saving…' : 'Save'}
+          </Button>
+        </>
+      )}
     </Card>
   )
 }
