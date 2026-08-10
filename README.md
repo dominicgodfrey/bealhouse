@@ -136,9 +136,16 @@ every build, so a small plugin in `vite.config.ts` writes it back.
 ## Content ownership
 
 Room descriptions, photos, amenities, and rate seasons are all owner-managed
-through the admin console. What is in the seed is placeholder: descriptions are
-marked as such, amenities are empty, and there is a single flat rate season.
-None of it should be edited in SQL once admin exists.
+through the admin console, and none of it should be edited in SQL now that the
+console exists.
+
+The seed is in halves. `rooms.sql` is the seven rooms as facts and marks every
+description `PLACEHOLDER`. `content.sql` is provisional copy transcribed off the
+inn's current site — the owner's own sentences — and fills amenities and clears
+those placeholders; only one of the seven rooms is described there, because only
+one is described on the site it came from. `menu-mock.sql` is invented structure
+for exercising the editor and must not reach production. `rates.sql` is a single
+flat placeholder season, and it is the one seed whose numbers charge a card.
 
 ## Not yet built
 
@@ -151,11 +158,13 @@ What genuinely needs an account: `gateway.Stripe` and `email.Resend` are both
 written and neither has ever made a request. Add the keys and they are used
 automatically, and then the Stripe verification matrix in ARCHITECTURE.md —
 test cards, 3-D Secure, `stripe listen`, Test Clocks — which cannot be faked.
+Push notifications need no account, only a `bealhouse vapid` key pair.
 
-What needs the owner: the eight email templates, room descriptions, photographs,
-the menu, and the page prose. All of it is editable in the console and all of it
-renders as *nothing* until written, rather than as a placeholder somebody has to
-remember to delete.
+What needs the owner: real rate seasons, room descriptions, photographs, the
+menu, the page prose, and a pass over the eight email messages. Everything but
+the rates renders as *nothing* until written, rather than as a placeholder
+somebody has to remember to delete — the rates are the exception, because a
+placeholder price still charges a card.
 
 Also outstanding: AVIF (decision #16). Photographs already ship as a ladder of
 four widths in JPEG and WebP; AVIF is feasible with no cgo and deferred because

@@ -387,8 +387,12 @@ pasted in.
 - **Guests** — searchable by name, email, room, date, length of stay; notes with author and history.
 - **Content** — menu editor, room photos/descriptions + accessibility features, events gallery,
   inquiry inbox.
-- **Email copy** *(storage built)* — the eight messages the inn sends, each with a subject and a
-  body the owner edits. A row in `email_templates` overrides the file that ships; no row means the
+- **Email copy** *(built)* — the eight messages the inn sends, each with a subject and a
+  body the owner edits, and a preview that posts the **draft** rather than naming the stored row:
+  the question is what a save will look like, and asking after saving asks too late. It renders
+  against a sample booking, in a frame sandboxed with neither `allow-scripts` nor
+  `allow-same-origin` — the markup is the owner's, but it has no business reaching the session it
+  is previewed from. A row in `email_templates` overrides the file that ships; no row means the
   shipped one, so "reset to the original" is a delete and a message added in a later release turns
   up in the editor on its own. Nothing is cached, so a save applies to the next message rather than
   the next deploy. The **layout is not editable** — it carries the letterhead and the table
@@ -474,14 +478,29 @@ Dependency-ordered, not deadline-driven (single launch).
      admin console's editor is one authenticated endpoint away rather than a schema change. See the
      Admin console section for where the lines are drawn.
 
-   *The eight templates are still deliberately **blank** — a line saying what each is for and
-   nothing else. The copy is the owner's to write, like room descriptions and photos. The manage
-   link is wired into the confirmation as structure rather than copy, because it is the only way
-   a guest reaches their booking.*
+   - **Notifications to the owner's handset** (`internal/push`, migration 00023). A booking or an
+     inquiry reaches the phone while the console is shut, beside the email rather than instead of
+     it. Web Push with a VAPID pair from `bealhouse vapid`, a service worker in
+     `web/public/sw.js`, and the subscription rows the only state it owns — the handler forgets one
+     the push service says is gone. Queued on the same runner mail is, for the same reason: a push
+     service having a bad afternoon must delay the nudge and never the booking that earned it.
+     Half a key pair is an error in the log and treated as none, and notifications are logged
+     instead of sent.
+
+   *The eight templates shipped **blank** and no longer are.* The copy is still the owner's, and
+   still theirs to replace from the console — but the owner asked for a starting point rather than
+   eight empty files, so all eight now carry real sentences **written to be edited, not shipped
+   unread**. Each keeps the branch that carries its meaning: the confirmation says nothing about a
+   balance on a stay paid in full, the declined-card message leads with the room still being
+   theirs, and the departure note carries no figure at all. The email copy editor previews a draft
+   against a **sample booking** — Sample Guest, code SAMPLE, invented figures, every optional field
+   filled — so an inn on its first day sees its own letterhead and no real guest's name appears on
+   a screen that never asked about them. The manage link is wired into the confirmation as
+   structure rather than copy, because it is the only way a guest reaches their booking.
 
    **Still to do:** the Resend account itself — DNS for SPF/DKIM/DMARC (decision #17) and a first
-   real send — and the copy for the eight messages, which is the owner's, and which they will write
-   in the console rather than in this repository.
+   real send — a `PUSH_VAPID_*` pair from `bealhouse vapid`, and the owner's pass over the eight
+   messages in the console, which is a review of words that already work rather than a blank page.
 6. **Admin** ← **IN PROGRESS.** **Auth is built** (decision #15, revised): passkeys, no passwords,
    `internal/admin` plus the `/api/admin/auth/*` routes and the session middleware everything else
    will sit behind. `bealhouse enroll` is the bootstrap. The tests are written adversarially rather

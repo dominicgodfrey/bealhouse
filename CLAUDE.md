@@ -222,15 +222,34 @@ them in parallel against one shared database, so:
 ## Content is the owner's, not ours
 
 Room descriptions, photos, amenities, and rate seasons are all managed through the
-admin console once it exists. What is in the seed is placeholder: descriptions are
-marked `PLACEHOLDER`, amenities are empty, there is one flat rate season, and
+admin console. Do not invent content, and do not seed guesses.
+
+**The seed is in two halves, and the split is the point.** `rooms.sql` is the
+seven rooms as *facts* — occupancy, beds, views, the pet room — and leaves every
+description `PLACEHOLDER` so a leak onto the live site is unmistakable rather
+than plausible. `content.sql` is *provisional copy transcribed from the inn's
+current site*: every sentence in it is the owner's own, taken off a page they
+wrote, and it fills amenities and clears the placeholders. Five of the seven
+rooms are published there and only one carries a written description, so exactly
+one room gets one and the other six are blank on purpose. `menu-mock.sql` is
+neither — it is invented structure to exercise the editor, and it must not reach
+production. `rates.sql` is one flat placeholder season, and it is the one seed
+whose numbers charge a card.
+
 `web/public/placeholders/*.svg` stands in for photos as a **UI fallback** rather
 than seeded rows — a placeholder in the database is one somebody has to remember
-to delete. Do not invent content, and do not seed guesses.
+to delete.
 
-The same goes for **email copy** (`internal/email/templates/`). All eight templates
-are blank on purpose: a subject marked `PLACEHOLDER` and one line saying what the
-message is for. Write the shared layout, never the sentences a guest reads.
+**Email copy** (`internal/email/templates/`) shipped blank on the same reasoning
+and no longer does: the owner asked for a starting point rather than eight empty
+files, so all eight now carry real sentences. **They are written to be edited,
+not to be shipped unread** — the owner's own words replace them from the console,
+and the shipped file is what stands in until they do. Each keeps the branch that
+carries its meaning (the confirmation says nothing about a balance on a stay paid
+in full), every body is wrapped in `{{if .Data}}`, and every subject keeps literal
+text *outside* that guard, because `Names()` renders all eight against nil as a
+smoke test and a subject that came out empty would send that way. The shared
+layout is still not copy and still not editable.
 
 **And the copy is editable data, not just a file.** A row in `email_templates`
 overrides the shipped template for one message; no row means the shipped one, so
@@ -675,6 +694,35 @@ or the same guest hears from the inn ninety-six times that morning.
   T-7 charge is not a surprise. Call `payments.MarkWarned` **in the same
   transaction that queues the email**, or the same guest is warned every day
   until they arrive.
+
+## Notifications to the owner's phone — `internal/push`
+
+**Beside the email, never instead of it.** A booking or an inquiry reaches the
+handset while the console is shut. Web Push with a VAPID pair, a service worker
+in `web/public/sw.js`, and `push_subscriptions` (migration 00023).
+
+- **Shaped exactly like `internal/email`, on purpose:** a durable job
+  (`push.send`) on `internal/jobs`, a `Sender` with a real implementation and a
+  logging one, and **nothing sent inline**. `push.Queue` takes a `*db.Queries`,
+  so the notification commits with the booking that caused it.
+- **A subscription can die, and that is the one piece of state this package
+  owns.** A push service answering 404 or 410 means the browser is gone for
+  good, so `ErrGone` is its own error and the handler **deletes the row** rather
+  than retrying it forever while everything queues up behind it. Every other
+  status is a retry.
+- **One job fans out to every browser**, not a job per handset. The thing being
+  retried is the notification, so a phone that was unreachable gets it on the
+  retry — at the cost of re-sending to the ones that already had it. With two
+  handsets that trade is the right way round; with two hundred it would not be.
+- **A notification is a nudge, not a payload.** Title, body, a path to tap
+  through to, and a `Tag` that collapses supersessions — distinct per booking
+  code rather than per kind, because two bookings are two things to see.
+  Anything richer would be a second read model to keep in step with the console
+  that is one tap away.
+- **`bealhouse vapid` mints the pair, and both halves are required together.**
+  Half a pair is an error in the log and treated as none. Generating a new pair
+  **turns every phone off** — each has to subscribe again — which is why the keys
+  are deployment configuration and not a setting.
 
 ## Step 6: admin auth
 
