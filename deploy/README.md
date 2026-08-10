@@ -218,8 +218,12 @@ being alerted.
 
 ## Still to do at launch
 
-- **Sentry** — a DSN and the wiring. `slog` is what everything already logs
-  through, so it is a handler, not an audit of call sites.
+- **Sentry** — **the wiring is built**; what is left is a project and its DSN in
+  `/etc/bealhouse/env` as `SENTRY_DSN`. It is an `slog` handler, so it reports
+  what is already reported and there was no audit of call sites; `ENV` becomes
+  the Sentry environment, and only Error and above are sent, because WARN here
+  is how the binary says "no Stripe key". Empty means the journal on this box is
+  the only copy.
 - **Uptime monitoring** — something outside this box asking for
   `/api/health`. Note that it answers **200 with `"db":"down"`** rather than
   failing, so the check has to read the field; `deploy.sh` does the same. This

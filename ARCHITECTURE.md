@@ -649,8 +649,22 @@ Dependency-ordered, not deadline-driven (single launch).
    person looking at a button. `TestADeadlockArrivesAsADeadlock` deadlocks two transactions on
    purpose and asserts the SQLSTATE that comes back is `40P01` and not its aftermath.
 
-   **Still to do:** Sentry (a DSN and an `slog` handler), uptime monitoring from outside the box,
-   DNS cutover, Search Console, the Google Business Profile, and Stripe live keys.
+   **Error reporting is an `slog` handler** (`internal/sentry`), which is the only shape that does
+   not depend on somebody remembering to add a second line beside their `slog.Error` — the reports
+   that would be missing are exactly the ones from the paths nobody reviewed. It wraps rather than
+   replaces, so the journal on the box stays the full account and Sentry is the view of the part
+   worth looking at, and it reports **Error and above only**, because WARN here is how this binary
+   says "no Stripe key" and "no media directory" — conditions it is designed to survive and which
+   would otherwise open an issue on every boot. Written against `net/http` rather than the SDK, on
+   the same reasoning as `email.Resend`: one endpoint, one JSON body, one header, and this binary
+   already has panic recovery in the two places that need it. `slog.Record` carries the PC of the
+   call site, so a report names the line that produced it without a stack captured from inside a
+   handler, which would be full of slog's own frames. Reporting never blocks the goroutine that
+   logged and never retries — the error is already in the log, and a retry loop against an ingest
+   that is rate limiting the inn turns one bad afternoon into two.
+
+   **Still to do:** a Sentry project and its DSN, uptime monitoring from outside the box, DNS
+   cutover, Search Console, the Google Business Profile, and Stripe live keys.
 
 ---
 

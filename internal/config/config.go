@@ -98,6 +98,16 @@ type Config struct {
 	// to be typed again — see pushSubject.
 	PushSubject string
 
+	// SentryDSN is where errors are reported, and empty means nowhere — the log
+	// on the box is then the only copy, which is where this started.
+	//
+	// The key inside a DSN is not a secret: it identifies a project and is
+	// designed to be shipped in browser bundles. It is still configuration
+	// rather than a constant, because it names which project the inn's errors
+	// land in, and a laptop pointed at the live one is noise in the place
+	// somebody looks during an outage. Environment tells them apart.
+	SentryDSN string
+
 	// MediaDir is where photographs the owner uploads are stored (decision #16).
 	//
 	// Relative by default, which is right for a laptop and wrong for a server —
@@ -149,6 +159,8 @@ func Load() Config {
 		PushVAPIDPrivateKey: env("PUSH_VAPID_PRIVATE_KEY", ""),
 		PushSubject: pushSubject(
 			env("PUSH_SUBJECT", ""), env("OWNER_EMAIL", ""), siteURL),
+
+		SentryDSN: env("SENTRY_DSN", ""),
 
 		MediaDir: env("MEDIA_DIR", "media"),
 

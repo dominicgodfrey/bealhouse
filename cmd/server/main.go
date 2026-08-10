@@ -28,6 +28,7 @@ import (
 	"bealhouse/internal/payments"
 	"bealhouse/internal/push"
 	"bealhouse/internal/rates"
+	"bealhouse/internal/sentry"
 	"bealhouse/web"
 )
 
@@ -57,16 +58,23 @@ func main() {
 		return
 	}
 
-	if err := run(); err != nil {
+	// Configuration and logging are read here rather than inside run() so that
+	// the last error — the one that decides the process exits — is reported
+	// before the reporter is flushed. Run it the other way round and the single
+	// most useful line this binary can produce is the one that never leaves the
+	// box.
+	cfg := config.Load()
+	flushLogs := setupLogging(cfg)
+
+	if err := run(cfg); err != nil {
 		slog.Error("fatal", "err", err)
+		flushLogs()
 		os.Exit(1)
 	}
+	flushLogs()
 }
 
-func run() error {
-	cfg := config.Load()
-	setupLogging(cfg)
-
+func run(cfg config.Config) error {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
@@ -389,10 +397,47 @@ func connectDB(ctx context.Context, url string) (*pgxpool.Pool, error) {
 	return pool, nil
 }
 
-func setupLogging(cfg config.Config) {
+// setupLogging installs the default logger and returns a function that flushes
+// whatever it is still holding.
+//
+// Errors are reported to Sentry by wrapping the handler rather than by calling
+// something at each site that can fail: slog is what every package here already
+// logs through, so there is nothing to audit and nothing new to remember. The
+// wrapped handler still gets every record — the journal on the box stays the
+// full account, and Sentry is the view of the part somebody should look at.
+//
+// No DSN means no reporting and no complaint: that is the state this ran in
+// until now, and a laptop should not have to configure one. A DSN that is
+// *malformed* is a different thing and is said out loud, because it is typed by
+// hand into an environment file and a reporter that silently reports nothing
+// cannot be noticed by watching for reports.
+func setupLogging(cfg config.Config) func() {
 	level := slog.LevelInfo
 	if cfg.IsDev() {
 		level = slog.LevelDebug
 	}
-	slog.SetDefault(slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: level})))
+	base := slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: level})
+
+	if cfg.SentryDSN == "" {
+		slog.SetDefault(slog.New(base))
+		return func() {}
+	}
+
+	dsn, err := sentry.ParseDSN(cfg.SentryDSN)
+	if err != nil {
+		slog.SetDefault(slog.New(base))
+		slog.Error("SENTRY_DSN is not a DSN; errors will be logged here and reported nowhere",
+			"err", err)
+		return func() {}
+	}
+
+	host, _ := os.Hostname()
+	reporter := sentry.New(base, dsn, sentry.Options{
+		Environment: cfg.Env,
+		ServerName:  host,
+	})
+	slog.SetDefault(slog.New(reporter))
+	slog.Info("error reporting enabled", "environment", cfg.Env, "server", host)
+
+	return reporter.Close
 }
