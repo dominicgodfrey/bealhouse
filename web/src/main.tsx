@@ -12,7 +12,7 @@ import { Console } from './routes/admin/Console'
 import { EmailCopy } from './routes/admin/EmailCopy'
 import { Enroll } from './routes/admin/Enroll'
 import { EventsEditor, Inquiries } from './routes/admin/EventsEditor'
-import { GuestFile, Guests } from './routes/admin/Guests'
+import { GuestFile } from './routes/admin/Guests'
 import { MenuEditor } from './routes/admin/MenuEditor'
 import { NewBooking } from './routes/admin/NewBooking'
 import { PageCopyEditor } from './routes/admin/PageCopyEditor'
@@ -115,7 +115,13 @@ createRoot(root).render(
           {/* Keying in a card the guest is reading out over the telephone. */}
           <Route path="bookings/:code/collect" element={<Collect />} />
           <Route path="calendar" element={<CalendarScreen />} />
-          <Route path="guests" element={<Guests />} />
+          {/*
+            The guest list is the reservations search now — one box returning
+            people and stays together. The address stays alive rather than
+            404ing, because it is in the history of every phone that has used
+            the console.
+          */}
+          <Route path="guests" element={<Navigate to="/admin/bookings" replace />} />
           <Route path="guests/:id" element={<GuestFile />} />
           <Route path="rates" element={<Rates />} />
 

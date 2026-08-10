@@ -1,15 +1,36 @@
 import { useState } from 'react'
 import { Link, useSearchParams } from 'react-router'
 
-import { fetchStays, type Stay } from '../../lib/console'
+import { fetchGuests, fetchStays, type GuestCard, type Stay } from '../../lib/console'
 import { formatShort, today } from '../../lib/dates'
 import { useAsync } from '../../lib/useAsync'
 import { ErrorNote, Loading } from '../../components/Layout'
-import { Button, Card, Empty, Field, Input, MoneyLine, Screen, Select, StatusPill } from './ui'
+import {
+  Button,
+  Card,
+  Empty,
+  Field,
+  Input,
+  Money,
+  MoneyLine,
+  Screen,
+  Section,
+  Select,
+  StatusPill,
+} from './ui'
 
 /**
- * Upcoming reservations — an explicit requirement, and the screen the owner
- * lives in.
+ * Reservations and the people who made them, behind one search box.
+ *
+ * They were two screens, and the split was a lie about how an owner looks
+ * something up: "Sarah rang" is answered by a name, and whether that lands on a
+ * stay or on a person depends on what you happen to want next, not on which tab
+ * you opened first. One box, both answers.
+ *
+ * People appear only once something is typed. With nothing in the box the
+ * question is "what is coming up", which is a list of stays — the guest list
+ * unfiltered is everybody who has ever booked, and that is a directory rather
+ * than an answer.
  *
  * Every filter is in the URL rather than in component state, so the flagged link
  * on the Today screen can land here already narrowed, and so a filtered list is
@@ -45,6 +66,19 @@ export function Bookings() {
     [filter.from, filter.to, filter.status, filter.q, filter.flagged],
   )
 
+  // Only when there is something to match. Two requests rather than one
+  // combined endpoint, because both read models already exist and answer this
+  // exact question — a third query joining them would be a second definition of
+  // "matches", and the two would drift.
+  const guests = useAsync(
+    () => (filter.q ? fetchGuests({ q: filter.q }) : Promise.resolve([])),
+    [filter.q],
+  )
+
+  const searching = filter.q !== ''
+  const nothingAnywhere =
+    searching && stays.data?.length === 0 && guests.data?.length === 0
+
   return (
     <Screen
       title="Reservations"
@@ -66,12 +100,68 @@ export function Bookings() {
         </p>
       )}
 
+      {/*
+        People first when searching. Somebody looking up a name usually wants
+        the person — their history, and whatever the owners wrote down — and the
+        stays underneath are the same answer at a different altitude.
+      */}
+      {searching && (guests.data?.length ?? 0) > 0 && (
+        <Section title="People">
+          {guests.data?.map((guest) => <GuestRow key={guest.id} guest={guest} />)}
+        </Section>
+      )}
+      {guests.error && <ErrorNote error={guests.error} />}
+
       {stays.loading && <Loading what="reservations" />}
       {stays.error && <ErrorNote error={stays.error} />}
 
-      {stays.data?.length === 0 && <Empty>No bookings match that.</Empty>}
-      {stays.data?.map((stay) => <StayRow key={stay.code} stay={stay} />)}
+      {searching && (stays.data?.length ?? 0) > 0 ? (
+        <Section title="Reservations">
+          {stays.data?.map((stay) => <StayRow key={stay.code} stay={stay} />)}
+        </Section>
+      ) : (
+        !searching && stays.data?.map((stay) => <StayRow key={stay.code} stay={stay} />)
+      )}
+
+      {nothingAnywhere && <Empty>Nothing matches that — no bookings and nobody.</Empty>}
+      {!searching && stays.data?.length === 0 && <Empty>No bookings match that.</Empty>}
     </Screen>
+  )
+}
+
+/**
+ * One person, as the search returns them. The same card the guest list used to
+ * show, so the row an owner learned to read has not changed shape — only where
+ * it is found.
+ */
+function GuestRow({ guest }: { guest: GuestCard }) {
+  return (
+    <Card>
+      <div className="flex flex-wrap items-baseline justify-between gap-2">
+        <Link
+          to={`/admin/guests/${guest.id}`}
+          className="font-medium underline-offset-2 hover:underline"
+        >
+          {guest.name}
+        </Link>
+        <span className="text-sm text-neutral-600">
+          {guest.stays === 0
+            ? 'no stays yet'
+            : `${guest.stays} ${guest.stays === 1 ? 'stay' : 'stays'}`}
+        </span>
+      </div>
+
+      <p className="text-sm text-neutral-600">
+        {guest.email}
+        {guest.phone && ` · ${guest.phone}`}
+      </p>
+
+      <p className="text-sm text-neutral-600">
+        <Money cents={guest.lifetimeCents} /> collected
+        {guest.lastCheckout && ` · last here ${formatShort(guest.lastCheckout)}`}
+        {guest.notes > 0 && ` · ${guest.notes} ${guest.notes === 1 ? 'note' : 'notes'}`}
+      </p>
+    </Card>
   )
 }
 
@@ -86,7 +176,10 @@ function Search({
 
   return (
     <div className="flex flex-col gap-3 rounded-lg border border-neutral-200 bg-white p-4">
-      <Field label="Find a booking" hint="A code, a name, an email address, a phone number.">
+      <Field
+        label="Find a booking or a guest"
+        hint="A code, a name, an email address, a phone number. Returns both."
+      >
         <Input
           value={filter.q}
           onChange={(e) => set('q', e.target.value)}

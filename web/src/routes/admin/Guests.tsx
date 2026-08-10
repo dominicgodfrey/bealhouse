@@ -1,7 +1,7 @@
 import { useState } from 'react'
-import { Link, useParams, useSearchParams } from 'react-router'
+import { Link, useParams } from 'react-router'
 
-import { addNote, deleteNote, fetchGuest, fetchGuests, type GuestCard } from '../../lib/console'
+import { addNote, deleteNote, fetchGuest } from '../../lib/console'
 import { formatInstant } from '../../lib/admin'
 import { formatShort } from '../../lib/dates'
 import { useAsync } from '../../lib/useAsync'
@@ -11,8 +11,6 @@ import {
   Button,
   Card,
   Empty,
-  Field,
-  Input,
   Money,
   MoneyLine,
   Screen,
@@ -23,64 +21,12 @@ import {
   useReload,
 } from './ui'
 
-/**
- * The guest history, searchable the way an owner actually remembers people: by
- * a name, half an email, a phone number, or the code on the paperwork in front
- * of them.
+/*
+ * The guest list that used to live here is the reservations search now: one box
+ * returning people and stays together, because "Sarah rang" is a name and not a
+ * choice of tab. What stays here is one person's file, which the search links
+ * into and which has no equivalent on the reservations side.
  */
-export function Guests() {
-  const [params, setParams] = useSearchParams()
-  const q = params.get('q') ?? ''
-
-  const guests = useAsync(() => fetchGuests({ q: q || undefined }), [q])
-
-  return (
-    <Screen title="Guests" subtitle="Everyone who has ever booked.">
-      <Card>
-        <Field label="Search" hint="A name, an email, a phone number, or a booking code.">
-          <Input
-            value={q}
-            onChange={(e) => setParams(e.target.value ? { q: e.target.value } : {}, { replace: true })}
-            placeholder="Sarah, or sarah@…, or K3F9QX"
-          />
-        </Field>
-      </Card>
-
-      {guests.loading && <Loading what="guests" />}
-      {guests.error && <ErrorNote error={guests.error} />}
-      {guests.data?.length === 0 && <Empty>Nobody matches that.</Empty>}
-      {guests.data?.map((guest) => <Row key={guest.id} guest={guest} />)}
-    </Screen>
-  )
-}
-
-function Row({ guest }: { guest: GuestCard }) {
-  return (
-    <Card>
-      <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <Link to={`/admin/guests/${guest.id}`} className="font-medium underline-offset-2 hover:underline">
-          {guest.name}
-        </Link>
-        <span className="text-sm text-neutral-600">
-          {guest.stays === 0
-            ? 'no stays yet'
-            : `${guest.stays} ${guest.stays === 1 ? 'stay' : 'stays'}`}
-        </span>
-      </div>
-
-      <p className="text-sm text-neutral-600">
-        {guest.email}
-        {guest.phone && ` · ${guest.phone}`}
-      </p>
-
-      <p className="text-sm text-neutral-600">
-        <Money cents={guest.lifetimeCents} /> collected
-        {guest.lastCheckout && ` · last here ${formatShort(guest.lastCheckout)}`}
-        {guest.notes > 0 && ` · ${guest.notes} ${guest.notes === 1 ? 'note' : 'notes'}`}
-      </p>
-    </Card>
-  )
-}
 
 /**
  * One guest's file: who they are, every stay, and what the owners wrote down.

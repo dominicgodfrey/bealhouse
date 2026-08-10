@@ -122,12 +122,11 @@ function Shell({
             <Tab to="/admin/today">Today</Tab>
             <Tab to="/admin/bookings">Bookings</Tab>
             <Tab to="/admin/calendar">Calendar</Tab>
-            <Tab to="/admin/guests">Guests</Tab>
             <Tab to="/admin/rates">Rates</Tab>
             <Tab to="/admin/rooms">Rooms</Tab>
             <Tab to="/admin/menu">Menu</Tab>
             <Tab to="/admin/events">Events</Tab>
-            <Tab to="/admin/inquiries">Enquiries</Tab>
+            <Tab to="/admin/inquiries">Inquiries</Tab>
             <Tab to="/admin/pages">Pages</Tab>
             <Tab to="/admin/email">Email</Tab>
             <Tab to="/admin/settings">Settings</Tab>
