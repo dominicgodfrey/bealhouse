@@ -3,6 +3,7 @@
 package httpx
 
 import (
+	"errors"
 	"io/fs"
 	"log/slog"
 	"net/http"
@@ -10,6 +11,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"bealhouse/internal/admin"
@@ -303,8 +305,29 @@ func badRequest(w http.ResponseWriter, reason string) {
 }
 
 // serverError logs the cause and tells the client nothing about it.
+//
+// The one exception is a database that cannot be reached, which is not a bug in
+// the request and not something the caller can do anything about by retrying
+// differently. It is the same condition databaseRequired reports, arriving
+// later: configured, but not there. Answering 500 and "something went wrong"
+// sends whoever is holding the phone looking for a mistake they did not make —
+// the enrollment link, the token, the tunnel — when the answer is that Postgres
+// is down and only the person at the machine can fix it.
+//
+// This leaks nothing new. /api/health already publishes "db":"down" to anyone
+// who asks, deliberately, so that the binary stays diagnosable when the
+// database is not.
 func serverError(w http.ResponseWriter, r *http.Request, err error) {
 	logRequestError(r, err)
+
+	var connErr *pgconn.ConnectError
+	if errors.As(err, &connErr) {
+		writeJSON(w, http.StatusServiceUnavailable, map[string]string{
+			"error": "the database is unavailable; the server is running but cannot reach it",
+		})
+		return
+	}
+
 	writeJSON(w, http.StatusInternalServerError, map[string]string{
 		"error": "something went wrong",
 	})
