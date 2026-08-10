@@ -1,0 +1,18 @@
+[Unit]
+Description=Weekly Beal House restore drill
+
+[Timer]
+# Sunday 05:30 local — after Sunday's 04:00 backup and its randomised delay have
+# finished, so the set being proved is the one taken hours earlier and not one
+# being written underneath it.
+OnCalendar=Sun *-*-* 05:30:00
+
+# A box that was off on Sunday runs the drill when it comes back. A late drill
+# is worth all of what an on-time one is: the question it answers is whether the
+# backups restore, and that answer does not expire on Sunday night.
+Persistent=true
+
+RandomizedDelaySec=15m
+
+[Install]
+WantedBy=timers.target

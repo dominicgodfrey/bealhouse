@@ -1,0 +1,36 @@
+[Unit]
+Description=Beal House weekly restore drill (proves the newest backup)
+Documentation=file:///usr/local/share/bealhouse/restore.sh
+After=postgresql.service
+
+[Service]
+Type=oneshot
+User=bealhouse
+Group=bealhouse
+
+# The same file the server and the backup read, so the drill cannot end up
+# checking a backup of a different database than the one in use.
+EnvironmentFile=/etc/bealhouse/env
+
+# No set-dir: the newest one. See the drill case in restore.sh for why the
+# argument is optional and why "newest" is by name rather than by mtime.
+ExecStart=/usr/local/share/bealhouse/restore.sh drill
+
+# It creates a scratch database, restores into it, checks it and drops it.
+# CREATE DATABASE is why this needs a role that can, which the application role
+# already is — and is one reason the drill is its own unit rather than work the
+# public-facing process does.
+#
+# Minutes, not seconds: pg_restore plus a tar extraction of every photograph.
+# The default 90s start timeout would kill it partway and leave the scratch
+# database behind, which is the one failure this job can cause rather than find.
+TimeoutStartSec=30min
+
+# It reads $BACKUP_DIR and writes only to a mktemp directory, which PrivateTmp
+# gives it and systemd throws away when the unit exits. Nothing live is touched,
+# so ProtectSystem=strict needs no ReadWritePaths at all — the difference from
+# bealhouse-backup.service, which has to write the set it is creating.
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=yes

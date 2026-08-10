@@ -189,7 +189,8 @@ deciding when a job is due is a bug that only shows up under load.
 | `checkout.remind` | **Built.** The departure-morning note — checkout time and the inn's goodbye, in the guest's inbox before they wake up on the day they leave. Every **fifteen** minutes rather than the balance jobs' hour, because those only have to land inside the right day and this one is meant to land at the start of it. **Matches the checkout date exactly**, where the T-8 warning uses a threshold to catch up: a late warning still works, a "you are leaving today" that arrives after the guest got home does not, so a day the server spent entirely off is a note that does not go out. `checkout_email_sent_at` is set in the same transaction that queues the mail |
 | `email.send` | queued sends with exponential backoff retry. *Built: `internal/email` renders and the runner delivers. `Resend` implements `Sender` over plain `net/http` and takes over as soon as `RESEND_API_KEY` and `EMAIL_FROM` are set; until then `LogSender` writes each message to the log and says plainly that nothing was sent* |
 | `rates.rebuild` | **Built.** Monthly, and on season save once admin exists — regenerate the nightly calendar 24 months forward. Nothing breaks on the day it stops: the horizon just creeps closer until a guest planning next autumn finds no price and the room drops out of the search with no error anywhere |
-| `backup.verify` | weekly — assert last night's dump is non-empty and restorable |
+| `push.send` | **Built.** One queued notification fanned out to every browser the console is signed in on, so a booking reaches the owner's handset while the console is shut. Deliberately not one job per subscription: the thing being retried is the notification, and with two handsets re-sending to the one that already had it is the cheaper half of that trade. A push service answering 404 or 410 means the browser is gone, which is the one failure that must not be retried — the row is deleted instead |
+| ~~`backup.verify`~~ | **Not a job on this runner.** It is `bealhouse-verify.timer`, weekly, shelling out to `restore.sh drill`. Written here first and moved because the drill wants `CREATE DATABASE`, `pg_restore` and a scratch directory — which the hardened unit serving the public internet should not have — runs for minutes rather than inside a transaction, and proves a backup that is itself a systemd timer. See [deploy/README.md](deploy/README.md) |
 
 **Email is never sent inline in a request** — it is always queued, so a Resend outage delays
 confirmations rather than failing bookings.
@@ -622,8 +623,9 @@ Dependency-ordered, not deadline-driven (single launch).
    database and `MEDIA_DIR` as one set under one timestamp**, because `pg_dump` does not contain
    the photographs and a restore that brings back the paths and not the files is a site of broken
    images with nothing in any log to say so (decision #16) — `restore.sh drill` proves the pair
-   into a scratch database and throws it away, which is what the weekly `backup.verify` job should
-   call, and `verify` runs the same check against what is live. And **Caddy sets no security
+   into a scratch database and throws it away, and `verify` runs the same check against what is
+   live. **The drill runs itself**, from `bealhouse-verify.timer` every Sunday after the backup it
+   proves, on the newest set and with no argument to get wrong. And **Caddy sets no security
    headers**, because the binary sets them all and two sources for one header drift apart.
 
    *Writing the CI found a pre-existing flake in the suite itself*, which had been failing roughly

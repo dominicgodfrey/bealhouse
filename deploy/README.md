@@ -13,6 +13,7 @@ Files in this directory:
 | `backup.sh` | `/usr/local/share/bealhouse/` | nightly dump **and** photographs |
 | `restore.sh` | `/usr/local/share/bealhouse/` | verify, drill, restore |
 | `bealhouse-backup.{service,timer}` | `/etc/systemd/system/` | 04:00 nightly |
+| `bealhouse-verify.{service,timer}` | `/etc/systemd/system/` | Sunday 05:30, the restore drill |
 
 ---
 
@@ -100,11 +101,13 @@ committed here.
 ### The units
 
 ```bash
-cp deploy/bealhouse.service deploy/bealhouse-backup.service deploy/bealhouse-backup.timer \
+cp deploy/bealhouse.service \
+   deploy/bealhouse-backup.service deploy/bealhouse-backup.timer \
+   deploy/bealhouse-verify.service deploy/bealhouse-verify.timer \
    /etc/systemd/system/
 install -m 0755 deploy/backup.sh deploy/restore.sh /usr/local/share/bealhouse/
 systemctl daemon-reload
-systemctl enable --now bealhouse bealhouse-backup.timer
+systemctl enable --now bealhouse bealhouse-backup.timer bealhouse-verify.timer
 ```
 
 ### The seed, once
@@ -171,11 +174,29 @@ Off-box copies go wherever rclone can address — set `BACKUP_REMOTE` in
 `/etc/bealhouse/backup.env`. A provider snapshot is not a substitute and is not
 a tested restore.
 
+**The drill runs itself**, from `bealhouse-verify.timer` every Sunday at 05:30 —
+after Sunday's backup has finished, on the set it just wrote. It restores into a
+scratch database and a temporary directory, checks every photo row against a
+real file, and throws both away, so it touches nothing live.
+
+It is a **systemd timer and not a job on the application's runner**, which is
+where an earlier draft of ARCHITECTURE.md put it, for three reasons. The drill
+needs `CREATE DATABASE`, `pg_restore` and a writable scratch directory, and
+granting those to the process serving the public internet is strictly worse than
+a oneshot unit that has them for four minutes a week. It runs for minutes, where
+the jobs runner exists for work that belongs to a transaction. And the backup it
+proves is already a timer, so a drill on a different mechanism is the surprising
+arrangement rather than the consistent one.
+
 ```bash
-# The drill. Restores into a scratch database and a temporary directory, checks
-# every photo row against a real file, then throws both away. Touches nothing
-# live, so there is no reason not to run it weekly — this is what the
-# backup.verify job in ARCHITECTURE.md should shell out to.
+# Did last Sunday's drill pass?
+systemctl status bealhouse-verify.service --no-pager
+systemctl list-timers bealhouse-\* --no-pager
+
+# Run one now, against the newest set. This is exactly what the timer runs.
+/usr/local/share/bealhouse/restore.sh drill
+
+# Or against a particular set.
 /usr/local/share/bealhouse/restore.sh drill /var/backups/bealhouse/20260807T040000Z
 
 # The same integrity check against what is live right now.
@@ -186,6 +207,13 @@ a tested restore.
 /usr/local/share/bealhouse/restore.sh restore /var/backups/bealhouse/20260807T040000Z --yes
 ```
 
+**A failed drill is a failed unit and nothing else** — it is in the journal and
+in `systemctl list-units --failed`, and nobody is told. That is the honest state
+of it: the drill answers the question, and reading the answer is still a person's
+job until something watches the box from outside (see below). It is a far better
+place to be than a backup nobody has ever restored, and it is not the same as
+being alerted.
+
 ---
 
 ## Still to do at launch
@@ -194,7 +222,9 @@ a tested restore.
   through, so it is a handler, not an audit of call sites.
 - **Uptime monitoring** — something outside this box asking for
   `/api/health`. Note that it answers **200 with `"db":"down"`** rather than
-  failing, so the check has to read the field; `deploy.sh` does the same.
+  failing, so the check has to read the field; `deploy.sh` does the same. This
+  is also what would turn a failed restore drill from a line in the journal into
+  something somebody hears about.
 - **DNS cutover**, Search Console (`/sitemap.xml` is live and generated), and
   the Google Business Profile.
 - **Stripe live keys**, after the verification matrix in ARCHITECTURE.md.

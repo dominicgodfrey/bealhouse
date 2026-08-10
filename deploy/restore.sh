@@ -3,6 +3,7 @@
 # The other half of backup.sh, in three modes.
 #
 #     restore.sh verify                 # check the live pair, change nothing
+#     restore.sh drill                  # newest set, which is what the timer runs
 #     restore.sh drill  /var/backups/bealhouse/20260807T040000Z
 #     restore.sh restore /var/backups/bealhouse/20260807T040000Z --yes
 #
@@ -18,6 +19,7 @@
 set -euo pipefail
 
 MEDIA_DIR="${MEDIA_DIR:-/var/lib/bealhouse/media}"
+BACKUP_DIR="${BACKUP_DIR:-/var/backups/bealhouse}"
 MEDIA_URL_PREFIX="/media/" # media.URLPrefix; one constant, two languages
 
 say() { printf '\n\033[1m==> %s\033[0m\n' "$*"; }
@@ -65,10 +67,21 @@ drill)
 	# live: the dump goes into a scratch database and the archive into a scratch
 	# directory, the pair is checked, and both are thrown away.
 	#
-	# This is what the weekly `backup.verify` job should shell out to. A backup
-	# nobody has restored is a hypothesis, and the useful time to disprove it is
-	# not the morning the disk fails.
-	set_dir="${2:?usage: restore.sh drill <set-dir>}"
+	# bealhouse-verify.timer runs this weekly with no argument. A backup nobody
+	# has restored is a hypothesis, and the useful time to disprove it is not the
+	# morning the disk fails.
+	#
+	# No argument means the newest set. That is what a scheduled drill wants —
+	# last night's — and it keeps the unit file free of a glob it would have to
+	# get right in a shell systemd does not give it. Newest by name rather than
+	# by mtime, because the name is a UTC timestamp taken when the set was
+	# opened, and mtime is whenever the last byte landed in it.
+	set_dir="${2:-}"
+	if [ -z "$set_dir" ]; then
+		set_dir="$(find "$BACKUP_DIR" -mindepth 1 -maxdepth 1 -type d | sort | tail -1)"
+		[ -n "$set_dir" ] || die "no backup sets in $BACKUP_DIR"
+		say "Newest set is $set_dir"
+	fi
 	[ -f "$set_dir/db.dump" ] || die "no db.dump in $set_dir"
 	[ -f "$set_dir/media.tar.gz" ] || die "no media.tar.gz in $set_dir"
 
@@ -140,7 +153,8 @@ restore)
 	cat >&2 <<'EOF'
 usage:
   restore.sh verify                    check the live database against MEDIA_DIR
-  restore.sh drill   <set-dir>         restore into a scratch database and check it
+  restore.sh drill   [set-dir]         restore into a scratch database and check it
+                                       (no set-dir means the newest one)
   restore.sh restore <set-dir> --yes   replace the live database and MEDIA_DIR
 EOF
 	exit 2
