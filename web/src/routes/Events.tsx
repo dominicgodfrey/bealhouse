@@ -11,7 +11,7 @@ import { Photo } from '../components/Photo'
  * The events business: what is on, and the form that starts a conversation.
  *
  * Deliberately not a booking flow. Decision #11 puts event booking and deposits
- * out of scope, so this collects an enquiry and the owner answers it — which is
+ * out of scope, so this collects an inquiry and the owner answers it — which is
  * how a wedding gets arranged anyway, and pretending otherwise would mean
  * building a second payment path for a case that has never been priced.
  */

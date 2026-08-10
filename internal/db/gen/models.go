@@ -81,7 +81,7 @@ type EventInquiry struct {
 	Status    string
 	CreatedAt time.Time
 	UpdatedAt time.Time
-	// Which form wrote the row: the events enquiry form, or the general contact form on the home page.
+	// Which form wrote the row: the events inquiry form, or the general contact form on the home page.
 	Kind string
 }
 

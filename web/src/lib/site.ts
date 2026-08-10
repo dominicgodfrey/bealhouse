@@ -147,7 +147,7 @@ export type NewInquiry = {
   /**
    * Which form sent it. Both land in the same inbox and the owner answers them
    * the same way; the label is what tells a general question from a wedding
-   * enquiry. Omitted reads as 'event' on the server, which is what every row
+   * inquiry. Omitted reads as 'event' on the server, which is what every row
    * was before the contact form existed.
    */
   kind?: 'event' | 'contact'

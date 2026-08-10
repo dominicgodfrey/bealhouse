@@ -614,7 +614,7 @@ func (o *Ops) SaveEvents(ctx context.Context, events []Event) error {
 	})
 }
 
-// Inquiry is one message from the public site: an events enquiry, or a note
+// Inquiry is one message from the public site: an events inquiry, or a note
 // from the contact form on the home page.
 type Inquiry struct {
 	ID        int64  `json:"id"`
@@ -687,7 +687,7 @@ func (o *Ops) Inquiries(ctx context.Context, status, kind string, limit int) ([]
 }
 
 // NewInquiry is a submission from one of the two public forms — the events
-// enquiry, or the contact box on the home page. These are the only writes an
+// inquiry, or the contact box on the home page. These are the only writes an
 // anonymous visitor performs on this site apart from creating a booking.
 type NewInquiry struct {
 	Name      string `json:"name"`
@@ -698,7 +698,7 @@ type NewInquiry struct {
 	Message   string `json:"message"`
 
 	// Which form it came from. Anything but "contact" is read as an events
-	// enquiry, which is what every row was before the contact form existed —
+	// inquiry, which is what every row was before the contact form existed —
 	// so an old client that sends nothing still lands where it always did.
 	Kind string `json:"kind"`
 }

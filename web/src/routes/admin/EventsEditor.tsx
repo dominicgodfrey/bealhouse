@@ -62,7 +62,7 @@ export function EventsEditor() {
 
       <Aside>
         Only published events appear on the site, and only ones that have not already happened.
-        Booking an event is not something this system does — the page collects an enquiry and you
+        Booking an event is not something this system does — the page collects an inquiry and you
         answer it.
       </Aside>
 
@@ -204,7 +204,7 @@ export function Inquiries() {
         </div>
       }
     >
-      {inquiries.loading && <Loading what="enquiries" />}
+      {inquiries.loading && <Loading what="inquiries" />}
       {inquiries.error && <ErrorNote error={inquiries.error} />}
       {inquiries.data?.length === 0 && <Empty>Nothing here.</Empty>}
       {inquiries.data?.map((inquiry) => (

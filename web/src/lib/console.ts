@@ -546,7 +546,7 @@ export type Inquiry = {
   partySize?: number
   message: string
   status: InquiryStatus
-  /** Which form wrote it — the events enquiry, or the home page contact box. */
+  /** Which form wrote it — the events inquiry, or the home page contact box. */
   kind: InquiryKind
   at: string
 }

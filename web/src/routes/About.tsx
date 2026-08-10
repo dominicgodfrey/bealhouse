@@ -107,7 +107,7 @@ function FindUs() {
 
 /**
  * A way to write to the inn. Same inbox as the events form, marked `contact` so
- * the owner can tell a general question from a wedding enquiry — two inboxes is
+ * the owner can tell a general question from a wedding inquiry — two inboxes is
  * two places to forget to look.
  *
  * It inserts a row and stops: no email, no ticket, no auto-reply. The honest
