@@ -38,7 +38,7 @@ const (
 	paymentBurst = 10
 
 	// adminRate covers the console's anonymous surface: starting a sign-in or
-	// accepting an enrolment invitation.
+	// accepting an enrollment invitation.
 	//
 	// Not because a passkey can be guessed — it cannot, and this is not a
 	// password field with a dictionary pointed at it. It is because both of

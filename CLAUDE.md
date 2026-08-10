@@ -685,7 +685,7 @@ hold the state. One shared owner account, one credential per phone.
 
 **`bealhouse enroll` is the bootstrap and the only way in when no phone is
 enrolled.** It proves shell access to the server, which is the strongest thing
-available that is not a password. Every enrolment after the first can be minted
+available that is not a password. Every enrollment after the first can be minted
 from an already-signed-in console. A console with no passkeys and nobody able to
 reach the box stays shut — that is the correct failure, not a bug to work around.
 
@@ -734,7 +734,7 @@ passkeys with ids that could revoke nothing.
 then delete that exact string — because a literal on each side is what let the
 two encodings drift apart in the first place.
 
-**Enrolment refuses with its own sentence** (`deniedEnrollment`), not
+**Enrollment refuses with its own sentence** (`deniedEnrollment`), not
 `forbiddenAdmin`'s "not signed in", which is true of everybody on that page and
 says nothing about the link in their hand. It is still one message for expired,
 spent, forged and never-existed alike: the wording changes, not what it
@@ -742,7 +742,7 @@ distinguishes.
 
 ### The console's front end
 
-`web/src/routes/admin/` — the gate and frame in `Console.tsx`, the enrolment
+`web/src/routes/admin/` — the gate and frame in `Console.tsx`, the enrollment
 page, and the account screen. `web/src/lib/admin.ts` is its API and
 `web/src/lib/webauthn.ts` the browser half of a ceremony.
 
@@ -754,7 +754,7 @@ page, and the account screen. `web/src/lib/admin.ts` is its API and
   it is not offered a button that fails.
 - **Both halves of a ceremony run inside the click.** Browsers require a user
   gesture, so anything begun on mount is refused before a prompt is ever shown.
-- **The enrolment token comes out of the address bar as soon as it is read**,
+- **The enrollment token comes out of the address bar as soon as it is read**,
   and is captured in an effect rather than only at mount. A fragment arriving on
   a page already open is a *same-document* navigation: nothing re-mounts, so a
   mount-time read misses it and the clearing step then destroys an invitation

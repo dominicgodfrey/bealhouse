@@ -31,7 +31,7 @@
 //     list somebody can strike a line through. A signed stateless token cannot
 //     be revoked when a phone is lost. The token is stored as its SHA-256, so
 //     reading the table does not hand anyone a live session.
-//   - **Enrolment tokens are single use.** Enrolling a passkey creates a
+//   - **Enrollment tokens are single use.** Enrolling a passkey creates a
 //     permanent way in, so the thing authorising it must be spendable exactly
 //     once — which an HMAC link is not. Claiming is one UPDATE ... RETURNING,
 //     so two phones racing for the same token produce one row and one winner.
@@ -96,7 +96,7 @@ const (
 	// is far finer than a year needs.
 	touchInterval = time.Hour
 
-	// EnrollmentLifetime is how long an enrolment token is good for.
+	// EnrollmentLifetime is how long an enrollment token is good for.
 	//
 	// Short, because it is meant to be minted and used in the same few minutes
 	// with the phone in hand. It is also single use, so this is the second lock
@@ -108,7 +108,7 @@ const (
 	// challenge is not sitting there tomorrow.
 	ceremonyLifetime = 5 * time.Minute
 
-	// tokenBytes is the size of a session token and an enrolment token.
+	// tokenBytes is the size of a session token and an enrollment token.
 	//
 	// 32 bytes of crypto/rand is 256 bits of entropy, which is not guessable by
 	// anything, and is why the stored SHA-256 needs no salt and no work factor:
@@ -223,7 +223,7 @@ type Console struct {
 //     population that needs vetting.
 //
 // Authenticator attachment is deliberately left unset. Requiring "platform"
-// would restrict enrolment to the phone's built-in authenticator, which is what
+// would restrict enrollment to the phone's built-in authenticator, which is what
 // the owners will use anyway — leaving it open lets a hardware key be enrolled
 // as a spare at no cost to any of the above.
 func New(rp *RP, q *db.Queries, beginner Beginner) (*Console, error) {

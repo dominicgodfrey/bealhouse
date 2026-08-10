@@ -122,7 +122,7 @@ sudo -u postgres psql -d bealhouse -v ON_ERROR_STOP=1 -f internal/db/seed/rates.
 
 There is no password anywhere (decision #15), and `bealhouse enroll` proving
 shell access to this server is the only way in when no phone is enrolled. Every
-enrolment after the first can be minted from an already-signed-in console.
+enrollment after the first can be minted from an already-signed-in console.
 
 ```bash
 sudo -u bealhouse env $(cat /etc/bealhouse/env | xargs) /usr/local/bin/bealhouse enroll "Owner's iPhone"

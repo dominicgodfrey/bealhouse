@@ -39,7 +39,7 @@ Stack constraint: **TypeScript/React + Go**. No launch deadline — one complete
 | 12 | Menu | Structured admin editor (name, description/ingredients, price + course grouping) → JSON-LD `Menu` |
 | 13 | Tax | NH Meals & Rooms 8.5%, configurable; **each booking snapshots its rate** for audit |
 | 14 | Date picker | No flexible ±1 search. Calendar greys out unselectable dates live |
-| 15 | Admin auth | **Passkeys (WebAuthn), no password anywhere.** Single shared owner account, a real `users` table behind it, one credential per phone. *(revised; was a password plus TOTP)* The console is opened from the two owners' phones, so the authenticator is the handset itself: a private key it will only use after Face ID or a fingerprint. What that buys over the original plan is that **nothing stored server-side is a credential** — a leaked dump contains public keys — and that it **cannot be phished**, because the browser binds every signature to the origin. There is also no shared secret two people have to hand to each other and rotate. Sessions are **rows**, hashed, rolling **365 days** from last use, so a phone in regular use never signs in again and a lost one can be struck off. Enrolment is a **single-use** invitation, minted by `bealhouse enroll` on the server or from an already-signed-in console. **No step-up auth** on refunds: the owners' call, and the phones are locked |
+| 15 | Admin auth | **Passkeys (WebAuthn), no password anywhere.** Single shared owner account, a real `users` table behind it, one credential per phone. *(revised; was a password plus TOTP)* The console is opened from the two owners' phones, so the authenticator is the handset itself: a private key it will only use after Face ID or a fingerprint. What that buys over the original plan is that **nothing stored server-side is a credential** — a leaked dump contains public keys — and that it **cannot be phished**, because the browser binds every signature to the origin. There is also no shared secret two people have to hand to each other and rotate. Sessions are **rows**, hashed, rolling **365 days** from last use, so a phone in regular use never signs in again and a lost one can be struck off. Enrollment is a **single-use** invitation, minted by `bealhouse enroll` on the server or from an already-signed-in console. **No step-up auth** on refunds: the owners' call, and the phones are locked |
 | 16 | Media | Owner uploads in admin → VPS disk, Go generates AVIF/WebP variants, Cloudflare free CDN. **Built:** `internal/media` decodes an upload — which is also the only real check that it is an image — scales it to 2400px on the longest side, re-encodes it as JPEG, and stores it under the SHA-256 of its own bytes in `MEDIA_DIR`. Content addressing means the same photograph uploaded twice is one file and the URL can be served `immutable`; it also means **removing a photo does not delete the file**, since two rooms may point at the same bytes. `/media/*` is registered ahead of the SPA fallback, or a missing photograph would answer index.html with a 200 and render as a broken image with no error anywhere. **Built, less AVIF:** an upload now produces a ladder — 480/960/1600/2400, in JPEG and WebP — and the page picks with `srcset`. The widths are the larger half of that by far: the 960px JPEG measured 76 KB against 955 KB at 2400px, where WebP saves a further half at the same width, so a card four hundred CSS pixels wide was downloading twelve times what it could use. The rung is **in the filename**, which is what makes `media.Sources` a pure function and keeps a srcset from ever naming a file that was not written — a 404 inside one does not fall back, it is a broken image. The encoder is `gen2brain/webp`, libwebp under wazero, chosen because it builds with `CGO_ENABLED=0` on a machine with no C compiler; the pure-Go alternatives are lossless-only and larger than the JPEG they replace. **AVIF is feasible and deliberately deferred**: −61% at full size, but 5.3 MB of binary and ~1.7s per upload, which would move the work into a background job and require the API to report which variants exist yet. `MEDIA_DIR` is in neither the binary nor `pg_dump`, so it needs its own place on the VPS and its own line in the backup |
 | 17 | Email | Resend. SPF/DKIM/DMARC at Bluehost DNS (SPF must include Resend *and* the mailbox host) |
 | 18 | Launch | Placeholder site today → clean cutover. Google Business Profile + Search Console on day one |
@@ -337,7 +337,7 @@ into. Four things carry the security, and each exists because the alternative ha
   line through, and a signed stateless token cannot be revoked when a phone is lost. The cookie
   holds 32 random bytes; the table holds their SHA-256 — no salt and no work factor, because the
   value was not chosen by a person and there is no dictionary to run at it.
-- **Enrolment invitations are single use.** Enrolling a passkey creates a permanent way in, so the
+- **Enrollment invitations are single use.** Enrolling a passkey creates a permanent way in, so the
   thing authorising it must be spendable exactly once — which an HMAC link is not. The claim is one
   `UPDATE ... RETURNING`, so two phones racing produce one winner.
 - **Challenges are rows, deleted on use.** A challenge that can be answered twice is a signature
@@ -351,7 +351,7 @@ JSON content type and reject a `Sec-Fetch-Site` that says cross-site — an HTML
 cross-origin shape needing no preflight, can do neither.
 
 **Bootstrap is `bealhouse enroll` on the server**, which proves shell access, and is deliberately
-the only way in when no phone is enrolled. Every enrolment after the first can be minted from the
+the only way in when no phone is enrolled. Every enrollment after the first can be minted from the
 console. Removing the last passkey is refused; revoking one signs out its sessions **first**, before
 the row is deleted, because `ON DELETE SET NULL` would otherwise blank the link and leave the lost
 handset signed in for the rest of its year.
@@ -491,7 +491,7 @@ Dependency-ordered, not deadline-driven (single launch).
    passkey revocation.
 
    **The shell is built too.** `/admin` is the frame every later screen hangs off: the session
-   gate, the one-tap sign-in, the enrolment page a phone accepts an invitation on, and the one
+   gate, the one-tap sign-in, the enrollment page a phone accepts an invitation on, and the one
    screen whose backend already existed — the phones that can sign in, the phones currently
    signed in, and the buttons that mint an invitation, strike a handset off, or end every
    session at once. Nothing on it is a placeholder; every panel is wired to a real endpoint,

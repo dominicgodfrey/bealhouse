@@ -135,7 +135,7 @@ CREATE TABLE user_enrollments (
   label text NOT NULL,
 
   -- Which account the new phone joins. NULL means the shared owner account,
-  -- created on first use — so the very first enrolment needs nothing to exist
+  -- created on first use — so the very first enrollment needs nothing to exist
   -- beforehand.
   user_id bigint REFERENCES users (id) ON DELETE CASCADE,
 
@@ -166,7 +166,7 @@ CREATE TABLE webauthn_ceremonies (
   -- webauthn.SessionData: the challenge and what was asked of the authenticator.
   session jsonb NOT NULL,
 
-  -- For a registration, the enrolment being spent. Carried here rather than
+  -- For a registration, the enrollment being spent. Carried here rather than
   -- re-sent by the browser at the finish step, so the token cannot be swapped
   -- for a different one between the two halves.
   enrollment bytea REFERENCES user_enrollments (token_hash) ON DELETE CASCADE,
@@ -176,7 +176,7 @@ CREATE TABLE webauthn_ceremonies (
 
   CONSTRAINT ceremony_id_is_long_enough CHECK (octet_length(id) = 32),
 
-  -- A login ceremony has no enrolment and a registration always does. Stated as
+  -- A login ceremony has no enrollment and a registration always does. Stated as
   -- a constraint because the alternative — a registration that reached the
   -- finish step with nothing authorising it — is precisely the bug that would
   -- let anyone enrol a passkey.

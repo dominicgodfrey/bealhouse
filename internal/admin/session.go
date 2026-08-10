@@ -188,7 +188,7 @@ func (c *Console) Passkeys(ctx context.Context, userID int64) ([]Passkey, error)
 // ErrLastPasskey refuses to remove the only way in.
 //
 // Deleting it would leave a console nobody can open, recoverable only by
-// someone with shell access to the server minting a fresh enrolment. That is a
+// someone with shell access to the server minting a fresh enrollment. That is a
 // recovery path, not a thing to walk into by tapping "remove" on the wrong row.
 var ErrLastPasskey = errors.New("admin: that is the only passkey; enrol another phone before removing this one")
 

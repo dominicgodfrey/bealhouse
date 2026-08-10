@@ -23,7 +23,7 @@ import (
 // shell access to the server: you have to be able to run this binary, on that
 // box, against that database.
 //
-// Every enrolment after the first can be minted from an already-signed-in
+// Every enrollment after the first can be minted from an already-signed-in
 // console instead. This stays for the case that matters most and is easiest to
 // get wrong in a panic: both phones lost at once.
 //

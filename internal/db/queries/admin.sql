@@ -172,7 +172,7 @@ VALUES (
   now() + make_interval(secs => sqlc.arg(lifetime_seconds)::double precision)
 );
 
--- Claim an enrolment token, or find that there is nothing to claim.
+-- Claim an enrollment token, or find that there is nothing to claim.
 --
 -- **The check and the claim are one statement.** Reading the row and marking it
 -- used separately leaves a window in which two phones both pass the read and
@@ -189,7 +189,7 @@ WHERE token_hash = sqlc.arg(token_hash)
   AND expires_at > now()
 RETURNING token_hash, label, user_id, created_at, expires_at, used_at;
 
--- Look at an enrolment without spending it.
+-- Look at an enrollment without spending it.
 --
 -- The registration ceremony spans two requests and the token is claimed at the
 -- start, so the finish step needs to read what it is completing. Reachable only
@@ -200,7 +200,7 @@ SELECT token_hash, label, user_id, created_at, expires_at, used_at
 FROM user_enrollments
 WHERE token_hash = sqlc.arg(token_hash);
 
--- Hand an unspent enrolment back, so a ceremony that failed is not a token
+-- Hand an unspent enrollment back, so a ceremony that failed is not a token
 -- burned. Only ever called on the failure path of the same request that claimed
 -- it.
 -- name: ReleaseEnrollment :exec

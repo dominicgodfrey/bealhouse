@@ -45,7 +45,7 @@ func (c *Console) MintEnrollment(ctx context.Context, label string) (Enrollment,
 	}
 
 	// Attach to the shared account when there is one. NULL when there is not,
-	// which is the very first enrolment: the account is created at the end of
+	// which is the very first enrollment: the account is created at the end of
 	// the ceremony, so an invitation nobody accepts leaves nothing behind.
 	var userID *int64
 	if u, err := c.q.GetFirstUser(ctx); err == nil {
@@ -60,7 +60,7 @@ func (c *Console) MintEnrollment(ctx context.Context, label string) (Enrollment,
 		UserID:          userID,
 		LifetimeSeconds: EnrollmentLifetime.Seconds(),
 	}); err != nil {
-		return Enrollment{}, fmt.Errorf("admin: creating the enrolment: %w", err)
+		return Enrollment{}, fmt.Errorf("admin: creating the enrollment: %w", err)
 	}
 
 	return Enrollment{
@@ -109,12 +109,12 @@ func (c *Console) BeginEnrollment(ctx context.Context, token string) (*protocol.
 		return nil, nil, ErrDenied
 	}
 	if err != nil {
-		return nil, nil, fmt.Errorf("admin: claiming the enrolment: %w", err)
+		return nil, nil, fmt.Errorf("admin: claiming the enrollment: %w", err)
 	}
 
 	release := func() {
 		if err := c.q.ReleaseEnrollment(context.WithoutCancel(ctx), claimed.TokenHash); err != nil {
-			slog.Error("could not release a failed enrolment", "err", err)
+			slog.Error("could not release a failed enrollment", "err", err)
 		}
 	}
 
@@ -152,7 +152,7 @@ func (c *Console) BeginEnrollment(ctx context.Context, token string) (*protocol.
 //
 // An invitation carrying a user id joins that account and must see its existing
 // credentials, so the exclusion list is real. One carrying none is the first
-// enrolment: a brand new handle, held only in the challenge until the ceremony
+// enrollment: a brand new handle, held only in the challenge until the ceremony
 // succeeds.
 func (c *Console) enrollingAccount(ctx context.Context, e db.UserEnrollment) (*account, error) {
 	if e.UserID == nil {
@@ -178,7 +178,7 @@ func (c *Console) enrollingAccount(ctx context.Context, e db.UserEnrollment) (*a
 // be friction bought with nothing.
 //
 // Everything that follows is one transaction — the account if it is new, the
-// passkey, and the session. A partial enrolment is a credential the phone
+// passkey, and the session. A partial enrollment is a credential the phone
 // believes in that the server has no record of, which looks to the owner like a
 // passkey that silently does not work.
 func (c *Console) FinishEnrollment(ctx context.Context, ceremonyID []byte, r *http.Request) (Session, Identity, error) {
@@ -208,7 +208,7 @@ func (c *Console) FinishEnrollment(ctx context.Context, ceremonyID []byte, r *ht
 		// ceremony is gone either way, which is what stops this being a retry
 		// loop against one challenge.
 		if err := c.q.ReleaseEnrollment(context.WithoutCancel(ctx), enrollment.TokenHash); err != nil {
-			slog.Error("could not release a failed enrolment", "err", err)
+			slog.Error("could not release a failed enrollment", "err", err)
 		}
 		slog.Warn("admin passkey registration failed", "err", err)
 		return Session{}, Identity{}, ErrDenied
@@ -221,7 +221,7 @@ func (c *Console) FinishEnrollment(ctx context.Context, ceremonyID []byte, r *ht
 
 	tx, err := c.beginner.Begin(ctx)
 	if err != nil {
-		return Session{}, Identity{}, fmt.Errorf("admin: beginning the enrolment: %w", err)
+		return Session{}, Identity{}, fmt.Errorf("admin: beginning the enrollment: %w", err)
 	}
 	defer func() { _ = tx.Rollback(context.WithoutCancel(ctx)) }()
 
@@ -251,7 +251,7 @@ func (c *Console) FinishEnrollment(ctx context.Context, ceremonyID []byte, r *ht
 	}
 
 	if err := tx.Commit(ctx); err != nil {
-		return Session{}, Identity{}, fmt.Errorf("admin: committing the enrolment: %w", err)
+		return Session{}, Identity{}, fmt.Errorf("admin: committing the enrollment: %w", err)
 	}
 
 	slog.Info("a phone was enrolled in the admin console", "label", enrollment.Label)
@@ -272,7 +272,7 @@ func (c *Console) enrollingAccountFrom(ctx context.Context, e db.UserEnrollment,
 		return loadAccount(ctx, c.q, u)
 	}
 
-	// First enrolment. The account may have been created by a ceremony that
+	// First enrollment. The account may have been created by a ceremony that
 	// finished in between, in which case join it rather than making a second.
 	if u, err := c.q.GetUserByHandle(ctx, handle); err == nil {
 		return loadAccount(ctx, c.q, u)

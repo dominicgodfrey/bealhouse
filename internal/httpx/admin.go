@@ -93,7 +93,7 @@ func forbiddenAdmin(w http.ResponseWriter) {
 
 // deniedEnrollment is the same refusal, worded for the page it lands on.
 //
-// Enrolment is the one anonymous surface where "not signed in" is true of
+// Enrollment is the one anonymous surface where "not signed in" is true of
 // everybody and tells the owner nothing about the link in their hand. This
 // still says exactly one thing to expired, already spent, forged and
 // never-existed alike — the wording changes, not what it distinguishes.
@@ -315,7 +315,7 @@ func adminEnrollBegin(d adminDeps) http.HandlerFunc {
 			Token string `json:"token"`
 		}
 		if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 4<<10)).Decode(&body); err != nil {
-			badRequest(w, "expected a JSON body with an enrolment token")
+			badRequest(w, "expected a JSON body with an enrollment token")
 			return
 		}
 
@@ -420,7 +420,7 @@ func adminInvite(d adminDeps) http.HandlerFunc {
 			return
 		}
 
-		slog.Info("an admin enrolment invitation was created", "label", enrollment.Label)
+		slog.Info("an admin enrollment invitation was created", "label", enrollment.Label)
 
 		writeJSON(w, http.StatusCreated, map[string]any{
 			"url":       admin.EnrollURL(d.siteURL, enrollment.Token),

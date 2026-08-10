@@ -304,7 +304,7 @@ func TestAnInvitationCannotBeMintedWithoutASession(t *testing.T) {
 		t.Fatalf("answered %d, want 401", rec.Code)
 	}
 	if strings.Contains(rec.Body.String(), "/admin/enroll") {
-		t.Fatal("an enrolment link was handed out to an anonymous caller")
+		t.Fatal("an enrollment link was handed out to an anonymous caller")
 	}
 }
 
