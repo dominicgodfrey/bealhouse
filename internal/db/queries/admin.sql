@@ -237,3 +237,41 @@ RETURNING id, purpose, session, enrollment, created_at, expires_at;
 WITH c AS (DELETE FROM webauthn_ceremonies WHERE expires_at < now()),
      e AS (DELETE FROM user_enrollments WHERE expires_at < now() AND used_at IS NULL)
 DELETE FROM user_sessions WHERE expires_at < now() - interval '30 days';
+
+-- ---------------------------------------------------------------------------
+-- Push subscriptions
+-- ---------------------------------------------------------------------------
+
+-- Save where a browser wants its notifications.
+--
+-- An upsert on the endpoint, because that is the browser's own identity for
+-- this subscription and it hands back the same string when it re-subscribes.
+-- The keys are updated too: a browser may rotate them without the endpoint
+-- changing, and a stale p256dh encrypts a message nothing can open.
+-- name: UpsertPushSubscription :exec
+INSERT INTO push_subscriptions (endpoint, user_id, p256dh, auth, label)
+VALUES (sqlc.arg(endpoint), sqlc.arg(user_id), sqlc.arg(p256dh), sqlc.arg(auth), sqlc.arg(label))
+ON CONFLICT (endpoint) DO UPDATE SET
+  user_id = EXCLUDED.user_id,
+  p256dh  = EXCLUDED.p256dh,
+  auth    = EXCLUDED.auth,
+  label   = EXCLUDED.label;
+
+-- Everyone who should hear about a booking.
+--
+-- Every subscription, not the ones belonging to some particular phone: the
+-- console is one shared owner account and a notification about a booking is
+-- for whoever is holding a handset.
+-- name: ListPushSubscriptions :many
+SELECT endpoint, user_id, p256dh, auth, label, created_at, last_sent_at
+FROM push_subscriptions
+ORDER BY created_at;
+
+-- name: CountPushSubscriptions :one
+SELECT count(*) FROM push_subscriptions;
+
+-- name: DeletePushSubscription :execrows
+DELETE FROM push_subscriptions WHERE endpoint = sqlc.arg(endpoint);
+
+-- name: TouchPushSubscription :exec
+UPDATE push_subscriptions SET last_sent_at = now() WHERE endpoint = sqlc.arg(endpoint);

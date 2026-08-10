@@ -13,6 +13,7 @@ import (
 	"bealhouse/internal/civil"
 	db "bealhouse/internal/db/gen"
 	"bealhouse/internal/email"
+	"bealhouse/internal/push"
 )
 
 // manageLinkGraceDays is how long after checkout the manage link keeps working.
@@ -133,6 +134,28 @@ func confirmationMail(ctx context.Context, q *db.Queries, b db.GetBookingForPaym
 		To:       b.GuestEmail,
 		Template: email.BookingConfirmation,
 		Data:     confirmation,
+	}); err != nil {
+		return err
+	}
+
+	// The same news, to whichever handsets are subscribed.
+	//
+	// Queued in this transaction like the mail beside it, so the notification
+	// and the booking commit together: a crash between them cannot leave a
+	// confirmed stay nobody was told about, or a notification about a booking
+	// that rolled back.
+	//
+	// Deliberately above the OwnerEmail check rather than below it. The two are
+	// separate ways of hearing the same thing — an inn with notifications on
+	// and no owner address configured should still get the tap — and tying push
+	// to an email setting is how it would silently never fire.
+	if err := push.Queue(ctx, q, push.Notification{
+		Title: "New booking",
+		Body: fmt.Sprintf("%s · %s → %s · %s",
+			b.GuestName, email.Day(b.Checkin.Time), email.Day(b.Checkout.Time),
+			email.Money(b.TotalCents)),
+		URL: "/admin/bookings/" + b.Code,
+		Tag: b.Code,
 	}); err != nil {
 		return err
 	}

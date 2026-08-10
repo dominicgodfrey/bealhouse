@@ -73,6 +73,31 @@ type Config struct {
 	// stays overridable for the day the logo lives on a CDN.
 	EmailLogoURL string
 
+	// Web push, so a booking or an inquiry reaches the owner's phone and not
+	// only their inbox.
+	//
+	// Both halves are required together and neither is useful alone: the public
+	// key is what the browser subscribes with and the private key is what signs
+	// the delivery, and a browser subscribed against one server's public key
+	// cannot be reached by another's. Absent rather than invalid when nobody
+	// has generated a pair — `bealhouse vapid` prints one — and then
+	// notifications are logged instead of sent, exactly as email is without
+	// Resend.
+	//
+	// Keeping these out of the database is deliberate. Rotating them
+	// invalidates every existing subscription, so they are deployment
+	// configuration rather than a setting somebody can change from a phone and
+	// wonder why the notifications stopped.
+	PushVAPIDPublicKey  string
+	PushVAPIDPrivateKey string
+
+	// PushSubject identifies whoever is responsible for these notifications to
+	// the push services, as a mailto: or https: URL. Required by the spec, and
+	// in practice how an operator hears they are sending badly before they are
+	// blocked for it. Defaulted from OWNER_EMAIL or SITE_URL rather than left
+	// to be typed again — see pushSubject.
+	PushSubject string
+
 	// MediaDir is where photographs the owner uploads are stored (decision #16).
 	//
 	// Relative by default, which is right for a laptop and wrong for a server —
@@ -120,6 +145,11 @@ func Load() Config {
 		OwnerEmail:   env("OWNER_EMAIL", ""),
 		EmailLogoURL: emailLogoURL(env("EMAIL_LOGO_URL", ""), siteURL),
 
+		PushVAPIDPublicKey:  env("PUSH_VAPID_PUBLIC_KEY", ""),
+		PushVAPIDPrivateKey: env("PUSH_VAPID_PRIVATE_KEY", ""),
+		PushSubject: pushSubject(
+			env("PUSH_SUBJECT", ""), env("OWNER_EMAIL", ""), siteURL),
+
 		MediaDir: env("MEDIA_DIR", "media"),
 
 		BehindProxy: env("BEHIND_PROXY", "") == "true",
@@ -147,6 +177,36 @@ func (c Config) StripeConfigured() bool {
 // confirmation.
 func (c Config) EmailConfigured() bool {
 	return c.ResendAPIKey != "" && c.EmailFrom != ""
+}
+
+// PushConfigured reports whether a notification can actually reach a handset.
+//
+// All or nothing, like Stripe and Resend: a browser subscribes against the
+// public key and only the matching private key can sign a delivery it will
+// accept, so half a pair is a mistake to report at boot rather than one to
+// discover from an owner who missed a booking.
+func (c Config) PushConfigured() bool {
+	return c.PushVAPIDPublicKey != "" && c.PushVAPIDPrivateKey != ""
+}
+
+// pushSubject resolves who the push services should complain to.
+//
+// An explicit PUSH_SUBJECT wins. Otherwise the inn's own notification address,
+// which is already configured and already a person who reads mail about this
+// system; failing that the site itself, which the spec allows and which at
+// least resolves to somebody. Empty only on a deployment with none of the
+// three, and then push is not configured anyway.
+func pushSubject(configured, ownerEmail, siteURL string) string {
+	switch {
+	case configured != "":
+		return configured
+	case ownerEmail != "":
+		return "mailto:" + ownerEmail
+	case siteURL != "":
+		return siteURL
+	default:
+		return ""
+	}
 }
 
 // EmailLogoPath is where the letterhead image sits in the SPA bundle this

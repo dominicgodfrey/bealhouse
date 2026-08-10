@@ -12,6 +12,7 @@ import (
 	db "bealhouse/internal/db/gen"
 	"bealhouse/internal/email"
 	"bealhouse/internal/media"
+	"bealhouse/internal/push"
 )
 
 // ---------------------------------------------------------------------------
@@ -738,18 +739,42 @@ func (o *Ops) SubmitInquiry(ctx context.Context, in NewInquiry) error {
 		kind = KindContact
 	}
 
-	if _, err := o.q.CreateEventInquiry(ctx, db.CreateEventInquiryParams{
-		Name:      name,
-		Email:     address,
-		Phone:     strings.TrimSpace(in.Phone),
-		EventDate: when,
-		PartySize: party,
-		Message:   strings.TrimSpace(in.Message),
-		Kind:      kind,
-	}); err != nil {
-		return fmt.Errorf("console: recording an inquiry: %w", err)
-	}
-	return nil
+	// One transaction for the row and the notification about it, for the reason
+	// every queued message in this system is written that way: the queue is a
+	// table, so the two commit together and a crash between them cannot leave a
+	// message in the inbox nobody was told about — or a notification pointing at
+	// an inquiry that was never written.
+	return o.tx(ctx, func(q *db.Queries) error {
+		row, err := q.CreateEventInquiry(ctx, db.CreateEventInquiryParams{
+			Name:      name,
+			Email:     address,
+			Phone:     strings.TrimSpace(in.Phone),
+			EventDate: when,
+			PartySize: party,
+			Message:   strings.TrimSpace(in.Message),
+			Kind:      kind,
+		})
+		if err != nil {
+			return fmt.Errorf("console: recording an inquiry: %w", err)
+		}
+
+		what := "event inquiry"
+		if kind == KindContact {
+			what = "message"
+		}
+
+		// No email here, and that is not an oversight: an inquiry has always
+		// landed in a list the owner reads, and adding a notification is the
+		// change asked for. The message names who wrote and nothing they said —
+		// a push payload travels through a service the inn does not run, and
+		// the console is one tap away with the whole of it.
+		return push.Queue(ctx, q, push.Notification{
+			Title: "New " + what,
+			Body:  name + " has been in touch",
+			URL:   "/admin/inquiries",
+			Tag:   fmt.Sprintf("inquiry-%d", row.ID),
+		})
+	})
 }
 
 func (o *Ops) SetInquiryStatus(ctx context.Context, id int64, status string) error {
@@ -1124,3 +1149,87 @@ func parseID(s string) (int64, error) {
 // "today" the same way every date boundary in this system does rather than
 // reaching for time.Now.
 func Today() time.Time { return civil.Today() }
+
+// ---------------------------------------------------------------------------
+// Push subscriptions
+// ---------------------------------------------------------------------------
+
+// PushSubscription is one browser's delivery address, as the console sends it.
+//
+// The shape the browser's own PushSubscription.toJSON() produces, so the client
+// hands it over untouched rather than picking it apart into a payload of this
+// system's invention — one less encoding to keep in step with a platform API.
+type PushSubscription struct {
+	Endpoint string `json:"endpoint"`
+	Keys     struct {
+		P256dh string `json:"p256dh"`
+		Auth   string `json:"auth"`
+	} `json:"keys"`
+
+	// Label is what the owner calls this handset on the account screen. Not
+	// the browser's to know, so the console supplies it.
+	Label string `json:"label"`
+}
+
+// SavePushSubscription records where a browser wants its notifications.
+//
+// The user id comes from the session and never from the request, which is the
+// rule the whole console runs on: nothing behind the gate reads who the caller
+// is from anything the caller sent.
+//
+// An upsert on the endpoint, because a browser that re-subscribes hands back
+// the same one. That makes turning notifications on twice harmless rather than
+// a second row that delivers a duplicate.
+func (o *Ops) SavePushSubscription(ctx context.Context, userID int64, sub PushSubscription) error {
+	if !strings.HasPrefix(sub.Endpoint, "https://") {
+		return badf("that is not a push endpoint")
+	}
+	if strings.TrimSpace(sub.Keys.P256dh) == "" || strings.TrimSpace(sub.Keys.Auth) == "" {
+		return badf("the subscription is missing its keys")
+	}
+
+	label := strings.TrimSpace(sub.Label)
+	if label == "" {
+		label = "This phone"
+	}
+
+	if err := o.q.UpsertPushSubscription(ctx, db.UpsertPushSubscriptionParams{
+		Endpoint: sub.Endpoint,
+		UserID:   userID,
+		P256dh:   sub.Keys.P256dh,
+		Auth:     sub.Keys.Auth,
+		Label:    label,
+	}); err != nil {
+		return fmt.Errorf("console: saving a push subscription: %w", err)
+	}
+	return nil
+}
+
+// ForgetPushSubscription stops notifications reaching one browser.
+//
+// Keyed on the endpoint the browser holds rather than on a row id handed out
+// earlier, so a handset can switch itself off with what it already has and
+// without first asking which row it is. There is nothing to leak: knowing an
+// endpoint is knowing the address you are already subscribed at.
+func (o *Ops) ForgetPushSubscription(ctx context.Context, endpoint string) error {
+	if strings.TrimSpace(endpoint) == "" {
+		return badf("no subscription was named")
+	}
+	if _, err := o.q.DeletePushSubscription(ctx, endpoint); err != nil {
+		return fmt.Errorf("console: forgetting a push subscription: %w", err)
+	}
+	return nil
+}
+
+// PushSubscriberCount is how many browsers would hear about the next booking.
+//
+// On the account screen beside the phones, because "notifications are on" is a
+// claim an owner should be able to check rather than trust — and because a
+// handset that was cleared or reinstalled goes quiet without saying so.
+func (o *Ops) PushSubscriberCount(ctx context.Context) (int64, error) {
+	n, err := o.q.CountPushSubscriptions(ctx)
+	if err != nil {
+		return 0, fmt.Errorf("console: counting push subscriptions: %w", err)
+	}
+	return n, nil
+}

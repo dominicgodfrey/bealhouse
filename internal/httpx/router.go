@@ -83,6 +83,13 @@ type Deps struct {
 	// rather than once.
 	Ops *console.Ops
 
+	// PushPublicKey is the VAPID key a browser subscribes for notifications
+	// against. Public by design, like the Stripe publishable key: it identifies
+	// this server to a push service and can do nothing on its own. Empty when no
+	// keys are configured, which is what tells the console to say notifications
+	// are off rather than offer a switch that subscribes against nothing.
+	PushPublicKey string
+
 	// Media stores and serves the photographs the owner uploads (decision #16).
 	// Nil when no directory could be prepared, which leaves both the upload
 	// route and /media/* answering 503 with a sentence rather than 404 — a
@@ -211,6 +218,7 @@ func NewRouter(d Deps) http.Handler {
 			siteURL:     d.SiteURL,
 			ops:         d.Ops,
 			media:       d.Media,
+			pushKey:     d.PushPublicKey,
 		}, rateLimit(newLimiter(adminRate, adminBurst), d.BehindProxy))
 
 		api.NotFound(func(w http.ResponseWriter, r *http.Request) {

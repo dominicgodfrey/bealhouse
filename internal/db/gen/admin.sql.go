@@ -79,6 +79,17 @@ func (q *Queries) CountPasskeys(ctx context.Context, userID int64) (int64, error
 	return count, err
 }
 
+const countPushSubscriptions = `-- name: CountPushSubscriptions :one
+SELECT count(*) FROM push_subscriptions
+`
+
+func (q *Queries) CountPushSubscriptions(ctx context.Context) (int64, error) {
+	row := q.db.QueryRow(ctx, countPushSubscriptions)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
 const countUsers = `-- name: CountUsers :one
 SELECT count(*) FROM users
 `
@@ -238,6 +249,18 @@ type DeletePasskeyParams struct {
 // signed in and is not any more.
 func (q *Queries) DeletePasskey(ctx context.Context, arg DeletePasskeyParams) (int64, error) {
 	result, err := q.db.Exec(ctx, deletePasskey, arg.ID, arg.UserID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const deletePushSubscription = `-- name: DeletePushSubscription :execrows
+DELETE FROM push_subscriptions WHERE endpoint = $1
+`
+
+func (q *Queries) DeletePushSubscription(ctx context.Context, endpoint string) (int64, error) {
+	result, err := q.db.Exec(ctx, deletePushSubscription, endpoint)
 	if err != nil {
 		return 0, err
 	}
@@ -499,6 +522,45 @@ func (q *Queries) ListPasskeys(ctx context.Context, userID int64) ([]UserPasskey
 	return items, nil
 }
 
+const listPushSubscriptions = `-- name: ListPushSubscriptions :many
+SELECT endpoint, user_id, p256dh, auth, label, created_at, last_sent_at
+FROM push_subscriptions
+ORDER BY created_at
+`
+
+// Everyone who should hear about a booking.
+//
+// Every subscription, not the ones belonging to some particular phone: the
+// console is one shared owner account and a notification about a booking is
+// for whoever is holding a handset.
+func (q *Queries) ListPushSubscriptions(ctx context.Context) ([]PushSubscription, error) {
+	rows, err := q.db.Query(ctx, listPushSubscriptions)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []PushSubscription{}
+	for rows.Next() {
+		var i PushSubscription
+		if err := rows.Scan(
+			&i.Endpoint,
+			&i.UserID,
+			&i.P256dh,
+			&i.Auth,
+			&i.Label,
+			&i.CreatedAt,
+			&i.LastSentAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const releaseEnrollment = `-- name: ReleaseEnrollment :exec
 UPDATE user_enrollments SET used_at = NULL WHERE token_hash = $1
 `
@@ -588,6 +650,15 @@ func (q *Queries) SweepExpiredAuth(ctx context.Context) error {
 	return err
 }
 
+const touchPushSubscription = `-- name: TouchPushSubscription :exec
+UPDATE push_subscriptions SET last_sent_at = now() WHERE endpoint = $1
+`
+
+func (q *Queries) TouchPushSubscription(ctx context.Context, endpoint string) error {
+	_, err := q.db.Exec(ctx, touchPushSubscription, endpoint)
+	return err
+}
+
 const touchSession = `-- name: TouchSession :exec
 UPDATE user_sessions
 SET last_seen_at = now(),
@@ -633,5 +704,44 @@ type UpdatePasskeyAfterUseParams struct {
 // one was saved.
 func (q *Queries) UpdatePasskeyAfterUse(ctx context.Context, arg UpdatePasskeyAfterUseParams) error {
 	_, err := q.db.Exec(ctx, updatePasskeyAfterUse, arg.Credential, arg.ID)
+	return err
+}
+
+const upsertPushSubscription = `-- name: UpsertPushSubscription :exec
+
+INSERT INTO push_subscriptions (endpoint, user_id, p256dh, auth, label)
+VALUES ($1, $2, $3, $4, $5)
+ON CONFLICT (endpoint) DO UPDATE SET
+  user_id = EXCLUDED.user_id,
+  p256dh  = EXCLUDED.p256dh,
+  auth    = EXCLUDED.auth,
+  label   = EXCLUDED.label
+`
+
+type UpsertPushSubscriptionParams struct {
+	Endpoint string
+	UserID   int64
+	P256dh   string
+	Auth     string
+	Label    string
+}
+
+// ---------------------------------------------------------------------------
+// Push subscriptions
+// ---------------------------------------------------------------------------
+// Save where a browser wants its notifications.
+//
+// An upsert on the endpoint, because that is the browser's own identity for
+// this subscription and it hands back the same string when it re-subscribes.
+// The keys are updated too: a browser may rotate them without the endpoint
+// changing, and a stale p256dh encrypts a message nothing can open.
+func (q *Queries) UpsertPushSubscription(ctx context.Context, arg UpsertPushSubscriptionParams) error {
+	_, err := q.db.Exec(ctx, upsertPushSubscription,
+		arg.Endpoint,
+		arg.UserID,
+		arg.P256dh,
+		arg.Auth,
+		arg.Label,
+	)
 	return err
 }

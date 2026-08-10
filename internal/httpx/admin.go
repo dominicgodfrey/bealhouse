@@ -53,6 +53,12 @@ type adminDeps struct {
 	// media stores uploaded photographs. Nil when no directory could be
 	// prepared, which leaves the upload route answering 503 with a sentence.
 	media *media.Store
+
+	// pushKey is the VAPID public key a browser subscribes against. Public by
+	// design — it can do nothing on its own — and empty on a deployment with no
+	// keys, which is how the console knows to say notifications are off rather
+	// than offering a button that subscribes against nothing.
+	pushKey string
 }
 
 // setCookie writes one of the console's cookies with the whole policy in one
@@ -266,6 +272,14 @@ func mountAdmin(api chi.Router, d adminDeps, limit func(http.Handler) http.Handl
 			in.Post("/passkeys/invite", adminInvite(d))
 			in.Delete("/passkeys/{id}", adminRevokePasskey(d))
 			in.Post("/sessions/revoke-all", adminRevokeAllSessions(d))
+
+			// Notifications for this browser. Subscribing is a POST because it
+			// writes, and unsubscribing is one too rather than a DELETE with a
+			// body — the endpoint is several hundred characters and belongs
+			// nowhere near a URL.
+			in.Get("/push", adminPushSettings(d))
+			in.Post("/push/subscribe", adminPushSubscribe(d))
+			in.Post("/push/unsubscribe", adminPushUnsubscribe(d))
 
 			// Everything the console actually does, mounted inside this group
 			// so being behind the session is a property of where it sits rather
@@ -492,4 +506,82 @@ func ceremonyFrom(r *http.Request) []byte {
 		return nil
 	}
 	return id
+}
+
+// adminPushSettings tells the console whether notifications are possible here,
+// and what to subscribe against.
+//
+// The public key is safe to serve — it identifies this server to a push service
+// and can do nothing on its own — and an empty one is the honest answer on a
+// deployment with no keys, which is what stops the console offering a switch
+// that would subscribe a phone against nothing.
+func adminPushSettings(d adminDeps) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		out := map[string]any{
+			"publicKey":   d.pushKey,
+			"configured":  d.pushKey != "",
+			"subscribers": 0,
+		}
+
+		if d.ops != nil {
+			n, err := d.ops.PushSubscriberCount(r.Context())
+			if err != nil {
+				serverError(w, r, err)
+				return
+			}
+			out["subscribers"] = n
+		}
+		writeJSON(w, http.StatusOK, out)
+	}
+}
+
+// adminPushSubscribe records where this browser wants its notifications.
+func adminPushSubscribe(d adminDeps) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if d.ops == nil {
+			databaseRequired(w, r)
+			return
+		}
+
+		var sub console.PushSubscription
+		if err := decodeBody(w, r, &sub); err != nil {
+			consoleError(w, r, err)
+			return
+		}
+
+		// From the session, never from the body. The rule the whole console
+		// runs on: nothing behind the gate learns who the caller is from
+		// anything the caller sent.
+		id := currentAdmin(r)
+
+		if err := d.ops.SavePushSubscription(r.Context(), id.UserID, sub); err != nil {
+			consoleError(w, r, err)
+			return
+		}
+		w.WriteHeader(http.StatusNoContent)
+	}
+}
+
+// adminPushUnsubscribe stops notifications reaching this browser.
+func adminPushUnsubscribe(d adminDeps) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if d.ops == nil {
+			databaseRequired(w, r)
+			return
+		}
+
+		var body struct {
+			Endpoint string `json:"endpoint"`
+		}
+		if err := decodeBody(w, r, &body); err != nil {
+			consoleError(w, r, err)
+			return
+		}
+
+		if err := d.ops.ForgetPushSubscription(r.Context(), body.Endpoint); err != nil {
+			consoleError(w, r, err)
+			return
+		}
+		w.WriteHeader(http.StatusNoContent)
+	}
 }

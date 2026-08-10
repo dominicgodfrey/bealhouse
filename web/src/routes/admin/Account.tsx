@@ -14,6 +14,13 @@ import {
 } from '../../lib/admin'
 import { useAsync } from '../../lib/useAsync'
 import { ErrorNote, Loading } from '../../components/Layout'
+import {
+  disablePush,
+  enablePush,
+  fetchPushSettings,
+  pushEnabledHere,
+  pushSupported,
+} from '../../lib/push'
 import { useConsole } from './Console'
 
 /**
@@ -54,6 +61,8 @@ export function Account() {
       </Section>
 
       <InvitePanel onSignedOut={refresh} />
+
+      <NotificationsPanel />
 
       <Section title="Signed in now">
         {devices.loading && <Loading what="your sessions" />}
@@ -395,5 +404,112 @@ function SignOutEverywhere({ onSignedOut }: { onSignedOut: () => void }) {
         </button>
       </div>
     </div>
+  )
+}
+
+/**
+ * Notifications on this handset.
+ *
+ * On the phones screen rather than in settings because that is what it is about:
+ * a subscription belongs to the browser in your hand, not to the inn, and the
+ * question "is this phone going to buzz" is asked in the same breath as "can
+ * this phone sign in".
+ *
+ * The switch reports on *this* browser and the count reports on all of them,
+ * which is the pair worth showing. A handset that was cleared or reinstalled
+ * stops receiving without saying so, and an owner who can see "2 phones" when
+ * they know there are three has learned something.
+ */
+function NotificationsPanel() {
+  const [nonce, setNonce] = useState(0)
+  const settings = useAsync(fetchPushSettings, [nonce])
+  const here = useAsync(pushEnabledHere, [nonce])
+
+  const [working, setWorking] = useState(false)
+  const [error, setError] = useState<Error | null>(null)
+
+  const supported = pushSupported()
+
+  async function toggle() {
+    setWorking(true)
+    setError(null)
+    try {
+      if (here.data) {
+        await disablePush()
+      } else {
+        await enablePush(settings.data?.publicKey ?? '', 'This phone')
+      }
+      setNonce((n) => n + 1)
+    } catch (err) {
+      setError(err instanceof Error ? err : new Error(String(err)))
+    } finally {
+      setWorking(false)
+    }
+  }
+
+  return (
+    <Section title="Notifications">
+      <Card>
+        <div className="flex flex-col gap-1">
+          <span className="font-medium">A booking or a message reaches this phone</span>
+          <span className="text-sm text-neutral-600">
+            Arrives whether or not the console is open. It says who and when, and nothing else —
+            tapping it opens the booking.
+          </span>
+        </div>
+
+        {settings.error && <ErrorNote error={settings.error} />}
+        {error && <ErrorNote error={error} />}
+
+        {/*
+          Three ways this cannot work, and each says which one rather than
+          offering a switch that fails. A browser too old for the Push API, a
+          deployment with no VAPID keys, and a permission the owner has already
+          denied — the last of which the browser will never re-prompt for, so
+          the message has to send them to site settings.
+        */}
+        {!supported ? (
+          <p className="text-sm text-neutral-600">
+            This browser cannot receive notifications. On a phone, open the console in Chrome or
+            Samsung Internet.
+          </p>
+        ) : settings.data && !settings.data.configured ? (
+          <p className="text-sm text-neutral-600">
+            No notification keys are configured on this server, so there is nothing to subscribe
+            to. Run <code className="font-mono">bealhouse vapid</code> and set the two keys it
+            prints.
+          </p>
+        ) : (
+          <div className="flex flex-wrap items-center gap-3">
+            <button
+              type="button"
+              onClick={toggle}
+              disabled={working || here.loading}
+              className={`rounded-lg px-4 py-2 text-sm font-medium disabled:opacity-60 ${
+                here.data
+                  ? 'border border-neutral-300 bg-white text-neutral-900'
+                  : 'bg-neutral-900 text-white'
+              }`}
+            >
+              {working
+                ? 'Just a moment…'
+                : here.data
+                  ? 'Turn off on this phone'
+                  : 'Turn on for this phone'}
+            </button>
+
+            {settings.data && (
+              <span className="text-sm text-neutral-600">
+                {settings.data.subscribers === 0
+                  ? 'No phones are receiving notifications.'
+                  : `${settings.data.subscribers} ${
+                      settings.data.subscribers === 1 ? 'phone is' : 'phones are'
+                    } receiving them.`}
+              </span>
+            )}
+          </div>
+        )}
+      </Card>
+    </Section>
   )
 }

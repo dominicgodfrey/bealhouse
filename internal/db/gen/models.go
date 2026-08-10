@@ -185,6 +185,17 @@ type Payment struct {
 	CreatedAt   time.Time
 }
 
+// Browsers that have agreed to receive notifications for the admin console.
+type PushSubscription struct {
+	Endpoint   string
+	UserID     int64
+	P256dh     string
+	Auth       string
+	Label      string
+	CreatedAt  time.Time
+	LastSentAt pgtype.Timestamptz
+}
+
 type RateCalendar struct {
 	RoomID     int64
 	Date       pgtype.Date

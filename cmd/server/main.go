@@ -26,6 +26,7 @@ import (
 	"bealhouse/internal/jobs"
 	"bealhouse/internal/media"
 	"bealhouse/internal/payments"
+	"bealhouse/internal/push"
 	"bealhouse/internal/rates"
 	"bealhouse/web"
 )
@@ -44,8 +45,10 @@ func main() {
 			err = enroll(os.Args[2:])
 		case "migrate":
 			err = migrate(os.Args[2:])
+		case "vapid":
+			err = vapid(os.Args[2:])
 		default:
-			err = fmt.Errorf("unknown command %q; want enroll or migrate", os.Args[1])
+			err = fmt.Errorf("unknown command %q; want enroll, migrate or vapid", os.Args[1])
 		}
 		if err != nil {
 			fmt.Fprintln(os.Stderr, err)
@@ -97,6 +100,11 @@ func run() error {
 	// in the log. Said plainly rather than left to be discovered: an inn that
 	// believes it is emailing guests and is not finds out from a guest.
 	sender := emailSender(cfg)
+
+	// The same arrangement for notifications, and the same reasoning: the queue
+	// accepts them either way, and what changes is whether draining one reaches
+	// a handset or the log.
+	notifier := pushSender(cfg)
 
 	// The manage-booking capability (decision #19). Nil without a secret, which
 	// leaves confirmations without the link and its endpoints refusing — said
@@ -222,6 +230,12 @@ func run() error {
 		// console applies to the next message rather than the next deploy.
 		runner.Handle(email.JobKind, mail.Handler(sender))
 
+		// Notifications, queued rather than sent for the reason mail is: a push
+		// service having a bad afternoon must delay the nudge, never the
+		// booking that earned it. The handler forgets a subscription the push
+		// service says is gone, which is the one piece of state it owns.
+		runner.Handle(push.JobKind, push.Handler(q, notifier))
+
 		go runner.Run(ctx)
 	}
 
@@ -240,6 +254,7 @@ func run() error {
 			Console:              adminAuth,
 			Ops:                  ops,
 			Media:                store,
+			PushPublicKey:        cfg.PushVAPIDPublicKey,
 		}),
 		ReadHeaderTimeout: 10 * time.Second,
 		WriteTimeout:      30 * time.Second,
@@ -322,6 +337,31 @@ func emailSender(cfg config.Config) email.Sender {
 
 	slog.Warn("no email provider configured; queued messages will be logged, not sent")
 	return email.LogSender{}
+}
+
+// pushSender picks the notifier, or the one that only pretends to be one.
+//
+// Half a key pair is called out at error level and treated as none, and does
+// not stop the binary booting — the same judgement emailSender makes, for the
+// same reason: notifications are the addition to how this inn is run, and the
+// inn taking bookings is the thing that must not depend on them.
+func pushSender(cfg config.Config) push.Sender {
+	if cfg.PushConfigured() {
+		slog.Info("push notifications configured", "subject", cfg.PushSubject)
+		return push.VAPID{
+			Public:  cfg.PushVAPIDPublicKey,
+			Private: cfg.PushVAPIDPrivateKey,
+			Subject: cfg.PushSubject,
+		}
+	}
+
+	if cfg.PushVAPIDPublicKey != "" || cfg.PushVAPIDPrivateKey != "" {
+		slog.Error("push is half configured; PUSH_VAPID_PUBLIC_KEY and " +
+			"PUSH_VAPID_PRIVATE_KEY are required together. Run `bealhouse vapid` for a pair")
+	}
+
+	slog.Warn("no push keys configured; notifications will be logged, not sent")
+	return push.LogSender{}
 }
 
 // connectDB returns a nil pool when no DATABASE_URL is set, so the binary boots
