@@ -1,27 +1,63 @@
-{{define "booking_confirmation_subject"}}PLACEHOLDER — booking confirmation{{end}}
+{{define "booking_confirmation_subject"}}Your booking at The Beal House{{if .Data}} — {{.Data.Code}}{{end}}{{end}}
 
-{{define "booking_confirmation_body"}}
+{{define "booking_confirmation_body"}}{{if .Data}}
   {{/*
-    PLACEHOLDER. Sent once payment succeeds and the hold has become a booking —
-    from the payment_intent.succeeded webhook, not the browser redirect, so it
-    reaches a guest who closed the tab.
+    Sent once payment succeeds and the hold has become a booking — from the
+    payment_intent.succeeded webhook, not the browser redirect, so it reaches a
+    guest who closed the tab.
 
-    Should eventually carry: the booking reference, room, dates, the per-night
-    breakdown with tax, what was charged today, and what will be charged at T-7
-    (or that the stay is paid in full). The PDF is reached through the manage
-    link below rather than attached: an attachment is what makes a confirmation
-    look like spam, and the link leads to the same document.
-
-    The manage link below is structure rather than copy and is already wired —
-    it is the only way a guest reaches their booking (decision #19), so it is
-    here rather than waiting on the sentences around it. Its wording is still
-    the owner's to settle.
+    The BalanceDue branch is the load-bearing part. A stay paid in full at
+    booking leaves BalanceDue and BalanceChargeOn empty, and saying nothing
+    about a balance is the whole point: telling a guest who owes nothing that
+    money is coming off their card is the worst sentence this system could send.
   */}}
-  <p style="margin:0 0 12px 0;"><strong>Booking confirmation</strong></p>
-  <p style="margin:0;color:#57534e;">
-    This template is not written yet. It confirms a paid booking and gives the
-    guest their reference, dates, and payment summary.
+  <p style="margin:0 0 16px 0;">Dear {{.Data.GuestName}},</p>
+
+  <p style="margin:0 0 16px 0;">
+    Thank you — your room is booked and we look forward to having you with us.
   </p>
+
+  <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%"
+         style="margin:0 0 16px 0;border-collapse:collapse;">
+    <tr>
+      <td style="padding:6px 0;color:#78716c;width:40%;">Reference</td>
+      <td style="padding:6px 0;"><strong>{{.Data.Code}}</strong></td>
+    </tr>
+    <tr>
+      <td style="padding:6px 0;color:#78716c;">Room</td>
+      <td style="padding:6px 0;">{{range .Data.Rooms}}{{.}}<br>{{end}}</td>
+    </tr>
+    <tr>
+      <td style="padding:6px 0;color:#78716c;">Arriving</td>
+      <td style="padding:6px 0;">{{.Data.Checkin}}</td>
+    </tr>
+    <tr>
+      <td style="padding:6px 0;color:#78716c;">Leaving</td>
+      <td style="padding:6px 0;">{{.Data.Checkout}}</td>
+    </tr>
+    <tr>
+      <td style="padding:6px 0;color:#78716c;">Nights</td>
+      <td style="padding:6px 0;">{{.Data.Nights}}</td>
+    </tr>
+    <tr>
+      <td style="padding:6px 0;color:#78716c;">Paid today</td>
+      <td style="padding:6px 0;">{{.Data.PaidNow}}</td>
+    </tr>
+    <tr>
+      <td style="padding:6px 0;color:#78716c;">Total for the stay</td>
+      <td style="padding:6px 0;">{{.Data.Total}}</td>
+    </tr>
+  </table>
+
+  {{with .Data}}{{if .BalanceDue}}
+    <p style="margin:0 0 16px 0;">
+      The balance of <strong>{{.BalanceDue}}</strong> comes off the same card on
+      {{.BalanceChargeOn}}. We will write to you the day before, so it is never a
+      surprise.
+    </p>
+  {{else}}
+    <p style="margin:0 0 16px 0;">Your stay is paid in full — there is nothing further to pay.</p>
+  {{end}}{{end}}
 
   {{/*
     Empty on a deploy with no signing secret or no site URL, and then omitted
@@ -48,8 +84,13 @@
         </td>
       </tr>
     </table>
-    <p style="margin:0;font-size:12px;line-height:1.5;color:#78716c;word-break:break-all;">
+    <p style="margin:0 0 16px 0;font-size:12px;line-height:1.5;color:#78716c;word-break:break-all;">
       {{.ManageURL}}
     </p>
   {{end}}{{end}}
-{{end}}
+
+  <p style="margin:0;">
+    If anything about your plans changes, or there is something we can arrange before you
+    arrive, simply reply to this message.
+  </p>
+{{end}}{{end}}

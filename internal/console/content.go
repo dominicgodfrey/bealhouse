@@ -1055,6 +1055,37 @@ func (o *Ops) SaveEmailCopy(ctx context.Context, name, subject, body string) err
 	return nil
 }
 
+// PreviewEmailCopy renders one message against sample data, from copy that has
+// not been saved.
+//
+// The subject and body come from the editor rather than from the row, because
+// the question a preview answers is "what will this look like" and asking it
+// after saving answers it too late. It is also the cheapest possible way to
+// find out that a template does not compile: the same email.Parse the save
+// runs, reached without writing anything.
+//
+// Sample data rather than a real booking. An inn on its first day has no
+// bookings to render, which is exactly when this copy gets written — and
+// showing a real guest's name and money on a screen nobody asked about them
+// from is a cost with no matching benefit.
+func (o *Ops) PreviewEmailCopy(name, subject, body string) (email.Message, error) {
+	if o.mail == nil {
+		return email.Message{}, badf("email is not configured on this deployment")
+	}
+	if !known(name, email.Names()) {
+		return email.Message{}, badf("there is no message called %q", name)
+	}
+	if strings.TrimSpace(subject) == "" || strings.TrimSpace(body) == "" {
+		return email.Message{}, badf("a preview needs a subject and a body")
+	}
+
+	msg, err := o.mail.Preview(name, subject, body)
+	if err != nil {
+		return email.Message{}, badf("that copy will not render: %s", err)
+	}
+	return msg, nil
+}
+
 // ResetEmailCopy puts a message back to what ships with the binary.
 //
 // A delete rather than a rewrite: the shipped copy lives in the repository, and

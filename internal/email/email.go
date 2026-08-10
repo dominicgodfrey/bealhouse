@@ -148,8 +148,6 @@ type data struct {
 // The context is here for the lookup of that edit. A Renderer with no store
 // never touches it.
 func (r *Renderer) Render(ctx context.Context, name string, payload any) (Message, error) {
-	in := data{Brand: r.brand, Data: payload}
-
 	// The owner's copy when they have written some, the shipped file when they
 	// have not. Everything downstream of this is identical either way.
 	set, err := r.custom(ctx, name)
@@ -159,6 +157,18 @@ func (r *Renderer) Render(ctx context.Context, name string, payload any) (Messag
 	if set == nil {
 		set = r.templates
 	}
+
+	return r.assemble(set, name, payload)
+}
+
+// assemble turns one template set and one payload into a finished message.
+//
+// Split out of Render so that the console's Preview reaches the same code with
+// a set parsed from unsaved text. Two paths that each assembled a message would
+// be two chances for the preview to show something the send does not — which is
+// the one failure a preview cannot have.
+func (r *Renderer) assemble(set *template.Template, name string, payload any) (Message, error) {
+	in := data{Brand: r.brand, Data: payload}
 
 	subject, err := render(set, name+"_subject", in)
 	if err != nil {

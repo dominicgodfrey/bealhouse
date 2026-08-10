@@ -1,14 +1,49 @@
-{{define "owner_notification_subject"}}PLACEHOLDER — new booking{{end}}
+{{define "owner_notification_subject"}}New booking{{if .Data}} — {{.Data.GuestName}}, {{.Data.Checkin}} ({{.Data.Code}}){{end}}{{end}}
 
-{{define "owner_notification_body"}}
+{{define "owner_notification_body"}}{{if .Data}}
   {{/*
-    PLACEHOLDER. The inn's own copy of a new booking. Goes to the owner, not the
-    guest, so it can carry the things the guest's copy deliberately does not:
-    contact details, the party, and anything flagged about the payment.
+    The inn's own copy, queued in the same transaction as the guest's. It
+    carries the guest's contact details, which their own confirmation does not
+    need and the public booking API deliberately never returns.
+
+    Written as a notice rather than as a letter: nobody says "Dear" to
+    themselves, and this one is read at a glance on a phone.
   */}}
-  <p style="margin:0 0 12px 0;"><strong>New booking</strong></p>
+  <p style="margin:0 0 16px 0;"><strong>A booking has just been paid for.</strong></p>
+
+  <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%"
+         style="margin:0 0 16px 0;border-collapse:collapse;">
+    <tr>
+      <td style="padding:6px 0;color:#78716c;width:40%;">Guest</td>
+      <td style="padding:6px 0;"><strong>{{.Data.GuestName}}</strong></td>
+    </tr>
+    <tr>
+      <td style="padding:6px 0;color:#78716c;">Email</td>
+      <td style="padding:6px 0;">{{.Data.GuestEmail}}</td>
+    </tr>
+    <tr>
+      <td style="padding:6px 0;color:#78716c;">Reference</td>
+      <td style="padding:6px 0;">{{.Data.Code}}</td>
+    </tr>
+    <tr>
+      <td style="padding:6px 0;color:#78716c;">Room</td>
+      <td style="padding:6px 0;">{{range .Data.Rooms}}{{.}}<br>{{end}}</td>
+    </tr>
+    <tr>
+      <td style="padding:6px 0;color:#78716c;">Dates</td>
+      <td style="padding:6px 0;">{{.Data.Checkin}} → {{.Data.Checkout}} ({{.Data.Nights}} nights)</td>
+    </tr>
+    <tr>
+      <td style="padding:6px 0;color:#78716c;">Taken today</td>
+      <td style="padding:6px 0;">{{.Data.PaidNow}}</td>
+    </tr>
+    <tr>
+      <td style="padding:6px 0;color:#78716c;">Total</td>
+      <td style="padding:6px 0;">{{.Data.Total}}</td>
+    </tr>
+  </table>
+
   <p style="margin:0;color:#57534e;">
-    This template is not written yet. It tells the owner a booking has been paid
-    for, with the guest's details and the stay.
+    The guest has had their confirmation. Nothing needs doing.
   </p>
-{{end}}
+{{end}}{{end}}

@@ -1,24 +1,31 @@
-{{define "checkout_reminder_subject"}}PLACEHOLDER — checking out today{{end}}
+{{define "checkout_reminder_subject"}}Leaving us today{{if .Data}} — checkout is {{.Data.CheckoutTime}}{{end}}{{end}}
 
-{{define "checkout_reminder_body"}}
+{{define "checkout_reminder_body"}}{{if .Data}}
   {{/*
-    PLACEHOLDER. Sent by the checkout.remind job in the first minutes of the day
-    the guest leaves, so it is waiting when they wake up rather than arriving
-    while they are packing.
+    Reaches the guest in the first minutes of the day they leave, which is why
+    the job runs every fifteen minutes and deliberately does not catch up: a
+    "you are leaving today" that arrives after they got home is worse than
+    nothing.
 
-    Should eventually carry: the checkout time and what to do with the key, a
-    thank-you, and whatever the owner wants to say about coming back. It must
-    not read as a demand for money — a stay reaching this message has already
-    been charged in full at T-7, and a guest whose card failed has had the
-    balance_failed message instead.
+    It carries no money at all. A stay reaching this point has been paid in
+    full, and a guest whose card was refused has had balance_failed instead.
 
-    `.Data.CheckoutTime` is the inn's checkout hour from settings, already
-    formatted ("11:00 AM"), so the sentence about it stays true when the owner
-    changes the setting.
+    CheckoutTime comes from settings rather than being written into the words,
+    so the sentence stays true when the owner changes the hour.
   */}}
-  <p style="margin:0 0 12px 0;"><strong>Checking out today</strong></p>
-  <p style="margin:0;color:#57534e;">
-    This template is not written yet. It reaches the guest on the morning they
-    leave with the checkout time and the inn's goodbye.
+  <p style="margin:0 0 16px 0;">Dear {{.Data.GuestName}},</p>
+
+  <p style="margin:0 0 16px 0;">
+    We hope you have slept well and enjoyed your {{.Data.Nights}} nights with us.
   </p>
-{{end}}
+
+  <p style="margin:0 0 16px 0;">
+    Checkout is at <strong>{{.Data.CheckoutTime}}</strong> today. There is no need to do
+    anything on your way out — leave the key in the room and we will see to the rest. If you
+    would like to leave a bag with us for the day, just ask.
+  </p>
+
+  <p style="margin:0;">
+    Thank you for staying at The Beal House. You would be very welcome back.
+  </p>
+{{end}}{{end}}

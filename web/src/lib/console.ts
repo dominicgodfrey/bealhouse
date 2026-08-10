@@ -595,6 +595,27 @@ export function saveEmailCopy(name: string, subject: string, body: string): Prom
   })
 }
 
+export type EmailPreview = { subject: string; html: string }
+
+/**
+ * What the message will look like, from copy that has not been saved.
+ *
+ * Sends the draft rather than naming the stored row, because a preview of what
+ * is already saved answers the question one save too late. Rendered against
+ * sample data on the server: an inn with no bookings yet still gets a preview,
+ * and no real guest's details appear on a screen that did not ask for them.
+ */
+export function previewEmailCopy(
+  name: string,
+  subject: string,
+  body: string,
+): Promise<EmailPreview> {
+  return request<EmailPreview>(
+    `/api/admin/email-templates/${encodeURIComponent(name)}/preview`,
+    { method: 'POST', body: JSON.stringify({ subject, body }) },
+  )
+}
+
 /** A delete, not a rewrite: the shipped copy lives in the repository. */
 export function resetEmailCopy(name: string): Promise<void> {
   return request<void>(`/api/admin/email-templates/${encodeURIComponent(name)}`, {

@@ -1,20 +1,30 @@
-{{define "cancellation_refund_subject"}}PLACEHOLDER — your booking is cancelled{{end}}
+{{define "cancellation_refund_subject"}}Your booking has been cancelled{{if .Data}} — {{.Data.Code}}{{end}}{{end}}
 
-{{define "cancellation_refund_body"}}
+{{define "cancellation_refund_body"}}{{if .Data}}
   {{/*
-    PLACEHOLDER. Sent when a stay is cancelled, by the guest through the signed
-    link (decision #19) or by the owner in admin.
+    Queued by whichever transaction cancelled the stay — a guest who changed
+    their mind, or a room the inn could not honour — and not by RecordRefund,
+    which runs once per intent and would tell a deposit-plus-balance guest
+    twice, each message naming part of the money.
 
-    The number in here is the one guests query, so it should show its working:
-    what was collected, what the inn kept, and what is on its way back. Two
-    things get retained and they are not the same — the late-cancellation
-    penalty (decision #9), and the card processor's cut on an on-time
-    cancellation (decision #26). A guest told "full refund" who then sees 3%
-    missing will write in.
+    It also goes out when the refund is zero. A late cancellation still
+    happened and the guest is owed the confirmation, so the copy must not
+    assume there is money coming back.
   */}}
-  <p style="margin:0 0 12px 0;"><strong>Cancellation</strong></p>
-  <p style="margin:0;color:#57534e;">
-    This template is not written yet. It confirms a cancellation and breaks down
-    the refund: what was paid, what is retained, and what is being returned.
+  <p style="margin:0 0 16px 0;">Dear {{.Data.GuestName}},</p>
+
+  <p style="margin:0 0 16px 0;">
+    Your booking {{.Data.Code}} for {{.Data.Checkin}} to {{.Data.Checkout}} has been
+    cancelled.
   </p>
-{{end}}
+
+  <p style="margin:0 0 16px 0;">
+    We are returning <strong>{{.Data.Refunded}}</strong> to the card you paid with. Banks
+    usually take a few working days to show it.
+  </p>
+
+  <p style="margin:0;">
+    We are sorry not to be seeing you this time, and hope to another time. If you think
+    anything here is wrong, reply and we will look into it.
+  </p>
+{{end}}{{end}}

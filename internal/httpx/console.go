@@ -127,6 +127,11 @@ func mountConsole(in chi.Router, ops *console.Ops) {
 	in.Put("/email-templates/{name}", consoleSaveEmailCopy(ops))
 	in.Delete("/email-templates/{name}", consoleResetEmailCopy(ops))
 
+	// A POST because it carries the unsaved draft in its body, and writes
+	// nothing. The alternative — previewing whatever is stored — would answer
+	// the owner's question one save too late.
+	in.Post("/email-templates/{name}/preview", consolePreviewEmailCopy(ops))
+
 	in.Get("/copy", consoleCopy(ops))
 	in.Put("/copy/{slug}", consoleSaveCopy(ops))
 	in.Put("/copy/{slug}/photos", consoleSavePagePhotos(ops))
@@ -727,6 +732,36 @@ func consoleSaveEmailCopy(ops *console.Ops) http.HandlerFunc {
 			return
 		}
 		w.WriteHeader(http.StatusNoContent)
+	}
+}
+
+// consolePreviewEmailCopy renders a draft against sample data.
+//
+// The rendered document comes back as a JSON string rather than as text/html,
+// so this endpoint can never be navigated to directly and made to serve
+// owner-authored markup from the site's own origin. The console puts it in a
+// sandboxed frame, which is where it is safe to look at.
+func consolePreviewEmailCopy(ops *console.Ops) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		var body struct {
+			Subject string `json:"subject"`
+			Body    string `json:"body"`
+		}
+		if err := decodeBody(w, r, &body); err != nil {
+			consoleError(w, r, err)
+			return
+		}
+
+		msg, err := ops.PreviewEmailCopy(chi.URLParam(r, "name"), body.Subject, body.Body)
+		if err != nil {
+			consoleError(w, r, err)
+			return
+		}
+
+		writeJSON(w, http.StatusOK, map[string]string{
+			"subject": msg.Subject,
+			"html":    msg.HTML,
+		})
 	}
 }
 

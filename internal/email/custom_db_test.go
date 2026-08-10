@@ -107,14 +107,17 @@ func TestResettingGoesBackToTheShippedCopy(t *testing.T) {
 	if err != nil {
 		t.Fatalf("building the renderer: %v", err)
 	}
-	msg, err := r.Render(ctx, CancellationRefund, nil)
+	// Rendered against the sample payload rather than nil: every body is
+	// guarded on .Data so that Names() can smoke-test them, which means a nil
+	// render produces the layout and nothing to tell the two copies apart.
+	msg, err := r.Render(ctx, CancellationRefund, Sample(CancellationRefund))
 	if err != nil {
 		t.Fatalf("rendering: %v", err)
 	}
 	if strings.Contains(msg.HTML, "Sorry to see you go.") {
 		t.Error("the deleted copy is still being sent")
 	}
-	if !strings.Contains(msg.HTML, "not written yet") {
+	if !strings.Contains(msg.HTML, "We are sorry not to be seeing you") {
 		t.Error("the shipped copy did not come back")
 	}
 }

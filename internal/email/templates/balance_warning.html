@@ -1,17 +1,25 @@
-{{define "balance_warning_subject"}}PLACEHOLDER — your balance will be charged tomorrow{{end}}
+{{define "balance_warning_subject"}}A note before we take the balance{{if .Data}} — {{.Data.Code}}{{end}}{{end}}
 
-{{define "balance_warning_body"}}
+{{define "balance_warning_body"}}{{if .Data}}
   {{/*
-    PLACEHOLDER. The T-8 heads-up (decision #6), sent by the balance.warn job
-    the day before the card is charged off-session.
-
-    This one is not a courtesy. A charge nobody was warned about is the one that
-    gets disputed, so it should state the amount, the date it will be taken, and
-    the card it will go to.
+    Decision #6's promise: the T-7 charge is never a surprise. Sent a day
+    before, and the scan catches up if the server was off — so this may arrive
+    later than intended, which is why it says the date rather than "tomorrow".
   */}}
-  <p style="margin:0 0 12px 0;"><strong>Balance charge reminder</strong></p>
-  <p style="margin:0;color:#57534e;">
-    This template is not written yet. It warns the guest, the day before, that
-    the remaining balance is about to be charged to the card on file.
+  <p style="margin:0 0 16px 0;">Dear {{.Data.GuestName}},</p>
+
+  <p style="margin:0 0 16px 0;">
+    We are looking forward to your stay from {{.Data.Checkin}} to {{.Data.Checkout}}.
   </p>
-{{end}}
+
+  <p style="margin:0 0 16px 0;">
+    This is just to let you know that the remaining balance of
+    <strong>{{.Data.Amount}}</strong> will be taken from the card you booked with on
+    {{.Data.ChargeOn}}. You do not need to do anything.
+  </p>
+
+  <p style="margin:0;">
+    If you would rather settle it another way, or the card has changed since you booked,
+    reply to this message or telephone us and we will sort it out.
+  </p>
+{{end}}{{end}}

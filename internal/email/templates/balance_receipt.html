@@ -1,14 +1,34 @@
-{{define "balance_receipt_subject"}}PLACEHOLDER — balance received{{end}}
+{{define "balance_receipt_subject"}}Balance received{{if .Data}} — {{.Data.Code}}{{end}}{{end}}
 
-{{define "balance_receipt_body"}}
+{{define "balance_receipt_body"}}{{if .Data}}
   {{/*
-    PLACEHOLDER. Sent when the T-7 off-session charge succeeds, so the guest has
-    a receipt for the second of the two payments and knows nothing further is
-    owed before arrival.
+    Closes the loop opened by balance_warning a day earlier. Also the message a
+    guest gets when they pay an emailed link, since money landing on an
+    already-confirmed stay is labelled KindBalance — so it must read as a
+    receipt and never as "you're booked", which they have had already.
   */}}
-  <p style="margin:0 0 12px 0;"><strong>Balance received</strong></p>
-  <p style="margin:0;color:#57534e;">
-    This template is not written yet. It receipts the T-7 balance charge and
-    confirms the stay is paid in full.
+  <p style="margin:0 0 16px 0;">Dear {{.Data.GuestName}},</p>
+
+  <p style="margin:0 0 16px 0;">
+    Thank you — we have received <strong>{{.Data.Amount}}</strong> and your stay is now paid
+    in full.
   </p>
-{{end}}
+
+  <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%"
+         style="margin:0 0 16px 0;border-collapse:collapse;">
+    <tr>
+      <td style="padding:6px 0;color:#78716c;width:40%;">Reference</td>
+      <td style="padding:6px 0;">{{.Data.Code}}</td>
+    </tr>
+    <tr>
+      <td style="padding:6px 0;color:#78716c;">Dates</td>
+      <td style="padding:6px 0;">{{.Data.Checkin}} → {{.Data.Checkout}}</td>
+    </tr>
+    <tr>
+      <td style="padding:6px 0;color:#78716c;">Total for the stay</td>
+      <td style="padding:6px 0;">{{.Data.Total}}</td>
+    </tr>
+  </table>
+
+  <p style="margin:0;">We will see you on {{.Data.Checkin}}.</p>
+{{end}}{{end}}

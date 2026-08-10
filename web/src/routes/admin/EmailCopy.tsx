@@ -2,9 +2,11 @@ import { useState } from 'react'
 
 import {
   fetchEmailCopy,
+  previewEmailCopy,
   resetEmailCopy,
   saveEmailCopy,
   type EmailCopy as Copy,
+  type EmailPreview,
 } from '../../lib/console'
 import { useAsync } from '../../lib/useAsync'
 import { ErrorNote, Loading } from '../../components/Layout'
@@ -72,6 +74,13 @@ function Message({ copy, onChanged }: { copy: Copy; onChanged: () => void }) {
   const [draft, setDraft] = useState(copy)
   const saving = useSaving(refresh)
 
+  // Preview state is separate from the save's, because looking at a message is
+  // not a step towards keeping it: either can be in flight without the other
+  // and a failure in one must not be reported as a failure of the other.
+  const [preview, setPreview] = useState<EmailPreview | null>(null)
+  const [previewing, setPreviewing] = useState(false)
+  const [previewError, setPreviewError] = useState<Error | null>(null)
+
   if (!open) {
     return (
       <Card>
@@ -98,6 +107,7 @@ function Message({ copy, onChanged }: { copy: Copy; onChanged: () => void }) {
 
       {saving.error && <ErrorNote error={saving.error} />}
       {saving.saved && <Saved>Saved. The next message uses it.</Saved>}
+      {previewError && <ErrorNote error={previewError} />}
 
       <Field label="Subject">
         <Input
@@ -146,6 +156,41 @@ function Message({ copy, onChanged }: { copy: Copy; onChanged: () => void }) {
         </p>
       </div>
 
+      {preview && (
+        <div className="flex flex-col gap-2">
+          <div className="flex flex-wrap items-baseline justify-between gap-2">
+            <span className="text-sm font-medium">Subject: {preview.subject}</span>
+            <button
+              type="button"
+              onClick={() => setPreview(null)}
+              className="text-sm text-neutral-600 underline"
+            >
+              Hide
+            </button>
+          </div>
+
+          {/*
+            Sandboxed, and deliberately without allow-scripts or
+            allow-same-origin: this is the owner's own markup, but it is markup
+            being rendered by the console, and a preview has no business being
+            able to reach the session it is previewed from. Email HTML has no
+            scripts in it anyway — anything that needed them would not survive a
+            mail client either.
+          */}
+          <iframe
+            title="What the message looks like"
+            sandbox=""
+            srcDoc={preview.html}
+            className="h-96 w-full rounded-lg border border-neutral-300 bg-white"
+          />
+
+          <p className="text-xs text-neutral-500">
+            Rendered against a sample booking — Sample Guest, code SAMPLE — not a real one. The
+            figures are invented.
+          </p>
+        </div>
+      )}
+
       <div className="flex flex-wrap gap-2">
         <Button
           kind="primary"
@@ -159,6 +204,30 @@ function Message({ copy, onChanged }: { copy: Copy; onChanged: () => void }) {
         >
           {saving.working ? 'Saving…' : 'Save'}
         </Button>
+
+        {/*
+          Its own busy flag rather than the save's. A preview that disabled the
+          Save button while it ran would read as though looking at the message
+          were a step on the way to keeping it.
+        */}
+        <Button
+          onClick={async () => {
+            setPreviewing(true)
+            setPreviewError(null)
+            try {
+              setPreview(await previewEmailCopy(draft.name, draft.subject, draft.body))
+            } catch (err) {
+              setPreview(null)
+              setPreviewError(err instanceof Error ? err : new Error(String(err)))
+            } finally {
+              setPreviewing(false)
+            }
+          }}
+          disabled={previewing}
+        >
+          {previewing ? 'Rendering…' : 'See what it looks like'}
+        </Button>
+
         <Button onClick={() => setOpen(false)}>Close</Button>
         {copy.edited && (
           <Button

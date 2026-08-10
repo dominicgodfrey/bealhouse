@@ -1,22 +1,67 @@
-{{define "payment_request_subject"}}PLACEHOLDER — how to pay for your stay{{end}}
+{{define "payment_request_subject"}}Your stay at The Beal House{{if .Data}} — payment for {{.Data.Code}}{{end}}{{end}}
 
-{{define "payment_request_body"}}
+{{define "payment_request_body"}}{{if .Data}}
   {{/*
-    PLACEHOLDER. Sent when the owner takes a reservation over the telephone and
-    asks the guest to pay for it themselves, rather than reading a card out or
-    settling some other way.
+    For a booking the owner took over the telephone. It carries no deadline and
+    no expiry, deliberately: every other message about money here is attached to
+    something running out — a hold, a T-7 date — and this one is not. The room is
+    already the guest's and what is outstanding stays outstanding until somebody
+    settles it, so copy written as a countdown would simply be false.
 
-    The room is already theirs — this is not a hold and nothing expires — so the
-    tone is an invoice rather than a countdown. What it has to carry is the
-    amount, the link, and the fact that the booking is confirmed either way, so
-    that a guest who pays a week later has not been worrying about losing it.
-
-    .Data.PayURL is empty on a deployment with no public address configured. The
-    copy has to check before offering a button to nowhere.
+    PayURL is empty on a deployment with no public address, and the button is
+    omitted rather than pointing nowhere — the same shape as ManageURL on the
+    confirmation.
   */}}
-  <p style="margin:0 0 12px 0;"><strong>Payment for your stay</strong></p>
-  <p style="margin:0;color:#57534e;">
-    This template is not written yet. It gives a guest whose booking was taken
-    over the telephone the amount outstanding and a link to pay it.
+  <p style="margin:0 0 16px 0;">Dear {{.Data.GuestName}},</p>
+
+  <p style="margin:0 0 16px 0;">
+    Thank you for booking with us over the telephone. Your room is held in your name — this
+    is simply the bill.
   </p>
-{{end}}
+
+  <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%"
+         style="margin:0 0 16px 0;border-collapse:collapse;">
+    <tr>
+      <td style="padding:6px 0;color:#78716c;width:40%;">Reference</td>
+      <td style="padding:6px 0;"><strong>{{.Data.Code}}</strong></td>
+    </tr>
+    <tr>
+      <td style="padding:6px 0;color:#78716c;">Room</td>
+      <td style="padding:6px 0;">{{range .Data.Rooms}}{{.}}<br>{{end}}</td>
+    </tr>
+    <tr>
+      <td style="padding:6px 0;color:#78716c;">Dates</td>
+      <td style="padding:6px 0;">{{.Data.Checkin}} → {{.Data.Checkout}} ({{.Data.Nights}} nights)</td>
+    </tr>
+    <tr>
+      <td style="padding:6px 0;color:#78716c;">Total for the stay</td>
+      <td style="padding:6px 0;">{{.Data.Total}}</td>
+    </tr>
+    <tr>
+      <td style="padding:6px 0;color:#78716c;">Outstanding</td>
+      <td style="padding:6px 0;"><strong>{{.Data.Amount}}</strong></td>
+    </tr>
+  </table>
+
+  {{with .Data}}{{if .PayURL}}
+    <table role="presentation" cellpadding="0" cellspacing="0" border="0"
+           style="margin:20px 0 8px 0;">
+      <tr>
+        <td align="center" style="border-radius:6px;background-color:#1c1917;">
+          <a href="{{.PayURL}}"
+             style="display:inline-block;padding:11px 20px;font-family:-apple-system,
+                    BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;font-size:15px;
+                    color:#ffffff;text-decoration:none;">Pay {{.Amount}} now</a>
+        </td>
+      </tr>
+    </table>
+    <p style="margin:0 0 16px 0;font-size:12px;line-height:1.5;color:#78716c;word-break:break-all;">
+      {{.PayURL}}
+    </p>
+  {{end}}{{end}}
+
+  <p style="margin:0;">
+    If you would rather pay on arrival or over the telephone, that is no trouble at all —
+    simply reply and let us know.
+  </p>
+{{end}}{{end}}

@@ -1,17 +1,27 @@
-{{define "balance_failed_subject"}}PLACEHOLDER — we could not take your balance{{end}}
+{{define "balance_failed_subject"}}We could not take the balance{{if .Data}} — {{.Data.Code}}{{end}}{{end}}
 
-{{define "balance_failed_body"}}
+{{define "balance_failed_body"}}{{if .Data}}
   {{/*
-    PLACEHOLDER. Sent when the off-session charge is declined. The booking stays
-    confirmed — the guest is still arriving — so this asks them to get in touch
-    rather than telling them anything has been cancelled.
-
-    The owner gets their own unmissable flag in admin at the same time; this is
-    the guest's half of that.
+    A declined card is an outcome, not a failure: the stay stays confirmed and
+    the guest is still arriving. The copy has to say that plainly, because the
+    natural reading of "your payment failed" is "my booking is gone" — and a
+    guest who believes that books somewhere else.
   */}}
-  <p style="margin:0 0 12px 0;"><strong>Payment problem</strong></p>
-  <p style="margin:0;color:#57534e;">
-    This template is not written yet. It tells the guest their balance could not
-    be charged and asks them to contact the inn. The booking is not cancelled.
+  <p style="margin:0 0 16px 0;">Dear {{.Data.GuestName}},</p>
+
+  <p style="margin:0 0 16px 0;">
+    We tried to take the remaining <strong>{{.Data.Outstanding}}</strong> for your stay and
+    the payment was declined. It happens often enough — usually an expiry date or a bank
+    being cautious — and it is easily sorted.
   </p>
-{{end}}
+
+  <p style="margin:0 0 16px 0;">
+    <strong>Your room is still yours.</strong> Your booking from {{.Data.Checkin}} to
+    {{.Data.Checkout}} stands, and nothing has been cancelled.
+  </p>
+
+  <p style="margin:0;">
+    Reply to this message or give us a ring and we will take the balance over the telephone,
+    or on arrival if you would rather.
+  </p>
+{{end}}{{end}}
