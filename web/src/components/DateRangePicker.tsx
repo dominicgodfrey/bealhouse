@@ -13,7 +13,7 @@ const MONTHS_AHEAD = 12
 /**
  * How many months are on screen at once.
  *
- * One on a phone. Two stacked was two thumb-scrolls of calendar inside a sheet
+ * One on a phone. Two stacked was two thumb-scrolls of calendar inside a panel
  * that already scrolls, and the arrows — the obvious way to move — appeared to
  * skip a month, because tapping "next" replaced a pair. One month makes the
  * arrow mean what it looks like it means.

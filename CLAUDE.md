@@ -421,13 +421,26 @@ added to it comes out of the empty middle — it does not get a scrollbar.
   visitor who has asked for less motion. It becomes a `<video>` the moment
   `backdropVideo` in `Home.tsx` names one, with the first photograph as poster.
 - **The calendar starts closed and floats**, never pushing the page (SearchForm's
-  `overlay`). It hangs off the field where there is room under it and pins
-  itself above the bottom of the viewport where there is not — the `roomy`
-  variant in `index.css`, which tests **width and height**, because a 1280×620
-  window is wide and has no room in it. **Nothing between that panel and the
-  viewport may carry a `backdrop-filter`**: a blurred ancestor becomes the
-  containing block for `fixed`, and the sheet would pin itself to the card it is
-  trying to escape.
+  `overlay`). It hangs off the bottom of the field **at every size**, phone
+  included. It used to become a sheet pinned to the bottom of the viewport below
+  a `roomy` breakpoint, and that variant is gone: it put the panel somewhere
+  different on a phone than on a monitor for no reason a guest could see, with
+  the field it belongs to up the screen and the panel against the bottom edge.
+  - **What the breakpoint was guarding is still real**, and is now guarded by
+    measurement. The home page cannot scroll, so a panel taller than the space
+    under the field has a bottom that no gesture can reach. `fit` in SearchForm
+    gives it exactly the room between its own top edge and the viewport, and it
+    scrolls inside that. **Not a `max-h-[calc(100dvh-…)]` class**: the constant
+    such a class needs is how far down the field ends, and that moves with the
+    header, with the fields going from stacked to side by side, and with the
+    dates line wrapping once a range is chosen.
+  - The trade is a **landscape phone**, where there are about 155px under the
+    field and the calendar is a short scrolling panel. The sheet had more room
+    there. Portrait, which is what a phone books in, gains the whole thing.
+  - **Nothing between that panel and the viewport may carry a
+    `backdrop-filter`**: a blurred ancestor becomes the containing block for
+    absolutely positioned descendants as well as fixed ones, and the panel would
+    pin itself to the card it is trying to escape.
 - **Search with no dates opens the calendar** rather than sitting greyed out.
 
 **Everything that used to be below the fold there is on `/about`**: the owner's

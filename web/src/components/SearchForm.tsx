@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useLayoutEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router'
 
 import type { Stay } from '../lib/api'
@@ -11,19 +11,27 @@ const MAX_GUESTS = 4
 /**
  * Where the calendar goes when it may not push the page around.
  *
- * Given room under the field (`roomy`, in index.css) it hangs off it like any
- * dropdown; otherwise it pins above the bottom of the viewport and scrolls
- * inside itself. Not a phone concession — on a 568px screen the field's bottom
- * edge is 300px down and the page underneath cannot scroll to reveal the rest.
- * `dvh` because `vh` counts the strip the address bar sits on.
+ * It hangs off the bottom of the field like any dropdown, at every size. It
+ * used to become a sheet pinned to the bottom of the viewport below a `roomy`
+ * breakpoint, which put the panel in a different place on a phone than on a
+ * monitor for no reason a guest could see — the field it belongs to was up the
+ * screen and the panel was against the bottom edge.
+ *
+ * What the breakpoint was actually protecting against is real, though: the home
+ * page cannot scroll, so a panel taller than the space under the field has a
+ * bottom nobody can reach. `fit` below is that guard, done by measurement
+ * instead — see it for why this is not a `max-h-[…]` class.
  *
  * **Nothing between this and the viewport may carry a `backdrop-filter`**: a
- * blurred ancestor becomes the containing block for `fixed`, and this would pin
- * itself to the card it is escaping. See Home.tsx.
+ * blurred ancestor becomes the containing block for fixed and absolute
+ * descendants alike, and this would pin itself to the card it is escaping. See
+ * Home.tsx.
  */
 const floating =
-  'fixed inset-x-3 bottom-3 z-30 max-h-[85dvh] overflow-y-auto overscroll-contain rounded-lg shadow-xl ' +
-  'roomy:absolute roomy:inset-x-0 roomy:bottom-auto roomy:top-full roomy:mt-2 roomy:max-h-[70vh]'
+  'absolute inset-x-0 top-full z-30 mt-2 overflow-y-auto overscroll-contain rounded-lg shadow-xl'
+
+/** Breathing room between the bottom of the open calendar and the viewport. */
+const gutter = 12
 
 type Props = {
   initial?: Partial<Stay>
@@ -56,8 +64,42 @@ export function SearchForm({ initial, overlay = false }: Props) {
   const [guests, setGuests] = useState(initial?.guests ?? 2)
   const [withPet, setWithPet] = useState(initial?.withPet ?? false)
   const [open, setOpen] = useState(false)
+  const panel = useRef<HTMLDivElement>(null)
 
   const complete = Boolean(checkin && checkout)
+
+  /**
+   * Give the open calendar exactly the room there is under the field.
+   *
+   * Only when it is overlaid — everywhere else the page is a document that
+   * scrolls and the picker is part of it. On the home page, which does not
+   * scroll, a panel that runs past the bottom of the viewport has a "Start
+   * over" and a last week of dates that no gesture can bring into view.
+   *
+   * Measured rather than a `max-h-[calc(100dvh-…)]` class because the constant
+   * such a class needs is how far down the field ends, and that is not one
+   * number: it moves with the header, with the fields going from stacked to
+   * side by side, and with the dates line wrapping once a range is chosen. Each
+   * of those was a value somebody would have had to remember to re-measure.
+   *
+   * The panel's own top does not move when its height changes — it is pinned to
+   * `top-full` — so reading the rect after setting the height is stable rather
+   * than a feedback loop.
+   */
+  useLayoutEffect(() => {
+    const el = panel.current
+    if (!overlay || !el) return
+
+    const fit = () => {
+      const room = window.innerHeight - el.getBoundingClientRect().top - gutter
+      el.style.maxHeight = `${Math.max(room, 0)}px`
+    }
+
+    fit()
+    // Rotation, and the mobile address bar collapsing, both arrive as a resize.
+    window.addEventListener('resize', fit)
+    return () => window.removeEventListener('resize', fit)
+  }, [open, overlay, complete])
 
   function submit() {
     // Nothing to search for yet: show the calendar rather than refusing. This
@@ -153,7 +195,7 @@ export function SearchForm({ initial, overlay = false }: Props) {
       </label>
 
       {open && (
-        <div className={overlay ? floating : undefined}>
+        <div ref={panel} className={overlay ? floating : undefined}>
           <DateRangePicker
             checkin={checkin}
             checkout={checkout}
