@@ -11,7 +11,9 @@ Resend, the Sentry project, push keys) are in
 [ARCHITECTURE.md](ARCHITECTURE.md).
 
 **The state below was read out of the development database on 2026-08-10.** The
-inn's live database starts from the same seed, so it starts in the same place.
+inn's live database is seeded from the same files and so starts in the same
+place, with one deliberate exception: the invented menu used to exercise the
+editor is not loaded onto the live server. See §4.
 
 ---
 
@@ -103,16 +105,19 @@ room's pictures came off the inn's current website.
 
 ### 4. The menu — `/admin/menu`
 
-**What is there now is invented placeholder food**, five items across a few
-courses, put there to make the editor usable. It is the one piece of seeded
-content that was not taken from something the owner wrote, and it **must not be
-on the site at launch**.
+**Empty**, and the restaurant page says so: that the menu is not up yet and to
+ring the inn. Nothing invented is on the site.
 
 Add a **Course** (Starters, Mains, Puddings), then dishes under it with a name, a
-description of what is in it, and a price. Delete the placeholder courses when
-the real menu is in. The whole menu saves as one document, so a half-finished
-edit never reaches the public page — the previous menu stays until the save
-succeeds.
+description of what is in it, and a price. The whole menu saves as one document,
+so a half-finished edit never reaches the public page — the previous menu stays
+until the save succeeds.
+
+*A development machine loads `menu-mock.sql`, five invented dishes written to
+exercise this editor. It is deliberately not part of what is loaded onto the
+live server, so if a course called Starters appears here with food nobody
+cooked, that file was run somewhere it should not have been — say so rather than
+editing around it.*
 
 ### 5. Events — `/admin/events`
 
@@ -207,8 +212,7 @@ without the owner deciding to.
 ## Before the site goes public
 
 - [ ] **Real rate seasons in, placeholder season deleted** (§1)
-- [ ] **The placeholder menu deleted** (§4) — the one invented thing in the
-      database
+- [ ] **The real menu in, or left empty on purpose** (§4)
 - [ ] Descriptions for the six rooms without one (§2)
 - [ ] Photographs for Back Lavender and Flume (§3)
 - [ ] A sentence for the home page's search-engine description (§6)
