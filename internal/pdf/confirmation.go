@@ -59,10 +59,17 @@ const (
 	contentWide = pageWidth - 2*marginX
 )
 
+// The menu's palette, which is the site's and the email's: warm ink, the muted
+// brown under it, the paler line, and the barn red the mark is drawn in.
+//
+// No paper here. The page stays the sheet it is printed on, because a guest
+// printing this at home would otherwise spend a cartridge laying #f7f1e8 over
+// paper that is already that colour.
 var (
-	ink   = [3]int{28, 25, 23} // #1c1917, the same ink as the site and the email
-	faint = [3]int{120, 113, 108}
-	rule  = [3]int{231, 229, 228}
+	ink   = [3]int{51, 32, 28}  // #33201c
+	faint = [3]int{122, 98, 92} // #7a625c
+	rule  = [3]int{224, 204, 193}
+	barn  = [3]int{168, 36, 30} // #a8241e
 )
 
 // Render produces the confirmation as PDF bytes.
@@ -155,13 +162,13 @@ var markOutline = [...][2]float64{
 // does not have to know the grid.
 const markAspect = 211.0 / 58.0
 
-// mark draws the inn's three buildings, in ink.
+// mark draws the inn's three buildings, in the barn red.
 //
 // Drawn rather than embedded: a PDF wants vectors, and shipping a raster here
 // would be one more copy of the shape to keep in step with the other three.
 func mark(doc *fpdf.Fpdf, x, y, width float64) {
 	s := width / 211
-	doc.SetFillColor(ink[0], ink[1], ink[2])
+	doc.SetFillColor(barn[0], barn[1], barn[2])
 
 	points := make([]fpdf.PointType, 0, len(markOutline))
 	for _, p := range markOutline {

@@ -27,14 +27,21 @@ export function Layout({
   backdrop?: ReactNode
 }) {
   return (
+    // `site` is not a utility: it is where index.css redefines the neutral ramp
+    // and `white` to the menu's paper and ink, for everything underneath. The
+    // console renders no Layout, which is what keeps it out of the repaint.
     <div
-      className={`flex flex-col bg-white text-neutral-900 ${
+      className={`site flex flex-col bg-white text-neutral-900 ${
         fills ? 'h-dvh overflow-hidden' : 'min-h-dvh'
       }`}
     >
       {/* shrink-0 on both bars: in a fixed-height column it is main that has
-          room to give, not a header whose nav has wrapped. */}
-      <header className="shrink-0 border-b border-neutral-200">
+          room to give, not a header whose nav has wrapped.
+
+          The rule under it is the menu's masthead rule, and the one place the
+          accent appears on the site's chrome. The footer keeps the plain line,
+          exactly as the colophon does on the sheet. */}
+      <header className="shrink-0 border-b-2 border-barn">
         {/*
           gap-x-6 with a smaller gap-y: when the nav wraps under the wordmark on
           a narrow screen, a uniform gap-4 leaves it floating in the middle of
@@ -45,10 +52,16 @@ export function Layout({
           {/*
             The mark carries no words, so the name stays beside it and the image
             takes an empty alt rather than repeating what the link already says.
+
+            Set as the menu sets its wordmark: Fraunces, light, uppercased and
+            opened up. The uppercase is CSS and not the string — `inn.name` is
+            "The Beal House" everywhere else and a screen reader should still
+            hear it that way. `text-indent` matches the tracking, or the trailing
+            letter-space pushes the whole thing left of where it looks centred.
           */}
           <Link
             to="/"
-            className="flex items-center gap-2.5 text-lg font-semibold tracking-tight"
+            className="flex items-center gap-3 font-serif text-base font-semibold tracking-[0.15em] uppercase [text-indent:0.15em]"
           >
             <img src="/logo.svg" alt="" className="h-6 w-auto" />
             {inn.name}

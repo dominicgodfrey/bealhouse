@@ -1,54 +1,176 @@
 @import 'tailwindcss';
 
 /*
- * A humanist sans: the ground between the UI stack this started in, which read
- * like a dashboard for an 1833 house, and the transitional serif that replaced
- * it, which read a degree more formal than the inn does. Same broad-nib
- * calligraphy as the old serifs, with the serifs left off.
+ * The type and the colour on this site are the dinner menu's, carried onto the
+ * screen: Fraunces for names and headings, Karla for everything else, warm ink
+ * on warm paper with the barn red as the one accent.
  *
- * NO WEBFONT. Every family below is already on the machines that will read this
- * site, so it costs zero bytes and there is no FOUT — where a self-hosted file
- * would be ~100 KB per weight on a page meant to load on mountain mobile data.
- * Optima is the Apple one and the one this was chosen for; Candara is
- * Microsoft's answer to it and is what most visitors will see.
+ * THIS OVERTURNS THE NO-WEBFONT RULE THAT STOOD HERE. It said, correctly, that
+ * Optima and Candara are already on the machines that will read this and cost
+ * nothing — and that is still true and still what the fallbacks are. What
+ * changed is that the inn now has a printed identity, and a site set in a
+ * different face is a different inn. The bill is paid down as far as it goes:
+ * self-hosted rather than Google's CDN, so `font-src 'self'` in the CSP is
+ * untouched and there is no third-party request on the critical path; variable
+ * files, so one download covers 300–600 rather than one per weight; `swap`, so
+ * the words are readable in Candara from the first paint; and `unicode-range`,
+ * so the latin-ext files only ever arrive on a page that has a character in
+ * them. A first visit pays ~99 KB for the two latin files.
  */
+@font-face {
+  font-family: 'Fraunces';
+  font-style: normal;
+  font-weight: 300 600;
+  font-display: swap;
+  src: url('/fonts/fraunces-latin.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304,
+    U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: 'Fraunces';
+  font-style: normal;
+  font-weight: 300 600;
+  font-display: swap;
+  src: url('/fonts/fraunces-latin-ext.woff2') format('woff2');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308,
+    U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113,
+    U+2C60-2C7F, U+A720-A7FF;
+}
+@font-face {
+  font-family: 'Karla';
+  font-style: normal;
+  font-weight: 300 600;
+  font-display: swap;
+  src: url('/fonts/karla-latin.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304,
+    U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: 'Karla';
+  font-style: normal;
+  font-weight: 300 600;
+  font-display: swap;
+  src: url('/fonts/karla-latin-ext.woff2') format('woff2');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308,
+    U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113,
+    U+2C60-2C7F, U+A720-A7FF;
+}
+
 @theme {
+  /*
+   * The humanist sans the whole app was set in, and still what the console is
+   * set in: the ground between the UI stack this started in, which read like a
+   * dashboard for an 1833 house, and the transitional serif that replaced it,
+   * which read a degree more formal than the inn does.
+   *
+   * Every family here is already on the machines that will read this, so it
+   * costs zero bytes and there is no FOUT. That is why it is also the fallback
+   * under Karla on the public site, and why the console — which never renders a
+   * `.site` — fetches no webfont at all.
+   */
   --font-sans:
     Optima, Candara, 'Gill Sans', 'Gill Sans MT', 'Trebuchet MS', 'Segoe UI', ui-sans-serif,
     system-ui, sans-serif;
 
-  /* One family everywhere: the alias stops a stray `font-serif` dropping to Times. */
+  /* One family in the console: the alias stops a stray `font-serif` dropping to
+     Times. `.site` below is where it becomes a second real face. */
   --font-serif: var(--font-sans);
 
   /*
-   * Burnt sienna, taken most of the way to white. Full strength fights the red
-   * house behind the home page; this stays quiet over a photograph and still
-   * reads as a colour rather than as dirty white on the pages that are white.
-   *
-   * It is the fill on every panel the site has — cards, forms, the menu, the
-   * calendar — so `border-neutral-200` around one of them is a grey line on a
-   * warm ground. `sienna-line` is the same hue carried far enough past the fill
-   * to read as an edge.
+   * The barn red off the menu — the crest, the rule under the masthead, the
+   * ABV keys. One accent and it is used sparingly: the mark, and the line under
+   * the site's header. Money stays ink, because a price in red reads as a sale.
    */
-  --color-sienna: #f2ddd0;
-  --color-sienna-line: #e0bda7;
+  --color-barn: #a8241e;
+
+  /*
+   * The panel fill and its edge, still a pair, now taken from the menu's second
+   * ground rather than from a tint of the old sienna. `sienna` is what every
+   * panel on the public site is filled with — cards, forms, the menu, the
+   * calendar — so a `border-neutral-200` around one of them is the wrong line;
+   * `sienna-line` is the same hue carried past the fill to read as an edge.
+   *
+   * The names are unchanged on purpose: they are load-bearing in about thirty
+   * places and what they mean — panel, and the edge of a panel — did not.
+   */
+  --color-sienna: #e9dccf;
+  --color-sienna-line: #d3b9a8;
 }
 
 /*
- * "There is room under the field for a dropdown."
+ * The inn's own type and paper, and the seam that keeps both off the console.
  *
- * Width alone is the wrong test: a 1280×600 window is wide and has no room in
- * it, and the calendar hung off the bottom of a page that cannot scroll. Height
- * alone is wrong too — a tall phone has the pixels and not the width for two
- * months side by side. Below both, the picker becomes a sheet against the
- * bottom of the viewport instead.
+ * Tailwind v4 compiles `text-neutral-700` to `color: var(--color-neutral-700)`,
+ * so redefining the ramp on an ancestor repaints every utility underneath it
+ * without touching the utilities themselves. `.site` is on <Layout>'s root
+ * element, and <Layout> is used by the public pages and by nothing else — the
+ * console imports `ErrorNote` and `Loading` from that file but never the shell.
+ * So the console keeps the grey ramp and the old face from `:root`, which is
+ * the point: it is a tool, not the inn's front, and the inn's paper stock on a
+ * table of bookings would be costume.
+ *
+ * Nothing public renders outside this element — no portals — so there is no
+ * second place to remember.
+ *
+ * The ramp is the menu's own five values with the gaps interpolated: paper at
+ * 100, the rule at 200, the faint grey-brown at 400, the muted body colour at
+ * 500 and the ink at 900. `white` becomes the paper because that is what the
+ * sheet is; `bg-white` on this site has always meant "the page", not "#fff".
+ *
+ * The dark end is checked rather than eyeballed: 500 on paper is 5.1:1, which
+ * is where the small print lives, and every step below it is darker.
  */
-@custom-variant roomy (@media (min-width: 640px) and (min-height: 760px));
+.site {
+  /*
+   * Karla is the menu's body face; the stack above stays behind it verbatim, so
+   * what renders during `swap` — and on anything that fails to fetch — is the
+   * face this site had before, never Arial. The explicit `font-family` is not
+   * redundant: preflight sets it on <html> from `:root`, and inheritance
+   * carries the resolved string rather than the variable, so redefining the
+   * variable alone would change nothing.
+   */
+  --font-sans:
+    Karla, Optima, Candara, 'Gill Sans', 'Gill Sans MT', 'Trebuchet MS', 'Segoe UI', ui-sans-serif,
+    system-ui, sans-serif;
+  font-family: var(--font-sans);
+
+  /*
+   * Here `font-serif` is a real second family rather than an alias: Fraunces,
+   * which is what the menu sets every dish name and its wordmark in. Georgia
+   * stands in for it because it is the humanist serif everyone already has.
+   */
+  --font-serif: Fraunces, Georgia, 'Iowan Old Style', 'Palatino Linotype', serif;
+
+  --color-white: #f7f1e8;
+
+  --color-neutral-50: #fbf7f2;
+  --color-neutral-100: #f4ede4;
+  --color-neutral-200: #e0ccc1;
+  --color-neutral-300: #cdb4a7;
+  --color-neutral-400: #a8938c;
+  --color-neutral-500: #7a625c;
+  --color-neutral-600: #66504b;
+  --color-neutral-700: #533f3a;
+  --color-neutral-800: #422f2a;
+  --color-neutral-900: #33201c;
+  --color-neutral-950: #241412;
+}
 
 /*
- * Numbers line up wherever they are compared. Written for Georgia and still
- * needed for Candara, whose default figures are old-style — handsome in a
- * sentence, unreadable in a column of money.
+ * Headings are the display face, everywhere on the public site, without a
+ * `font-serif` having to be added to forty elements that would then have to be
+ * kept in step. This is the one blanket element rule here and it is scoped to
+ * `.site`, so the console's headings are untouched along with its colour.
+ */
+.site :is(h1, h2, h3) {
+  font-family: var(--font-serif);
+  font-weight: 500;
+}
+
+/*
+ * Numbers line up wherever they are compared. Written for Georgia, still needed
+ * for Candara underneath, and still needed for Karla — its default figures are
+ * proportional, so a column of money without this is a ragged column of money.
  */
 .tabular-nums {
   font-variant-numeric: lining-nums tabular-nums;

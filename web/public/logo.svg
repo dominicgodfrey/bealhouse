@@ -1,5 +1,10 @@
 <!--
-  The Beal House mark: the three connected buildings, in ink on nothing.
+  The Beal House mark: the three connected buildings, in barn red on nothing.
+
+  The red is the menu's accent (#a8241e) and the mark is the only thing on the
+  public site that carries it besides the rule under the header. It was ink
+  until the site was brought into step with the printed menu, where the crest at
+  the top of the sheet is this same outline in this same red.
 
   Traced from the owner's artwork rather than drawn by eye. The outline is
   walked on the source's pixel grid and then fitted to straight lines, so what
@@ -19,5 +24,5 @@
 -->
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 211 58"
      role="img" aria-label="The Beal House">
-  <path fill="#1c1917" d="M27 0L30 0L30 7L56 7L56 0L60 0L60 7L70 7L79 20L95 20L95 14L99 15L99 20L143 20L147 15L169 15L169 10L172 7L176 7L178 9L179 15L197 15L211 29L209 30L209 58L160 58L160 26L153 19L151 19L151 17L148 18L148 20L151 21L151 58L71 58L71 20L76 20L76 19L73 17L70 11L68 12L68 14L65 16L65 18L62 21L62 58L2 58L2 21L0 20L12 8L26 7Z" />
+  <path fill="#a8241e" d="M27 0L30 0L30 7L56 7L56 0L60 0L60 7L70 7L79 20L95 20L95 14L99 15L99 20L143 20L147 15L169 15L169 10L172 7L176 7L178 9L179 15L197 15L211 29L209 30L209 58L160 58L160 26L153 19L151 19L151 17L148 18L148 20L151 21L151 58L71 58L71 20L76 20L76 19L73 17L70 11L68 12L68 14L65 16L65 18L62 21L62 58L2 58L2 21L0 20L12 8L26 7Z" />
 </svg>

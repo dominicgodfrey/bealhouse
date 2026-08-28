@@ -1,16 +1,23 @@
 <!--
-  The mark knocked out of a black tile, square, for the browser tab.
+  The mark knocked out of a barn red tile, square, for the browser tab.
 
   Square because the mark is nearly four times wider than it is tall, and a tab
   renders that at a height nothing can read. The tile and the mark's placement
   in it are the owner's own artwork exactly: a 225 square, the mark 211 x 58
-  sitting at (7, 83), white on black.
+  sitting at (7, 83).
+
+  Reversed out rather than red-on-paper, which is what the menu's crest and
+  logo.svg are. At tab size the mark is a few pixels of hairline: on the paper
+  ground it disappears, and reversing it out is the whole reason this file is
+  not just logo.svg. So the tile takes the accent (#a8241e, was black) and the
+  mark takes the paper (#f7f1e8, was white) — the same two colours, the same
+  way round as the artwork.
 
   Same outline as logo.svg. Keep the two in step if either changes.
 -->
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 225 225"
      role="img" aria-label="The Beal House">
-  <rect width="225" height="225" fill="#000000" />
-  <path fill="#ffffff" transform="translate(7 83)"
+  <rect width="225" height="225" fill="#a8241e" />
+  <path fill="#f7f1e8" transform="translate(7 83)"
         d="M27 0L30 0L30 7L56 7L56 0L60 0L60 7L70 7L79 20L95 20L95 14L99 15L99 20L143 20L147 15L169 15L169 10L172 7L176 7L178 9L179 15L197 15L211 29L209 30L209 58L160 58L160 26L153 19L151 19L151 17L148 18L148 20L151 21L151 58L71 58L71 20L76 20L76 19L73 17L70 11L68 12L68 14L65 16L65 18L62 21L62 58L2 58L2 21L0 20L12 8L26 7Z" />
 </svg>

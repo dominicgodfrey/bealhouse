@@ -11,16 +11,29 @@
     contexts, and flexbox is not dependable anywhere. This is the boring shape
     that survives all of them.
   -->
-  <body style="margin:0;padding:0;background-color:#f5f5f4;">
+  <!--
+    The palette is the menu's and the site's: the deeper ground behind, the
+    paper as the sheet, the pale rule as its edge, warm ink for the words. The
+    faces are not — Fraunces and Karla are on nobody's mail client, a webfont in
+    an email is stripped by most of them, and `font-family` here has to name
+    something already installed. Georgia is the serif that stands in for
+    Fraunces on the site too.
+  -->
+  <body style="margin:0;padding:0;background-color:#e4d8ce;">
     <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"
-           style="background-color:#f5f5f4;padding:24px 12px;">
+           style="background-color:#e4d8ce;padding:24px 12px;">
       <tr>
         <td align="center">
           <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"
-                 style="max-width:560px;background-color:#ffffff;border:1px solid #e7e5e4;border-radius:8px;">
+                 style="max-width:560px;background-color:#f7f1e8;border:1px solid #e0ccc1;border-radius:8px;">
 
             <tr>
-              <td align="center" style="padding:28px 24px 8px 24px;">
+              {{/* The rule under the letterhead is the menu's masthead rule and
+                   the site header's, in the same barn red. A border on the cell
+                   rather than a spacer row: it is one declaration and Word's
+                   engine draws it. */}}
+              <td align="center"
+                  style="padding:28px 24px 12px 24px;border-bottom:2px solid #a8241e;">
                 {{/*
                   The logo when one is configured, the inn's name when not.
                   Never a broken image: a guest with images switched off, or a
@@ -32,7 +45,8 @@
                        style="display:block;border:0;max-width:160px;height:auto;" />
                 {{else}}
                   <p style="margin:0;font-family:Georgia,'Times New Roman',serif;font-size:22px;
-                            letter-spacing:0.02em;color:#1c1917;">{{.Brand.InnName}}</p>
+                            letter-spacing:0.15em;text-transform:uppercase;
+                            color:#33201c;">{{.Brand.InnName}}</p>
                 {{end}}
               </td>
             </tr>
@@ -40,7 +54,7 @@
             <tr>
               <td style="padding:8px 24px 28px 24px;font-family:-apple-system,BlinkMacSystemFont,
                          'Segoe UI',Helvetica,Arial,sans-serif;font-size:15px;line-height:1.55;
-                         color:#1c1917;">
+                         color:#33201c;">
                 {{.Data}}
               </td>
             </tr>
@@ -48,9 +62,9 @@
           </table>
 
           <p style="margin:16px 0 0 0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',
-                    Helvetica,Arial,sans-serif;font-size:12px;color:#78716c;">
+                    Helvetica,Arial,sans-serif;font-size:12px;color:#7a625c;">
             {{.Brand.InnName}}{{if .Brand.SiteURL}} &middot;
-              <a href="{{.Brand.SiteURL}}" style="color:#78716c;">{{.Brand.SiteURL}}</a>
+              <a href="{{.Brand.SiteURL}}" style="color:#7a625c;">{{.Brand.SiteURL}}</a>
             {{end}}
           </p>
         </td>

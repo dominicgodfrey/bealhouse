@@ -302,8 +302,10 @@ has been charged and with nothing in front of the owner to connect it to the
 sentence they typed.
 
 **The logo is the owner's and is now in the repo**, as one path in
-`web/public/logo.svg` — three connected buildings, ink on nothing, on a
-**211 × 58** grid.
+`web/public/logo.svg` — three connected buildings, on a **211 × 58** grid, in
+the menu's barn red (`#a8241e`). It was ink until the site was brought into step
+with the printed menu, where the crest above the wordmark is this same outline
+in this same red.
 
 **It is a trace of the owner's artwork, not a drawing of it.** The outline was
 walked on the source raster's pixel grid and fitted to straight lines; it
@@ -314,13 +316,19 @@ the proportions visibly wrong (316 × 108 against a true 211 × 58), which is
 exactly the mistake re-tidying would reintroduce.
 
 Three derivatives sit beside it and must be kept in step by hand if the shape
-ever changes: `favicon.svg` is the same path reversed out of a black tile,
+ever changes: `favicon.svg` is the same path reversed out of a solid tile,
 square because the mark is nearly four times wider than tall and a browser tab
 renders that at a height nothing can read; `logo-email.png` is it rasterised at
 640 × 176, because mail clients do not render SVG and the layout asks for it at
 160 wide; `pdf.mark` draws the same outline a fourth time from `markOutline`, in
 fpdf primitives on the same grid, because a PDF wants vectors and not a raster
 to keep in step.
+
+**The favicon is the one that is reversed, and it stays that way.** At tab size
+the mark is a few pixels of hairline and red-on-paper disappears, which is the
+whole reason that file is not just `logo.svg`. So its tile takes the accent and
+the mark takes the paper — the same two colours as everywhere else, the same way
+round as the owner's artwork, which was white on black.
 
 The source artwork is a small raster (225 px square, the mark 211 × 58 inside
 it), so this trace inherits its quantisation — a few one-pixel jogs on the
@@ -347,18 +355,56 @@ about the food would sit on the public internet until somebody remembered it.
 One string, `innName` in `internal/httpx/meta.go` and `inn.name` in
 `web/src/lib/contact.ts`.
 
-**The type is a humanist sans and there is no webfont** (`index.css`). Optima,
-then Candara, which is what most visitors will see — already installed
-everywhere, so it costs zero bytes and there is no FOUT. The `.tabular-nums`
-rule is not decoration: Candara's default figures are old-style, like Georgia's
-before it, and money in a column needs the lining set.
+**The site is set in the dinner menu's type and painted in its palette**
+(`index.css`). Fraunces for the wordmark and every heading, Karla for
+everything else, warm ink on warm paper with one barn red accent. The printed
+menu is the inn's identity and a site in a different face is a different inn.
 
-**Two custom colours, and they are a pair.** `--color-sienna` fills every panel
-on the public site — cards, forms, the menu's rules, the calendar — and
-`--color-sienna-line` is the same hue carried past it to read as an edge. A
-`border-neutral-200` on one of these is a grey line on a warm ground. The site
-chrome (header, footer) stays neutral so the frame does not compete with the
-pages, and the console is untouched: it is a tool, not the inn's front.
+- **There are webfonts now, and there deliberately were not before.** The rule
+  that stood here — Optima then Candara, already installed everywhere, zero
+  bytes, no FOUT — is still the fallback stack and still what renders during
+  `swap`. What is paid for the match is held down on every axis available:
+  **self-hosted** in `web/public/fonts`, so `font-src 'self'` in the CSP is
+  untouched and there is no third-party request on the critical path;
+  **variable** files, so one download covers 300–600 rather than one per
+  weight; `font-display: swap`; and `unicode-range`, so the latin-ext files
+  only arrive on a page that has a character in them. A first visit pays
+  ~99 KB. **Do not reach for Google's CDN** — it costs two CSP hosts and a
+  render-blocking hop for nothing this does not already have.
+- **`font-serif` is a real second family again**, not the alias to the sans it
+  used to be. Headings take it through one scoped element rule in `index.css`
+  rather than a `font-serif` added to forty elements that would then have to be
+  kept in step.
+- The `.tabular-nums` rule is not decoration: Karla's default figures are
+  proportional, as Candara's are old-style and Georgia's were before it, and
+  money in a column needs the lining set.
+
+**The palette is the menu's, and it is applied by redefining the ramp rather
+than by rewriting the utilities.** Tailwind v4 compiles `text-neutral-700` to
+`var(--color-neutral-700)`, so `.site` — one class, on `Layout`'s root element —
+redefines `neutral-50…950` and `white` to the menu's paper (#f7f1e8), rule,
+muted and ink (#33201c), and everything underneath repaints. The dark end is
+checked and not eyeballed: `neutral-500` on paper is 5.1:1, which is where the
+small print lives.
+
+  **`Layout` is the seam, and that is why the console is untouched.** The public
+  pages render a `Layout`; the console imports `ErrorNote` and `Loading` from
+  that file but never the shell, so it keeps the grey ramp *and the old humanist
+  stack* from `:root` — the faces are scoped to `.site` exactly as the colours
+  are, which is also why the console fetches no webfont at all. It is a tool,
+  not the inn's front, and the inn's paper stock behind a table of bookings
+  would be costume. Nothing public renders outside that element — there are no
+  portals — so there is no second place to remember.
+
+  **`--color-sienna` and `--color-sienna-line` are still a pair and still mean
+  what they meant** — the fill on every panel the public site has (cards, forms,
+  the menu's rules, the calendar) and the same hue carried past it to read as an
+  edge. Only the values moved, onto the menu's second ground. A
+  `border-neutral-200` on one of these is still the wrong line.
+
+  **The barn red is one accent and stays one.** The mark, and the rule under the
+  site header, which is the menu's masthead rule. Money stays ink: a price in
+  red reads as a sale.
 
 **The home page is one screenful and does not scroll**, on a desktop monitor and
 on a phone alike (`Layout`'s `fills`). Header, the search under it, the
@@ -1024,6 +1070,13 @@ balance landed this morning must not hand out a PDF saying it is outstanding.
 `Â·` and "Châtelet" is worse. Anything outside cp1252 needs an embedded TrueType
 font; that is a change to make when a guest needs it, not a megabyte carried on
 the chance.
+
+**Which is also why the PDF is the one surface not set in the site's faces.**
+It takes the menu's colours — ink, the muted brown, the pale rule, the mark in
+barn red — and keeps Times and Helvetica, because Fraunces and Karla here mean
+embedding two TrueType files and giving up the built-in cp1252 handling above.
+It does not take the paper: a guest printing this at home would spend a
+cartridge laying #f7f1e8 over paper that is already that colour.
 
 **The mark is drawn, not embedded** (`pdf.mark`, from `markOutline`) — the same
 outline as `web/public/logo.svg`, on the same 211 × 58 grid. Four files now
