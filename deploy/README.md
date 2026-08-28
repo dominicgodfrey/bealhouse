@@ -204,6 +204,19 @@ Off-box copies go wherever rclone can address — set `BACKUP_REMOTE` in
 `/etc/bealhouse/backup.env`. A provider snapshot is not a substitute and is not
 a tested restore.
 
+`rclone` is not in the provisioning list above, because until a destination is
+chosen there is nothing for it to talk to:
+
+```bash
+apt install -y rclone
+sudo -u bealhouse rclone config      # writes ~bealhouse/.config/rclone
+```
+
+Do both, or neither. `backup.sh` runs under `set -e`, so a `BACKUP_REMOTE` set
+with no `rclone` installed makes the nightly unit fail *after* it has written a
+perfectly good local set — which reads like a broken backup and is really a
+missing package.
+
 **The drill runs itself**, from `bealhouse-verify.timer` every Sunday at 05:30 —
 after Sunday's backup has finished, on the set it just wrote. It restores into a
 scratch database and a temporary directory, checks every photo row against a
@@ -264,3 +277,7 @@ being alerted.
 - **Stripe live keys**, after the verification matrix in ARCHITECTURE.md.
 - **Resend DNS** — SPF, DKIM and DMARC at Bluehost (decision #17); SPF has to
   include Resend *and* the mailbox host.
+- **An off-box copy of the backups.** The nightly set and the weekly drill both
+  live on the same disk as the database they protect, which covers a bad
+  migration and a deleted row and does not cover losing the box. That needs a
+  destination somebody has to choose and pay for — see `BACKUP_REMOTE` above.
