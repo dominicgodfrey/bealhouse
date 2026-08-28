@@ -112,14 +112,44 @@ systemctl enable --now bealhouse bealhouse-backup.timer bealhouse-verify.timer
 
 ### The seed, once
 
-The seven rooms and the placeholder rate season. **Not** run by `deploy.sh`: it
-is reference data the owner then edits, and re-running it over a live database
-is not something a deploy should be able to do by accident.
+Reference data the owner then edits. **Not** run by `deploy.sh`: re-running it
+over a live database is not something a deploy should be able to do by accident.
+All four files are re-runnable.
+
+**The order is not decoration and neither is what is missing from it.**
+`rooms.sql` describes the seven rooms as facts — occupancy, beds, views, the pet
+room — and deliberately leaves every description as the literal string
+`PLACEHOLDER`, so that one reaching the live site is unmistakable rather than
+plausible. `content.sql` is what clears them: the owner's own sentences,
+transcribed from the inn's current site, and with them the amenities and the
+prose on six pages. **Run rooms and stop, and seven room pages say
+"PLACEHOLDER — final copy to be supplied by the owner." to the public internet.**
 
 ```bash
+cd /path/to/checkout
 sudo -u postgres psql -d bealhouse -v ON_ERROR_STOP=1 -f internal/db/seed/rooms.sql
+sudo -u postgres psql -d bealhouse -v ON_ERROR_STOP=1 -f internal/db/seed/content.sql
+sudo -u postgres psql -d bealhouse -v ON_ERROR_STOP=1 -f internal/db/seed/attractions.sql
 sudo -u postgres psql -d bealhouse -v ON_ERROR_STOP=1 -f internal/db/seed/rates.sql
 ```
+
+Then check that none of it stayed behind, which is one query and is worth the
+ten seconds:
+
+```bash
+sudo -u postgres psql -d bealhouse -c "SELECT slug FROM rooms WHERE description LIKE 'PLACEHOLDER%'"
+```
+
+**`internal/db/seed/menu-mock.sql` is not in that list and must not be run on
+this box.** It is invented food, written to exercise the menu editor, and it is
+the only seeded content that is nobody's real words. A restaurant page with no
+menu correctly says the menu is not up and to ring the inn; a restaurant page
+with five invented dishes on it is a lie that stays up until somebody remembers.
+
+`rates.sql` is the one seed whose numbers charge a card — a single flat
+placeholder season, so the rooms are sellable on day one. Replacing it is the
+first item in [OWNER-SETUP.md](../OWNER-SETUP.md), and the only item there that
+can charge somebody the wrong amount.
 
 ### The first phone
 
