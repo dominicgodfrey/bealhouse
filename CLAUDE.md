@@ -364,13 +364,22 @@ menu is the inn's identity and a site in a different face is a different inn.
   that stood here — Optima then Candara, already installed everywhere, zero
   bytes, no FOUT — is still the fallback stack and still what renders during
   `swap`. What is paid for the match is held down on every axis available:
-  **self-hosted** in `web/public/fonts`, so `font-src 'self'` in the CSP is
+  **self-hosted** in `web/src/fonts`, so `font-src 'self'` in the CSP is
   untouched and there is no third-party request on the critical path;
   **variable** files, so one download covers 300–600 rather than one per
   weight; `font-display: swap`; and `unicode-range`, so the latin-ext files
-  only arrive on a page that has a character in them. A first visit pays
+  only arrive on a page that has a character in them. A **first** visit pays
   ~99 KB. **Do not reach for Google's CDN** — it costs two CSP hosts and a
   render-blocking hop for nothing this does not already have.
+  - **`src/fonts` and not `public/fonts`, and that is what makes "first visit"
+    true.** Referenced relatively from `index.css`, Vite fingerprints them into
+    `/assets`, which `serveSPA` already answers `immutable` for a year. In
+    `public/` they would keep their own names and be served `no-cache` — and
+    `no-cache` needs a validator to become a 304, which the embedded bundle
+    cannot supply: `embed.FS` files have no modification time, so nothing sets
+    `Last-Modified` and nothing sets an `ETag`. All ~99 KB would go out again on
+    every cold load. It also means swapping a typeface renames the file by
+    itself rather than by somebody remembering to.
 - **`font-serif` is a real second family again**, not the alias to the sans it
   used to be. Headings take it through one scoped element rule in `index.css`
   rather than a `font-serif` added to forty elements that would then have to be
