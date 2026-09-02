@@ -19,29 +19,165 @@ Files in this directory:
 
 ## Provisioning, once
 
-Debian 12 or Ubuntu 24.04. Everything below is root.
+**Debian 12.** Ubuntu 24.04 works the same way; substitute `noble` for
+`bookworm` in the PostgreSQL source below. Everything here is root, over ssh,
+and the box needs no domain yet — nothing until the Caddy step cares.
+
+If the provider's console does not offer the CX line in Ashburn, take the **AMD
+equivalent** at the same memory rather than dropping a size — decision #2 rests
+on the 4 GB, not on the processor, because the image pipeline is what a smaller
+box fails on.
+
+**Attach the ssh key when the server is created**, in the provider's console
+rather than afterwards. That writes it to root's `authorized_keys` on first boot
+and leaves password authentication off; adding it later means a window with a
+root password answering on the public internet.
+
+### The clock
+
+`internal/civil` resolves in America/New_York and the backup timer fires on
+local time, so a box left on UTC dumps at the wrong hour and disagrees with the
+inn about which day it is.
 
 ```bash
-# The clock. internal/civil resolves in America/New_York and the backup timer
-# fires on local time, so the box agrees with the inn.
 timedatectl set-timezone America/New_York
+```
 
-apt update && apt install -y postgresql caddy curl
+### Base packages, and security updates
+
+```bash
+apt update && apt -y full-upgrade && apt install -y curl ca-certificates gnupg unattended-upgrades
+```
+
+Unattended upgrades are safe here because the service was written for them:
+`bealhouse.service` says `Wants=postgresql.service` and not `Requires=`, and the
+binary is built to survive a database it cannot reach. A Postgres restart for a
+security patch is a couple of seconds of `"db":"down"` on `/api/health`, not an
+outage — which is the same property the health endpoint exists to report.
+
+### Swap
+
+The CX22 ships with none, and 4 GB with an image pipeline decoding 4000px phone
+photographs is where the OOM killer picks something. On this box the something
+it picks would be Postgres.
+
+```bash
+fallocate -l 2G /swapfile && chmod 600 /swapfile && mkswap /swapfile && swapon /swapfile && echo '/swapfile none swap sw 0 0' >> /etc/fstab
+```
+
+### Firewall
+
+Three ports in. Postgres binds to loopback by default and must stay there —
+`DATABASE_URL` carries `sslmode=disable`, which is only defensible while the
+connection never leaves the machine.
+
+```bash
+apt install -y ufw && ufw allow 22/tcp && ufw allow 80/tcp && ufw allow 443/tcp && ufw --force enable
+```
+
+### PostgreSQL 17, from PGDG
+
+**Not `apt install postgresql`,** which on Debian 12 is PostgreSQL 15 — two
+majors behind what this project is developed and tested against.
+`docker-compose.yml` and both CI jobs pin `postgres:17-alpine`, and the whole
+architecture is a bet on Postgres behaviour: the exclusion constraint,
+`pg_advisory_xact_lock`, range types, `now()` meaning the transaction's start,
+`SKIP LOCKED` in the jobs runner. All of those are stable well before 15, so 15
+would very probably be fine — but "probably fine" is a strange thing to say
+about the layer that prevents double-booking, and closing the gap costs one apt
+source.
+
+```bash
+install -d /usr/share/postgresql-common/pgdg && curl -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc --fail https://www.postgresql.org/media/keys/ACCC4CF8.asc
+```
+
+```bash
+echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] https://apt.postgresql.org/pub/repos/apt bookworm-pgdg main" > /etc/apt/sources.list.d/pgdg.list && apt update && apt install -y postgresql-17
+```
+
+### Caddy, from Caddy
+
+**Not `apt install caddy` either.** Debian 12 does carry a `caddy` package and
+it is **2.6.2**, from late 2022. For the process terminating TLS on the public
+internet, take the current stable from the repository Caddy itself documents.
+
+```bash
+apt install -y debian-keyring debian-archive-keyring apt-transport-https && curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/gpg.key' | gpg --dearmor -o /usr/share/keyrings/caddy-stable-archive-keyring.gpg && curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt' > /etc/apt/sources.list.d/caddy-stable.list && apt update && apt install -y caddy
+```
+
+The package starts Caddy immediately, serving its own default page on port 80
+until the Caddyfile below replaces it. That page is a useful sign the box is
+reachable before there is anything else to ask for.
+
+### The service account, the database, the directories
+
+**Two different things are called `bealhouse` here and they are unrelated**: a
+Unix system account the binary runs as, and a Postgres role. Same name on
+purpose, no connection between them.
+
+```bash
 adduser --system --group --home /var/lib/bealhouse bealhouse
+```
 
+```bash
 sudo -u postgres createuser bealhouse
 sudo -u postgres createdb --owner bealhouse bealhouse
 sudo -u postgres psql -c "ALTER USER bealhouse WITH PASSWORD '<a long random one>'"
+```
 
-# btree_gist, for the exclusion constraint that prevents double-booking. The
-# first migration creates the extension and needs a superuser to do it.
+Keep that password; it goes into `DATABASE_URL` below.
+
+`btree_gist` is what the exclusion constraint that prevents double-booking is
+built on. The first migration creates the extension and needs a superuser to do
+it, which is why it is here and not in the migration path:
+
+```bash
 sudo -u postgres psql -d bealhouse -c 'CREATE EXTENSION IF NOT EXISTS btree_gist'
+```
 
+```bash
 install -d -o bealhouse -g bealhouse /var/lib/bealhouse/media
 install -d -o bealhouse -g bealhouse /var/backups/bealhouse
 install -d -o root -g root -m 0755 /usr/local/share/bealhouse
 install -d -o root -g root -m 0750 /etc/bealhouse
 ```
+
+### The deploy account
+
+`deploy.sh` connects as `$BEAL_HOST` and runs `sudo` over a **non-interactive**
+ssh, so the account it uses needs passwordless sudo — a password prompt there is
+a hang with no output and nothing in any log.
+
+```bash
+adduser --disabled-password --gecos "" inn
+install -d -m 700 -o inn -g inn /home/inn/.ssh
+cp /root/.ssh/authorized_keys /home/inn/.ssh/ && chown inn:inn /home/inn/.ssh/authorized_keys
+```
+
+```bash
+echo 'inn ALL=(ALL) NOPASSWD:ALL' > /etc/sudoers.d/inn && chmod 440 /etc/sudoers.d/inn && visudo -c
+```
+
+Deploying as `root@` instead works and skips this entirely. The trade is that
+every deploy is then a root session, where this way the account with passwordless
+sudo is one that exists only to deploy.
+
+### Before moving on
+
+```bash
+psql -h 127.0.0.1 -U bealhouse -d bealhouse -c 'SELECT version()'
+ss -ltnp | grep 5432
+```
+
+PostgreSQL 17.x, and 5432 bound to `127.0.0.1` — never `0.0.0.0`. It is the
+default and it is worth seeing rather than assuming, for the `sslmode=disable`
+reason above.
+
+```bash
+ssh inn@<the box> 'sudo systemctl is-active caddy && timedatectl | head -3'
+```
+
+`active`, `America/New_York`, and no prompt for anything.
 
 ### `/etc/bealhouse/env`
 
@@ -86,7 +222,7 @@ set unless no Stripe variable is configured *and* `ENV` is dev, but the reason i
 is checked at all is that `ENV` defaults to dev — an unconfigured production
 deploy would otherwise look exactly like a laptop.
 
-### Caddy
+### The Caddyfile
 
 ```bash
 cp deploy/Caddyfile /etc/caddy/Caddyfile
