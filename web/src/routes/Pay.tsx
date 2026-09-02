@@ -1,5 +1,9 @@
 import { Elements, PaymentElement, useElements, useStripe } from '@stripe/react-stripe-js'
-import { loadStripe, type Stripe } from '@stripe/stripe-js'
+import { loadStripe } from '@stripe/stripe-js/pure'
+// The type only: `import type` is erased at compile time, so this is not the
+// side-effecting import the line above exists to avoid. /pure exports the
+// function and not the types.
+import type { Stripe } from '@stripe/stripe-js'
 import { useState } from 'react'
 import { useNavigate, useParams } from 'react-router'
 
@@ -13,6 +17,25 @@ import { useAsync } from '../lib/useAsync'
  * render. Cached here rather than at module scope because the key arrives with
  * the payment rather than being baked into the build — the same bundle has to
  * work against test keys, live keys, and no keys at all.
+ *
+ * **The import is `/pure` and that is the load-bearing part.** Importing
+ * `@stripe/stripe-js` fetches js.stripe.com as a side effect of the import
+ * itself, which its own README says plainly. This app is one bundle with no
+ * route splitting, so that side effect ran on every page — the home page, the
+ * rooms, the restaurant — and brought Stripe's fraud beacon and its
+ * m.stripe.com cookie with it. Lighthouse on the home page is what found it:
+ * two Best Practices failures, both this.
+ *
+ * It was doing that while the inn had no Stripe account at all. Loading it
+ * everywhere is Stripe's own recommendation, because browsing signal makes
+ * their fraud detection better — but that is a trade to make deliberately for a
+ * seven-room inn, not one to inherit from an import, and it sits badly beside
+ * self-hosting the webfonts to keep a third party off the critical path.
+ *
+ * `/pure` moves the fetch to the first `loadStripe` call, so Stripe.js loads on
+ * this page and the console's Collect screen and nowhere else. To give up the
+ * remaining signal as well, `loadStripe.setLoadParameters({ advancedFraudSignals:
+ * false })` — that one moves fraud liability and is not ours to take quietly.
  */
 const stripeByKey = new Map<string, Promise<Stripe | null>>()
 

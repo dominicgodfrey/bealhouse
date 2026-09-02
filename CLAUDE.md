@@ -622,6 +622,23 @@ only the last two steps need one.
   `www.openstreetmap.org` in `frame-src` for the About page's map. It has no
   `unsafe-inline` for scripts and the Vite build needs none; keep it that way.
   HSTS is asserted only on a request that actually arrived over TLS.
+  - **Stripe.js is imported from `@stripe/stripe-js/pure`, in both call sites,
+    and that is not a style choice.** The plain import fetches js.stripe.com as
+    a side effect of the import itself — its own README says so — and this
+    bundle has no route splitting, so it ran on the home page, the rooms and
+    the restaurant, bringing Stripe's fraud beacon and an `m.stripe.com`
+    third-party cookie to every visitor. It was doing that while the inn had no
+    Stripe account at all. Lighthouse on the home page is what found it; the
+    fix took Best Practices from 77 to 100. **One plain import anywhere puts it
+    back on every page**, which is why `Pay.tsx` and the console's `Collect.tsx`
+    both use `/pure` and why the type comes from a separate `import type` (erased
+    at compile time, so it carries no side effect).
+  - Loading Stripe.js everywhere is Stripe's own recommendation — browsing
+    signal improves their fraud detection — so this trades a little of that for
+    keeping a third party off pages that take no payment, which is the same
+    reasoning the webfonts are self-hosted under. `loadStripe.setLoadParameters({
+    advancedFraudSignals: false })` gives up the rest of it and moves fraud
+    liability; that one is the owner's call, not a default to take quietly.
 
 ## Step 4: payments
 

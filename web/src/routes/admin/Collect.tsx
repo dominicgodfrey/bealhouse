@@ -1,5 +1,9 @@
 import { Elements, PaymentElement, useElements, useStripe } from '@stripe/react-stripe-js'
-import { loadStripe, type Stripe } from '@stripe/stripe-js'
+import { loadStripe } from '@stripe/stripe-js/pure'
+// The type only: `import type` is erased at compile time, so this is not the
+// side-effecting import the line above exists to avoid. /pure exports the
+// function and not the types.
+import type { Stripe } from '@stripe/stripe-js'
 import { useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router'
 
@@ -54,6 +58,11 @@ export function Collect() {
  * loadStripe fetches a script and should happen once per key, not once per
  * render. Cached here rather than at module scope because the key arrives with
  * the payment rather than being baked into the build.
+ *
+ * `/pure` for the reason Pay.tsx gives at length: the plain import fetches
+ * js.stripe.com as a side effect, and in a bundle with no route splitting that
+ * means every page on the public site. Both call sites have to use it — one
+ * plain import anywhere puts the script back on all of them.
  */
 const stripeByKey = new Map<string, Promise<Stripe | null>>()
 
