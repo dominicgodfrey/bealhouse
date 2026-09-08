@@ -26,7 +26,7 @@ Stack constraint: **TypeScript/React + Go**. No launch deadline — one complete
 | # | Decision | Choice |
 |---|---|---|
 | 1 | Distribution | Direct only. Availability rows carry a `source` field so Airbnb/Booking.com sync is a later adapter, not a rewrite |
-| 2 | Hosting | **Hetzner Cloud CX22, Ashburn VA (~$5/mo)** + Caddy for automatic TLS. Bluehost = domain/DNS/email only. See *VPS* below |
+| 2 | Hosting | **Hetzner Cloud CX23, Falkenstein (€6.59/mo)** + Caddy for automatic TLS. Bluehost = domain/DNS/email only. *(revised 2026-09-08: Ashburn was planned, but its cheapest 4 GB box priced at $37/month at creation time against $6.59 in Germany; ~90 ms to New Hampshire was the cheaper trade)* See *VPS* below |
 | 3 | Rendering | Vite React SPA embedded in ONE Go binary via `embed.FS`; Go injects per-route meta + JSON-LD with live DB data. **Built** (`internal/httpx/meta.go`): the SPA fallback writes the page's own title, description, canonical, Open Graph tags and structured data into `<head>` before serving it, from the same read models the page's own API calls return — so the document a crawler indexes and the one a visitor reads cannot quote different rooms at different prices. Vite's static `<title>` is stripped, or every page would carry two. A description is the owner's own words or **absent**, never invented, on the same terms as the pages themselves; absolute URLs appear only with a `SITE_URL` to build them on. The booking flow and the console are `noindex` and carry no canonical. `robots.txt` and a `sitemap.xml` generated from live rooms sit beside it, ahead of the SPA fallback for the reason `/media/*` is |
 | 4 | Pricing | Seasonal date-range rates + minimum-stay. Guest count is a **capacity filter only**, never a price input |
 | 5 | Rate storage | Materialized nightly calendar `(room_id, date, price_cents, min_stay)` |
@@ -143,7 +143,16 @@ frontend and backend, and the whole system can be run locally with one command.
 
 ## VPS (decision #2)
 
-**Hetzner Cloud CX22, Ashburn VA — 2 vCPU, 4 GB RAM, 40 GB SSD, ~$5/month.**
+**Hetzner Cloud CX23, Falkenstein — 2 vCPU, 4 GB RAM, 40 GB SSD, €6.59/month, Ubuntu 26.04 LTS.**
+
+*Revised at creation, 2026-09-08.* The plan below says Ashburn, and Ashburn is still the right
+answer at the price it was written against. On the day the server was made, Hetzner's cheapest
+4 GB box in Ashburn was **$37/month** and the same memory in Falkenstein was **$6.59**. Five
+times the price bought ~75 ms of latency — Falkenstein is ~90 ms from New Hampshire against
+Ashburn's ~15 — and for a marketing page with a booking form that is a third of a second on a
+first paint, not a difference a guest names. The 4 GB, the Backups toggle and everything under
+*Provisioning* are unchanged. If US pricing comes back to earth, moving is a snapshot and a
+DNS change.
 
 Chosen against the owner's stated priority order: stability first regardless of price, then low
 price, then simplicity.

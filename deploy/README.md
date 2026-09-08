@@ -19,9 +19,12 @@ Files in this directory:
 
 ## Provisioning, once
 
-**Debian 12.** Ubuntu 24.04 works the same way; substitute `noble` for
-`bookworm` in the PostgreSQL source below. Everything here is root, over ssh,
-and the box needs no domain yet — nothing until the Caddy step cares.
+**Debian 12, or an Ubuntu LTS.** The live box is **Ubuntu 26.04 LTS** — Hetzner's
+picker had it selected at creation, and an LTS supported to 2031 was a better
+answer than rebuilding — so substitute the release codename (`resolute`; `noble`
+for 24.04) for `bookworm` in the PostgreSQL source below. Everything else is
+identical. Everything here is root, over ssh, and the box needs no domain yet —
+nothing until the Caddy step cares.
 
 If the provider's console does not offer the CX line in Ashburn, take the **AMD
 equivalent** at the same memory rather than dropping a size — decision #2 rests
@@ -77,8 +80,9 @@ apt install -y ufw && ufw allow 22/tcp && ufw allow 80/tcp && ufw allow 443/tcp 
 
 ### PostgreSQL 17, from PGDG
 
-**Not `apt install postgresql`,** which on Debian 12 is PostgreSQL 15 — two
-majors behind what this project is developed and tested against.
+**Not `apt install postgresql`,** which on Debian 12 is PostgreSQL 15 and on
+Ubuntu 26.04 is 18 — either side of what this project is developed and tested
+against.
 `docker-compose.yml` and both CI jobs pin `postgres:17-alpine`, and the whole
 architecture is a bet on Postgres behaviour: the exclusion constraint,
 `pg_advisory_xact_lock`, range types, `now()` meaning the transaction's start,
@@ -120,10 +124,14 @@ adduser --system --group --home /var/lib/bealhouse bealhouse
 ```
 
 ```bash
-sudo -u postgres createuser bealhouse
+sudo -u postgres createuser --createdb bealhouse
 sudo -u postgres createdb --owner bealhouse bealhouse
 sudo -u postgres psql -c "ALTER USER bealhouse WITH PASSWORD '<a long random one>'"
 ```
+
+`--createdb` is for the restore drill, which builds a scratch database as this
+role and drops it again. It is the one privilege beyond its own database the
+role has; the first drill on the live box failed for want of it.
 
 Keep that password; it goes into `DATABASE_URL` below.
 
@@ -226,13 +234,24 @@ deploy would otherwise look exactly like a laptop.
 
 ```bash
 cp deploy/Caddyfile /etc/caddy/Caddyfile
-printf 'BEAL_DOMAIN=bealhouse.com\nBEAL_ADMIN_EMAIL=owner@bealhouse.com\n' > /etc/default/caddy
+printf 'BEAL_DOMAIN=thebealhouse.com\nBEAL_ADMIN_EMAIL=info@thebealhouse.com\n' > /etc/default/caddy
+install -d /etc/systemd/system/caddy.service.d
+printf '[Service]\nEnvironmentFile=/etc/default/caddy\nLogsDirectory=caddy\n' > /etc/systemd/system/caddy.service.d/env.conf
+systemctl daemon-reload
 caddy validate --config /etc/caddy/Caddyfile
-systemctl reload caddy
+systemctl restart caddy
 ```
 
 The domain is the owner's, so it is read from the environment rather than
-committed here.
+committed here — and the drop-in is what makes that work: **the packaged unit
+does not read `/etc/default/caddy` on its own**, and without `LogsDirectory`
+the unit's sandbox refuses to open the log file the Caddyfile names. Both
+were found on the live box.
+
+**During the staging period the `www.` block is commented out** in the copy
+on the box, because `www.new.thebealhouse.com` has no record and Caddy would
+otherwise ask Let's Encrypt for it forever. Reinstalling `deploy/Caddyfile` at
+cutover restores it.
 
 ### The units
 
