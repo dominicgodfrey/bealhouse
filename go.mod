@@ -1,6 +1,7 @@
 module bealhouse
 
 go 1.26.0
+toolchain go1.26.6
 
 require (
 	github.com/SherClockHolmes/webpush-go v1.4.0
@@ -11,8 +12,8 @@ require (
 	github.com/jackc/pgx/v5 v5.10.0
 	github.com/pressly/goose/v3 v3.27.3
 	github.com/stripe/stripe-go/v86 v86.2.0
-	golang.org/x/image v0.44.0
-	golang.org/x/text v0.40.0
+	golang.org/x/image v0.45.0
+	golang.org/x/text v0.41.0
 )
 
 require (
