@@ -14,8 +14,6 @@ import {
   Saved,
   Screen,
   Textarea,
-  centsToInput,
-  inputToCents,
   useReload,
   useSaving,
 } from './ui'
@@ -67,7 +65,6 @@ function RoomEditor({ room, onSaved }: { room: RoomContent; onSaved: () => void 
           Sleeps {room.maxOccupancy} · {room.photos.length}{' '}
           {room.photos.length === 1 ? 'photo' : 'photos'} ·{' '}
           {room.amenities.length || 'no'} amenities
-          {room.isPetFriendly && ' · Takes pets'}
         </p>
         {room.description.includes('PLACEHOLDER') && (
           <p className="text-sm text-amber-800">
@@ -127,7 +124,6 @@ function RoomEditor({ room, onSaved }: { room: RoomContent; onSaved: () => void 
       <Beds draft={draft} set={set} />
       <Photos photos={draft.photos} onChange={(photos) => set('photos', photos)} />
 
-      <Pets draft={draft} set={set} />
       <Accessibility draft={draft} set={set} />
 
       <div className="flex flex-wrap gap-2">
@@ -204,44 +200,6 @@ function Beds({
       >
         Add a bed
       </Button>
-    </div>
-  )
-}
-
-function Pets({
-  draft,
-  set,
-}: {
-  draft: RoomContent
-  set: <K extends keyof RoomContent>(key: K, value: RoomContent[K]) => void
-}) {
-  return (
-    <div className="flex flex-col gap-2 rounded-lg bg-neutral-50 p-3">
-      <label className="flex items-center gap-2 text-sm font-medium">
-        <input
-          type="checkbox"
-          checked={draft.isPetFriendly}
-          onChange={(e) => {
-            set('isPetFriendly', e.target.checked)
-            // A fee on a room that does not take pets could never be charged,
-            // and the database refuses the combination outright — so clearing it
-            // here is what stops the save failing on a rule the owner cannot see.
-            if (!e.target.checked) set('petFeeCents', 0)
-          }}
-        />
-        Takes pets
-      </label>
-
-      {draft.isPetFriendly && (
-        <Field label="Pet fee per stay" hint="Taxed with the room charge, and refundable on the same terms.">
-          <Input
-            inputMode="decimal"
-            value={centsToInput(draft.petFeeCents)}
-            onChange={(e) => set('petFeeCents', inputToCents(e.target.value))}
-            placeholder="50.00"
-          />
-        </Field>
-      )}
     </div>
   )
 }

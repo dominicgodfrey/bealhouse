@@ -31,7 +31,6 @@ export function NewBooking() {
     checkin: addDays(today(), 1),
     checkout: addDays(today(), 3),
     guests: 2,
-    withPet: false,
     name: '',
     email: '',
     phone: '',
@@ -114,14 +113,6 @@ export function NewBooking() {
               onChange={(e) => set('guests', Number(e.target.value))}
             />
           </Field>
-          <label className="flex items-center gap-2 self-end pb-3 text-sm">
-            <input
-              type="checkbox"
-              checked={form.withPet}
-              onChange={(e) => set('withPet', e.target.checked)}
-            />
-            Bringing a pet
-          </label>
         </div>
 
         <Field label="Name">

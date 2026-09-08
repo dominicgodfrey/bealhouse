@@ -18,6 +18,9 @@
 -- all seven and the search filter is not offered. settings.accessibility_notice
 -- carries the disclaimer shown to guests instead.
 --
+-- Pets: none, in any room. Back Lavender was the pet room until the owner
+-- withdrew it (decision #23, revised), and the columns went with it.
+--
 -- Descriptions are marked placeholders on purpose: if one ever reaches the
 -- live site it should be unmistakable rather than plausible. content.sql, run
 -- after this file, replaces them with what the inn's current site actually
@@ -25,43 +28,41 @@
 
 BEGIN;
 
-INSERT INTO rooms (slug, name, description, view, max_occupancy, is_pet_friendly, pet_fee_cents, sort_order)
+INSERT INTO rooms (slug, name, description, view, max_occupancy, sort_order)
 VALUES
   ('mrs-beals-suite', 'Mrs. Beal''s Suite',
    'PLACEHOLDER — final copy to be supplied by the owner.',
-   'Street and mountain view in front, hill view in back', 3, false, 0, 1),
+   'Street and mountain view in front, hill view in back', 3, 1),
 
   ('garden-suite', 'Garden Suite',
    'PLACEHOLDER — final copy to be supplied by the owner.',
-   'Front room has mountain and street view; back room has hill view', 4, false, 0, 2),
+   'Front room has mountain and street view; back room has hill view', 4, 2),
 
   ('flume', 'Flume',
    'PLACEHOLDER — final copy to be supplied by the owner.',
-   'Street and mountain view', 2, false, 0, 3),
+   'Street and mountain view', 2, 3),
 
   ('rose-chamber', 'Rose Chamber',
    'PLACEHOLDER — final copy to be supplied by the owner.',
-   'Backyard, obstructed view', 2, false, 0, 4),
+   'Backyard, obstructed view', 2, 4),
 
   ('washington-room', 'Washington Room',
    'PLACEHOLDER — final copy to be supplied by the owner.',
-   'Street and mountain view', 2, false, 0, 5),
+   'Street and mountain view', 2, 5),
 
   ('blue-room', 'Blue Room',
    'PLACEHOLDER — final copy to be supplied by the owner.',
-   'Hill view at the back', 2, false, 0, 6),
+   'Hill view at the back', 2, 6),
 
   ('back-lavender', 'Back Lavender',
    'PLACEHOLDER — final copy to be supplied by the owner.',
-   'Hill view over the backyard', 3, true, 5000, 7)
+   'Hill view over the backyard', 3, 7)
 
 ON CONFLICT (slug) DO UPDATE SET
   name            = EXCLUDED.name,
   description     = EXCLUDED.description,
   view            = EXCLUDED.view,
   max_occupancy   = EXCLUDED.max_occupancy,
-  is_pet_friendly = EXCLUDED.is_pet_friendly,
-  pet_fee_cents   = EXCLUDED.pet_fee_cents,
   sort_order      = EXCLUDED.sort_order,
   updated_at      = now();
 

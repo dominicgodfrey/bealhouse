@@ -14,8 +14,8 @@ import (
 
 const createBooking = `-- name: CreateBooking :one
 INSERT INTO bookings (
-  code, guest_id, status, checkin, checkout, guests, with_pet,
-  room_subtotal_cents, pet_fee_cents, tax_cents, tax_rate_snapshot,
+  code, guest_id, status, checkin, checkout, guests,
+  room_subtotal_cents, tax_cents, tax_rate_snapshot,
   total_cents, deposit_cents, balance_due_cents, balance_charge_at,
   policies_accepted_at
 )
@@ -28,17 +28,15 @@ VALUES (
   $6,
   $7,
   $8,
-  $9,
+  $9::bigint::numeric / 100000,
   $10,
-  $11::bigint::numeric / 100000,
+  $11,
   $12,
   $13,
-  $14,
-  $15,
   -- The database's clock, not Go's and certainly not the browser's. Inside the
   -- inserting transaction this is the transaction's start time, so it agrees
   -- with created_at and cannot be back-dated by a client.
-  CASE WHEN $16::boolean THEN now() END
+  CASE WHEN $14::boolean THEN now() END
 )
 RETURNING id
 `
@@ -50,9 +48,7 @@ type CreateBookingParams struct {
 	Checkin           pgtype.Date
 	Checkout          pgtype.Date
 	Guests            int32
-	WithPet           bool
 	RoomSubtotalCents int64
-	PetFeeCents       int64
 	TaxCents          int64
 	TaxRateScaled     int64
 	TotalCents        int64
@@ -70,9 +66,7 @@ func (q *Queries) CreateBooking(ctx context.Context, arg CreateBookingParams) (i
 		arg.Checkin,
 		arg.Checkout,
 		arg.Guests,
-		arg.WithPet,
 		arg.RoomSubtotalCents,
-		arg.PetFeeCents,
 		arg.TaxCents,
 		arg.TaxRateScaled,
 		arg.TotalCents,
@@ -161,9 +155,7 @@ SELECT
   b.checkin,
   b.checkout,
   b.guests,
-  b.with_pet,
   b.room_subtotal_cents,
-  b.pet_fee_cents,
   b.tax_cents,
   (b.tax_rate_snapshot * 100000)::bigint AS tax_rate_scaled,
   b.total_cents,
@@ -195,9 +187,7 @@ type GetBookingByCodeRow struct {
 	Checkin           pgtype.Date
 	Checkout          pgtype.Date
 	Guests            int32
-	WithPet           bool
 	RoomSubtotalCents int64
-	PetFeeCents       int64
 	TaxCents          int64
 	TaxRateScaled     int64
 	TotalCents        int64
@@ -232,9 +222,7 @@ func (q *Queries) GetBookingByCode(ctx context.Context, code string) (GetBooking
 		&i.Checkin,
 		&i.Checkout,
 		&i.Guests,
-		&i.WithPet,
 		&i.RoomSubtotalCents,
-		&i.PetFeeCents,
 		&i.TaxCents,
 		&i.TaxRateScaled,
 		&i.TotalCents,

@@ -17,8 +17,8 @@ RETURNING id;
 
 -- name: CreateBooking :one
 INSERT INTO bookings (
-  code, guest_id, status, checkin, checkout, guests, with_pet,
-  room_subtotal_cents, pet_fee_cents, tax_cents, tax_rate_snapshot,
+  code, guest_id, status, checkin, checkout, guests,
+  room_subtotal_cents, tax_cents, tax_rate_snapshot,
   total_cents, deposit_cents, balance_due_cents, balance_charge_at,
   policies_accepted_at
 )
@@ -29,9 +29,7 @@ VALUES (
   sqlc.arg(checkin),
   sqlc.arg(checkout),
   sqlc.arg(guests),
-  sqlc.arg(with_pet),
   sqlc.arg(room_subtotal_cents),
-  sqlc.arg(pet_fee_cents),
   sqlc.arg(tax_cents),
   sqlc.arg(tax_rate_scaled)::bigint::numeric / 100000,
   sqlc.arg(total_cents),
@@ -69,9 +67,7 @@ SELECT
   b.checkin,
   b.checkout,
   b.guests,
-  b.with_pet,
   b.room_subtotal_cents,
-  b.pet_fee_cents,
   b.tax_cents,
   (b.tax_rate_snapshot * 100000)::bigint AS tax_rate_scaled,
   b.total_cents,

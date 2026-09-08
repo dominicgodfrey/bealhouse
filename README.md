@@ -15,7 +15,7 @@ walks the whole booking journey today without either account.
 | Double-booking prevention | [internal/occupancy](internal/occupancy/occupancy.go) |
 | `POST /api/bookings` — books and holds, revalidating server-side | [internal/booking](internal/booking/booking.go) |
 | Sellable spans per room, for the date picker | [internal/availability](internal/availability/calendar.go) |
-| Deposits, tax, pet fee, refunds | [internal/pricing](internal/pricing/pricing.go) |
+| Deposits, tax, refunds | [internal/pricing](internal/pricing/pricing.go) |
 | Payments, the ledger and the webhook | [internal/payments](internal/payments) · [internal/gateway](internal/gateway) |
 | The eight emails, queued not sent inline | [internal/email](internal/email) |
 | Passkey sign-in, no password anywhere | [internal/admin](internal/admin) |
@@ -103,12 +103,12 @@ compile time.
 cmd/server/              entrypoint: config, DB pool, HTTP server, hold sweeper
 internal/config/         environment + .env loading
 internal/httpx/          chi router, JSON API, SPA serving with history fallback
-internal/availability/   the search: capacity, pets, occupancy, rates, min stay;
+internal/availability/   the search: capacity, occupancy, rates, min stay;
                          and the sellable spans the date picker greys from
 internal/booking/        a booking and its hold, in one transaction
 internal/occupancy/      the exclusion constraint and its error translation
 internal/rates/          seasons to nightly calendar
-internal/pricing/        integer-cent money: deposits, tax, pet fee, refunds
+internal/pricing/        integer-cent money: deposits, tax, refunds
 internal/civil/          the inn's calendar in America/New_York
 internal/testdb/         test helpers: real Postgres, rolled-back transactions
 internal/db/migrations/  goose SQL migrations

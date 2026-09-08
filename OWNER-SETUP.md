@@ -86,8 +86,8 @@ left blank on purpose rather than filled in with invented sentences.
 | **Flume** | — | **none** |
 
 On `/admin/rooms`, open a room and fill in **Description** — a paragraph or two,
-in the inn's own voice. **View**, **Sleeps**, **Amenities** and the pet fee are
-on the same screen; amenities are already filled in from the current site and are
+in the inn's own voice. **View**, **Sleeps** and **Amenities** are on the same
+screen; amenities are already filled in from the current site and are
 worth a read rather than a rewrite.
 
 ### 3. The two rooms with no photographs — `/admin/rooms` → a room → Photographs

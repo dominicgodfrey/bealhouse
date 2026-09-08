@@ -26,7 +26,6 @@ export function Confirm() {
     stay?.checkin,
     stay?.checkout,
     stay?.guests,
-    stay?.withPet,
   ])
 
   return (
@@ -78,7 +77,6 @@ function ConfirmForm({ room, stay }: { room: RoomDetail; stay: Stay }) {
         checkin: stay.checkin,
         checkout: stay.checkout,
         guests: stay.guests,
-        withPet: stay.withPet,
         // The total the guest is looking at. The server prices the stay itself
         // and rejects the booking if the two disagree, so nobody is charged a
         // number they were never shown.
@@ -111,7 +109,6 @@ function ConfirmForm({ room, stay }: { room: RoomDetail; stay: Stay }) {
             </p>
             <p className="text-sm text-neutral-600">
               {stay.guests} {stay.guests === 1 ? 'guest' : 'guests'}
-              {stay.withPet && ' · with a pet'}
             </p>
           </div>
 

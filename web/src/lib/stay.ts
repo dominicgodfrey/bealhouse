@@ -12,7 +12,6 @@ export function staySearch(stay: Stay): string {
     checkin: stay.checkin,
     checkout: stay.checkout,
     guests: String(stay.guests),
-    ...(stay.withPet ? { pet: 'true' } : {}),
   }).toString()
 }
 
@@ -37,6 +36,5 @@ export function parseStay(params: URLSearchParams): Stay | null {
     checkin,
     checkout,
     guests: Number.isFinite(guests) && guests > 0 ? Math.floor(guests) : 1,
-    withPet: params.get('pet') === 'true',
   }
 }

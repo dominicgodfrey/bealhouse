@@ -77,7 +77,6 @@ function Card({ room }: { room: RoomCard }) {
       <p className="text-sm text-neutral-600">
         Sleeps {room.maxOccupancy}
         {room.view && ` · ${room.view}`}
-        {room.isPetFriendly && ' · Dogs welcome'}
       </p>
 
       {room.description && (

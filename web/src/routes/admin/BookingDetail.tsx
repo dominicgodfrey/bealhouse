@@ -94,7 +94,6 @@ function Stay({ detail }: { detail: Detail }) {
           <span className="text-neutral-600">
             {stay.nights} {stay.nights === 1 ? 'night' : 'nights'} · {stay.guests}{' '}
             {stay.guests === 1 ? 'guest' : 'guests'}
-            {stay.withPet && ' · with a pet'}
           </span>
         </p>
 
@@ -153,7 +152,6 @@ function Quote({ detail }: { detail: Detail }) {
     <Section title="What it costs" note="Snapshotted when the guest booked. A rate change since then cannot reach it.">
       <Card>
         <Line label={`Room, ${quote.nights} ${quote.nights === 1 ? 'night' : 'nights'}`} cents={quote.roomSubtotalCents} />
-        {quote.petFeeCents > 0 && <Line label="Pet fee" cents={quote.petFeeCents} />}
         <Line label="Tax" cents={quote.taxCents} />
         <Line label="Total" cents={quote.totalCents} strong />
 

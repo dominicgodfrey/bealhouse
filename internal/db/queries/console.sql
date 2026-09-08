@@ -32,7 +32,6 @@ SELECT
   b.checkin,
   b.checkout,
   b.guests,
-  b.with_pet,
   b.total_cents,
   b.amount_paid_cents,
   b.balance_charge_at,
@@ -75,7 +74,6 @@ SELECT
   b.checkin,
   b.checkout,
   b.guests,
-  b.with_pet,
   b.total_cents,
   b.amount_paid_cents,
   b.balance_due_cents,
@@ -341,8 +339,6 @@ SELECT
   amenities,
   is_accessible,
   accessibility_features,
-  is_pet_friendly,
-  pet_fee_cents,
   sort_order
 FROM rooms
 ORDER BY sort_order, id;
@@ -371,8 +367,6 @@ UPDATE rooms SET
   amenities              = sqlc.arg(amenities),
   is_accessible          = sqlc.arg(is_accessible),
   accessibility_features = sqlc.arg(accessibility_features),
-  is_pet_friendly        = sqlc.arg(is_pet_friendly),
-  pet_fee_cents          = sqlc.arg(pet_fee_cents),
   sort_order             = sqlc.arg(sort_order),
   updated_at             = now()
 WHERE id = sqlc.arg(id);

@@ -90,10 +90,6 @@ type Input struct {
 	// One entry per night: a 2-night stay has two entries.
 	NightlyCents []int64
 
-	// PetFeeCents is charged once per stay, not per night, and is taxed the
-	// same as the room charge.
-	PetFeeCents int64
-
 	TaxRate Rate
 }
 
@@ -107,12 +103,15 @@ type Input struct {
 type Quote struct {
 	Nights            int   `json:"nights"`
 	RoomSubtotalCents int64 `json:"roomSubtotalCents"`
-	PetFeeCents       int64 `json:"petFeeCents"`
-	TaxableCents      int64 `json:"taxableCents"`
-	TaxCents          int64 `json:"taxCents"`
-	TotalCents        int64 `json:"totalCents"`
-	DepositCents      int64 `json:"depositCents"`
-	BalanceCents      int64 `json:"balanceCents"`
+	// TaxableCents is the base the tax is computed over. It equals the room
+	// subtotal now that the pet fee is gone; it stays a field because it names
+	// the base explicitly, and a second fee would land here and not in the
+	// subtotal.
+	TaxableCents int64 `json:"taxableCents"`
+	TaxCents     int64 `json:"taxCents"`
+	TotalCents   int64 `json:"totalCents"`
+	DepositCents int64 `json:"depositCents"`
+	BalanceCents int64 `json:"balanceCents"`
 }
 
 // Compute resolves an Input into a Quote.
@@ -124,12 +123,10 @@ func Compute(in Input) Quote {
 		q.RoomSubtotalCents += n
 	}
 
-	q.PetFeeCents = in.PetFeeCents
-
 	// Tax is computed once over the whole base rather than per night. Rounding
 	// each night separately would drift by a cent or two on longer stays, and
 	// the advertised price is the all-in total, not a sum of rounded nights.
-	q.TaxableCents = q.RoomSubtotalCents + q.PetFeeCents
+	q.TaxableCents = q.RoomSubtotalCents
 	q.TaxCents = tax(q.TaxableCents, in.TaxRate)
 
 	q.TotalCents = q.TaxableCents + q.TaxCents

@@ -10,7 +10,7 @@ import (
 // calendar serves GET /api/calendar, which is what the date picker greys dates
 // from.
 //
-//	?from=2027-06-01&to=2027-09-01&guests=2&pet=true
+//	?from=2027-06-01&to=2027-09-01&guests=2
 //
 // Every parameter is optional. A picker opening on the current month has no
 // dates to offer yet and should not have to invent a window to ask about one.
@@ -43,7 +43,6 @@ func calendar(q *db.Queries) http.HandlerFunc {
 			return
 		}
 		req.Guests = guests
-		req.WithPet = query.Get("pet") == "true"
 
 		result, err := availability.Spans(r.Context(), q, req)
 		if err != nil {

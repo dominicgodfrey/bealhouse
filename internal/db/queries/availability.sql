@@ -4,7 +4,6 @@
 -- oversell or misprice a room:
 --
 --   capacity   the room sleeps the party
---   pets       when the guest is travelling with one, the room accepts them
 --   occupancy  nothing overlaps the stay, including holds and owner blocks
 --   rates      every night of the stay is priced, and the arrival night's
 --              minimum stay is satisfied
@@ -25,8 +24,6 @@ SELECT
   r.view,
   r.max_occupancy,
   r.amenities,
-  r.is_pet_friendly,
-  r.pet_fee_cents,
   array_agg(c.price_cents ORDER BY c.date)::int[] AS nightly_prices
 FROM rooms r
 JOIN rate_calendar c
@@ -34,9 +31,6 @@ JOIN rate_calendar c
  AND c.date >= sqlc.arg(checkin)::date
  AND c.date <  sqlc.arg(checkout)::date
 WHERE r.max_occupancy >= sqlc.arg(guests)::int
-  -- An unchecked pet box is not a filter: Back Lavender is an ordinary room
-  -- that also happens to accept pets, and hiding it would cost bookings.
-  AND (NOT sqlc.arg(with_pet)::boolean OR r.is_pet_friendly)
   AND NOT EXISTS (
     SELECT 1 FROM room_occupancy o
     WHERE o.room_id = r.id
@@ -69,7 +63,6 @@ JOIN rooms r ON r.id = c.room_id
 WHERE c.date >= sqlc.arg(from_date)::date
   AND c.date <  sqlc.arg(to_date)::date
   AND r.max_occupancy >= sqlc.arg(guests)::int
-  AND (NOT sqlc.arg(with_pet)::boolean OR r.is_pet_friendly)
   AND NOT EXISTS (
     SELECT 1 FROM room_occupancy o
     WHERE o.room_id = c.room_id

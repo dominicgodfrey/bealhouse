@@ -30,14 +30,13 @@ func TestCompute(t *testing.T) {
 			},
 		},
 		{
-			// Back Lavender with a pet. The fee is taxed with the room, and the
-			// resulting total is odd, so the deposit takes the extra cent.
-			name: "two nights with pet fee",
-			in:   Input{NightlyCents: []int64{15000, 15000}, PetFeeCents: 5000, TaxRate: nh},
+			// Two nights at $175: the total is odd, so the deposit takes the
+			// extra cent and the two halves still reconcile.
+			name: "two nights, odd total",
+			in:   Input{NightlyCents: []int64{17500, 17500}, TaxRate: nh},
 			want: Quote{
 				Nights:            2,
-				RoomSubtotalCents: 30000,
-				PetFeeCents:       5000,
+				RoomSubtotalCents: 35000,
 				TaxableCents:      35000,
 				TaxCents:          2975,
 				TotalCents:        37975,
@@ -186,7 +185,7 @@ func TestRefund(t *testing.T) {
 func TestRefundNeverLeavesTheInnOutOfPocket(t *testing.T) {
 	quotes := []Quote{
 		Compute(Input{NightlyCents: []int64{15000, 15000}, TaxRate: nh}),
-		Compute(Input{NightlyCents: []int64{15000, 15000, 15000}, PetFeeCents: 5000, TaxRate: nh}),
+		Compute(Input{NightlyCents: []int64{15000, 15000, 15000}, TaxRate: nh}),
 		Compute(Input{NightlyCents: []int64{9999}, TaxRate: nh}),
 		Compute(Input{NightlyCents: []int64{1}, TaxRate: nh}),
 	}
@@ -245,7 +244,7 @@ func TestProcessingFeeRoundsUp(t *testing.T) {
 // is the same number as the deposit. This is what makes the ordinary case
 // simple: refund the balance, keep the deposit.
 func TestLatePenaltyEqualsDeposit(t *testing.T) {
-	q := Compute(Input{NightlyCents: []int64{15000, 15000, 15000}, PetFeeCents: 5000, TaxRate: nh})
+	q := Compute(Input{NightlyCents: []int64{15000, 15000, 17500}, TaxRate: nh})
 
 	if q.Penalty(true) != q.DepositCents {
 		t.Errorf("late penalty %d != deposit %d", q.Penalty(true), q.DepositCents)

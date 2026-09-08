@@ -114,7 +114,6 @@ export function Held() {
             </p>
             <p className="text-sm text-neutral-600">
               {held.guests} {held.guests === 1 ? 'guest' : 'guests'}
-              {held.withPet && ' · with a pet'}
             </p>
           </div>
 

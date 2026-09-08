@@ -49,9 +49,6 @@ type RoomCard struct {
 	// remember to delete.
 	PlaceholderPhotoURL string `json:"placeholderPhotoUrl"`
 
-	IsPetFriendly bool  `json:"isPetFriendly"`
-	PetFeeCents   int64 `json:"petFeeCents,omitempty"`
-
 	FromCents *int64 `json:"fromCents,omitempty"`
 }
 
@@ -128,8 +125,6 @@ func roomCards(ctx context.Context, q *db.Queries) ([]RoomCard, error) {
 			Amenities:           room.Amenities,
 			Photos:              byRoom[room.ID],
 			PlaceholderPhotoURL: availability.PlaceholderPhoto(room.Slug),
-			IsPetFriendly:       room.IsPetFriendly,
-			PetFeeCents:         int64(room.PetFeeCents),
 		}
 		if room.View != nil {
 			card.View = *room.View

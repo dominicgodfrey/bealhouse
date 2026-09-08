@@ -63,9 +63,6 @@ type RoomContent struct {
 	IsAccessible          bool     `json:"isAccessible"`
 	AccessibilityFeatures []string `json:"accessibilityFeatures"`
 
-	IsPetFriendly bool  `json:"isPetFriendly"`
-	PetFeeCents   int64 `json:"petFeeCents"`
-
 	SortOrder int     `json:"sortOrder"`
 	Photos    []Photo `json:"photos"`
 	Beds      []Bed   `json:"beds"`
@@ -117,8 +114,6 @@ func (o *Ops) Rooms(ctx context.Context) ([]RoomContent, error) {
 			Amenities:             r.Amenities,
 			IsAccessible:          r.IsAccessible,
 			AccessibilityFeatures: r.AccessibilityFeatures,
-			IsPetFriendly:         r.IsPetFriendly,
-			PetFeeCents:           int64(r.PetFeeCents),
 			SortOrder:             int(r.SortOrder),
 			Photos:                byRoom[r.ID],
 			Beds:                  bedsByRoom[r.ID],
@@ -154,9 +149,6 @@ func (o *Ops) SaveRoom(ctx context.Context, in RoomContent) error {
 	if in.IsAccessible && len(in.AccessibilityFeatures) == 0 {
 		return badf("a room marked accessible has to say what makes it accessible — step-free entry, a roll-in shower, grab bars. The promise is one a guest plans a trip around")
 	}
-	if !in.IsPetFriendly && in.PetFeeCents != 0 {
-		return badf("a pet fee on a room that does not take pets could never be charged")
-	}
 	for _, p := range in.Photos {
 		if strings.TrimSpace(p.Alt) == "" {
 			return badf("every photo needs alt text; a picture with none is invisible to a screen reader")
@@ -178,8 +170,6 @@ func (o *Ops) SaveRoom(ctx context.Context, in RoomContent) error {
 			Amenities:             cleaned(in.Amenities),
 			IsAccessible:          in.IsAccessible,
 			AccessibilityFeatures: cleaned(in.AccessibilityFeatures),
-			IsPetFriendly:         in.IsPetFriendly,
-			PetFeeCents:           int32(in.PetFeeCents),
 			SortOrder:             int32(in.SortOrder),
 		})
 		if err != nil {

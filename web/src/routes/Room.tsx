@@ -26,7 +26,6 @@ export function Room() {
     stay?.checkin,
     stay?.checkout,
     stay?.guests,
-    stay?.withPet,
   ])
 
   return (
@@ -76,12 +75,6 @@ export function Room() {
               <dl className="flex flex-col gap-2 text-sm">
                 <Fact label="Sleeps" value={String(room.data.maxOccupancy)} />
                 <Fact label="Beds" value={describeBeds(room.data)} />
-                {room.data.isPetFriendly && (
-                  <Fact
-                    label="Pets"
-                    value="Welcome in this room, for a $50 fee covering the whole stay"
-                  />
-                )}
               </dl>
 
               {/*

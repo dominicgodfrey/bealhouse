@@ -32,7 +32,6 @@ type Stay struct {
 	Checkout string `json:"checkout"`
 	Nights   int    `json:"nights"`
 	Guests   int    `json:"guests"`
-	WithPet  bool   `json:"withPet"`
 
 	// Rooms is the room names joined for display. The console's lists are read,
 	// not parsed, and v1 sells one room at a time (decision #10).
@@ -80,7 +79,6 @@ func stayFromSearch(r db.SearchBookingsRow) Stay {
 		Checkout:         day(r.Checkout),
 		Nights:           civil.Nights(r.Checkin.Time, r.Checkout.Time),
 		Guests:           int(r.Guests),
-		WithPet:          r.WithPet,
 		Rooms:            r.RoomNames,
 		GuestID:          r.GuestID,
 		GuestName:        r.GuestName,
@@ -156,7 +154,6 @@ func (o *Ops) Today(ctx context.Context, on time.Time) (Board, error) {
 			Checkout:         day(r.Checkout),
 			Nights:           civil.Nights(r.Checkin.Time, r.Checkout.Time),
 			Guests:           int(r.Guests),
-			WithPet:          r.WithPet,
 			Rooms:            r.RoomNames,
 			GuestName:        r.GuestName,
 			GuestEmail:       r.GuestEmail,
@@ -322,7 +319,6 @@ func (o *Ops) Booking(ctx context.Context, code string, on time.Time) (BookingDe
 			Checkout:         full.Checkout,
 			Nights:           full.Nights,
 			Guests:           full.Guests,
-			WithPet:          full.WithPet,
 			Rooms:            roomNames(full.Rooms),
 			GuestName:        row.GuestName,
 			GuestEmail:       row.GuestEmail,
@@ -598,7 +594,6 @@ type ManualBooking struct {
 	Checkin  string `json:"checkin"`
 	Checkout string `json:"checkout"`
 	Guests   int    `json:"guests"`
-	WithPet  bool   `json:"withPet"`
 
 	Name  string `json:"name"`
 	Email string `json:"email"`
@@ -655,7 +650,6 @@ func (o *Ops) CreateBooking(ctx context.Context, in ManualBooking) (booking.Book
 		Checkin:  checkin,
 		Checkout: checkout,
 		Guests:   in.Guests,
-		WithPet:  in.WithPet,
 		Manual:   true,
 
 		// A phone booking accepts the policies too. The owner taking the

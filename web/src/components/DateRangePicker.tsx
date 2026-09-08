@@ -40,7 +40,6 @@ type Props = {
   checkin: string | null
   checkout: string | null
   guests: number
-  withPet: boolean
   onChange: (checkin: string | null, checkout: string | null) => void
 }
 
@@ -57,7 +56,7 @@ type Props = {
  * Which is why the API hands over spans per room. Greying from the union of
  * free nights across seven rooms would offer ranges that no single room covers.
  */
-export function DateRangePicker({ checkin, checkout, guests, withPet, onChange }: Props) {
+export function DateRangePicker({ checkin, checkout, guests, onChange }: Props) {
   const start = today()
   const shown = useMonthsShown()
   // The first month the arrows may land on: far enough back that the last month
@@ -72,9 +71,8 @@ export function DateRangePicker({ checkin, checkout, guests, withPet, onChange }
         from: start,
         to: addMonths(start, MONTHS_AHEAD),
         guests,
-        withPet,
       }),
-    [guests, withPet],
+    [guests],
   )
 
   const index = useMemo(() => indexSpans(calendar.data), [calendar.data])
@@ -157,8 +155,8 @@ export function DateRangePicker({ checkin, checkout, guests, withPet, onChange }
 
           {index.empty && (
             <p className="mt-3 text-center text-sm text-neutral-600">
-              Nothing is available for {guests} {guests === 1 ? 'guest' : 'guests'}
-              {withPet ? ' with a pet' : ''} in the next year.
+              Nothing is available for {guests} {guests === 1 ? 'guest' : 'guests'} in the
+              next year.
             </p>
           )}
 

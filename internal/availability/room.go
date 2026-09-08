@@ -30,7 +30,6 @@ type Detail struct {
 	IsAccessible          bool     `json:"isAccessible"`
 	AccessibilityFeatures []string `json:"accessibilityFeatures"`
 	AccessibilityNotice   string   `json:"accessibilityNotice"`
-	PetFeeCentsPerStay    int64    `json:"petFeeCentsPerStay,omitempty"`
 
 	// HasDates says whether the fields below mean anything. Without it an
 	// unavailable room and a room nobody asked about look identical.
@@ -41,7 +40,6 @@ type Detail struct {
 	Checkout  string `json:"checkout,omitempty"`
 	Nights    int    `json:"nights,omitempty"`
 	Guests    int    `json:"guests,omitempty"`
-	WithPet   bool   `json:"withPet,omitempty"`
 }
 
 // Lookup builds a room page. Pass a nil request for the dateless version.
@@ -86,15 +84,11 @@ func Lookup(ctx context.Context, q *db.Queries, slug string, req *Request) (Deta
 			Beds:                beds[row.ID],
 			Photos:              photos[row.ID],
 			PlaceholderPhotoURL: PlaceholderPhoto(row.Slug),
-			IsPetFriendly:       row.IsPetFriendly,
 			NightlyCents:        []int64{},
 		},
 		IsAccessible:          row.IsAccessible,
 		AccessibilityFeatures: row.AccessibilityFeatures,
 		AccessibilityNotice:   settings.AccessibilityNotice,
-	}
-	if row.IsPetFriendly {
-		detail.PetFeeCentsPerStay = int64(row.PetFeeCents)
 	}
 
 	if req == nil {
@@ -106,7 +100,6 @@ func Lookup(ctx context.Context, q *db.Queries, slug string, req *Request) (Deta
 	detail.Checkout = req.Checkout.Format(time.DateOnly)
 	detail.Nights = civil.Nights(req.Checkin, req.Checkout)
 	detail.Guests = req.Guests
-	detail.WithPet = req.WithPet
 
 	res, err := Search(ctx, q, *req)
 	if err != nil {

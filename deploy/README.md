@@ -253,8 +253,8 @@ over a live database is not something a deploy should be able to do by accident.
 All four files are re-runnable.
 
 **The order is not decoration and neither is what is missing from it.**
-`rooms.sql` describes the seven rooms as facts — occupancy, beds, views, the pet
-room — and deliberately leaves every description as the literal string
+`rooms.sql` describes the seven rooms as facts — occupancy, beds, views — and
+deliberately leaves every description as the literal string
 `PLACEHOLDER`, so that one reaching the live site is unmistakable rather than
 plausible. `content.sql` is what clears them: the owner's own sentences,
 transcribed from the inn's current site, and with them the amenities and the

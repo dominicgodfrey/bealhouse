@@ -100,7 +100,6 @@ JOIN rooms r ON r.id = c.room_id
 WHERE c.date >= $1::date
   AND c.date <  $2::date
   AND r.max_occupancy >= $3::int
-  AND (NOT $4::boolean OR r.is_pet_friendly)
   AND NOT EXISTS (
     SELECT 1 FROM room_occupancy o
     WHERE o.room_id = c.room_id
@@ -113,7 +112,6 @@ type ListSellableNightsParams struct {
 	FromDate pgtype.Date
 	ToDate   pgtype.Date
 	Guests   int32
-	WithPet  bool
 }
 
 type ListSellableNightsRow struct {
@@ -134,12 +132,7 @@ type ListSellableNightsRow struct {
 // [10, 13) the nights 10, 11 and 12 are occupied and the 13th is not, because
 // the 13th is a checkout rather than a night.
 func (q *Queries) ListSellableNights(ctx context.Context, arg ListSellableNightsParams) ([]ListSellableNightsRow, error) {
-	rows, err := q.db.Query(ctx, listSellableNights,
-		arg.FromDate,
-		arg.ToDate,
-		arg.Guests,
-		arg.WithPet,
-	)
+	rows, err := q.db.Query(ctx, listSellableNights, arg.FromDate, arg.ToDate, arg.Guests)
 	if err != nil {
 		return nil, err
 	}
@@ -172,8 +165,6 @@ SELECT
   r.view,
   r.max_occupancy,
   r.amenities,
-  r.is_pet_friendly,
-  r.pet_fee_cents,
   array_agg(c.price_cents ORDER BY c.date)::int[] AS nightly_prices
 FROM rooms r
 JOIN rate_calendar c
@@ -181,9 +172,6 @@ JOIN rate_calendar c
  AND c.date >= $1::date
  AND c.date <  $2::date
 WHERE r.max_occupancy >= $3::int
-  -- An unchecked pet box is not a filter: Back Lavender is an ordinary room
-  -- that also happens to accept pets, and hiding it would cost bookings.
-  AND (NOT $4::boolean OR r.is_pet_friendly)
   AND NOT EXISTS (
     SELECT 1 FROM room_occupancy o
     WHERE o.room_id = r.id
@@ -200,7 +188,6 @@ type SearchAvailabilityParams struct {
 	Checkin  pgtype.Date
 	Checkout pgtype.Date
 	Guests   int32
-	WithPet  bool
 }
 
 type SearchAvailabilityRow struct {
@@ -211,8 +198,6 @@ type SearchAvailabilityRow struct {
 	View          *string
 	MaxOccupancy  int32
 	Amenities     []string
-	IsPetFriendly bool
-	PetFeeCents   int32
 	NightlyPrices []int32
 }
 
@@ -222,7 +207,6 @@ type SearchAvailabilityRow struct {
 // oversell or misprice a room:
 //
 //	capacity   the room sleeps the party
-//	pets       when the guest is travelling with one, the room accepts them
 //	occupancy  nothing overlaps the stay, including holds and owner blocks
 //	rates      every night of the stay is priced, and the arrival night's
 //	           minimum stay is satisfied
@@ -235,12 +219,7 @@ type SearchAvailabilityRow struct {
 // maximum across the stay: a 3-night holiday season should stop a booking that
 // starts inside it, not one that merely passes through.
 func (q *Queries) SearchAvailability(ctx context.Context, arg SearchAvailabilityParams) ([]SearchAvailabilityRow, error) {
-	rows, err := q.db.Query(ctx, searchAvailability,
-		arg.Checkin,
-		arg.Checkout,
-		arg.Guests,
-		arg.WithPet,
-	)
+	rows, err := q.db.Query(ctx, searchAvailability, arg.Checkin, arg.Checkout, arg.Guests)
 	if err != nil {
 		return nil, err
 	}
@@ -256,8 +235,6 @@ func (q *Queries) SearchAvailability(ctx context.Context, arg SearchAvailability
 			&i.View,
 			&i.MaxOccupancy,
 			&i.Amenities,
-			&i.IsPetFriendly,
-			&i.PetFeeCents,
 			&i.NightlyPrices,
 		); err != nil {
 			return nil, err

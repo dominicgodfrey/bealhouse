@@ -234,30 +234,22 @@ func TestGuestDetailsAreRequired(t *testing.T) {
 	}
 }
 
-// The fee is snapshotted as its own column, so a booking can always say what
-// the extra $50 was for.
-func TestPetFeeIsSnapshotted(t *testing.T) {
+// The quote is snapshotted, so what is read back is what was written — a rate
+// or tax change in between cannot reach it.
+func TestQuoteIsSnapshotted(t *testing.T) {
 	ctx, q, b := setup(t)
 
 	req := request()
 	req.RoomSlug = "back-lavender"
-	req.WithPet = true
 
 	made := create(t, ctx, b, req)
-	if made.Quote.PetFeeCents != 5000 {
-		t.Errorf("pet fee %d, want 5000", made.Quote.PetFeeCents)
-	}
 
 	read, err := Get(ctx, q, made.Code)
 	if err != nil {
 		t.Fatalf("reading it back: %v", err)
 	}
-	if !read.WithPet || read.Quote.PetFeeCents != 5000 {
-		t.Errorf("read back withPet=%v fee=%d, want true/5000", read.WithPet, read.Quote.PetFeeCents)
-	}
-	if read.Quote.TotalCents != made.Quote.TotalCents {
-		t.Errorf("total drifted between writing and reading: %d then %d",
-			made.Quote.TotalCents, read.Quote.TotalCents)
+	if read.Quote != made.Quote {
+		t.Errorf("quote drifted between writing and reading:\n  wrote %+v\n  read  %+v", made.Quote, read.Quote)
 	}
 }
 

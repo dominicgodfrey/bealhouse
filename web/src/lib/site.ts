@@ -25,8 +25,6 @@ export type RoomCard = {
   photos: Photo[]
   /** The bundled drawing to show while a room has no uploaded photograph. */
   placeholderPhotoUrl: string
-  isPetFriendly: boolean
-  petFeeCents?: number
   /**
    * The cheapest night currently on the calendar. Absent — not zero — for a
    * room no season prices, because such a room cannot be sold at all and

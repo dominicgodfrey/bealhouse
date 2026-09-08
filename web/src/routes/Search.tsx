@@ -27,7 +27,6 @@ function Results({ stay }: { stay: NonNullable<ReturnType<typeof parseStay>> }) 
     stay.checkin,
     stay.checkout,
     stay.guests,
-    stay.withPet,
   ])
 
   if (search.loading) return <Loading what="rooms" />
@@ -48,7 +47,6 @@ function Results({ stay }: { stay: NonNullable<ReturnType<typeof parseStay>> }) 
           {formatLong(stay.checkin)} → {formatLong(stay.checkout)} · {nights}{' '}
           {nights === 1 ? 'night' : 'nights'} · {stay.guests}{' '}
           {stay.guests === 1 ? 'guest' : 'guests'}
-          {stay.withPet && ' · with a pet'}
         </p>
       </div>
 

@@ -15,9 +15,7 @@ SELECT
   max_occupancy,
   amenities,
   is_accessible,
-  accessibility_features,
-  is_pet_friendly,
-  pet_fee_cents
+  accessibility_features
 FROM rooms
 WHERE slug = sqlc.arg(slug);
 

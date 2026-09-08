@@ -18,9 +18,7 @@ type Booking struct {
 	Checkin               pgtype.Date
 	Checkout              pgtype.Date
 	Guests                int32
-	WithPet               bool
 	RoomSubtotalCents     int64
-	PetFeeCents           int64
 	TaxCents              int64
 	TaxRateSnapshot       pgtype.Numeric
 	TotalCents            int64
@@ -230,8 +228,6 @@ type Room struct {
 	Amenities             []string
 	IsAccessible          bool
 	AccessibilityFeatures []string
-	IsPetFriendly         bool
-	PetFeeCents           int32
 	SortOrder             int32
 	CreatedAt             time.Time
 	UpdatedAt             time.Time

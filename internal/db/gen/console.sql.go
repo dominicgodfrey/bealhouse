@@ -1268,8 +1268,6 @@ SELECT
   amenities,
   is_accessible,
   accessibility_features,
-  is_pet_friendly,
-  pet_fee_cents,
   sort_order
 FROM rooms
 ORDER BY sort_order, id
@@ -1285,8 +1283,6 @@ type ListRoomsRow struct {
 	Amenities             []string
 	IsAccessible          bool
 	AccessibilityFeatures []string
-	IsPetFriendly         bool
-	PetFeeCents           int32
 	SortOrder             int32
 }
 
@@ -1312,8 +1308,6 @@ func (q *Queries) ListRooms(ctx context.Context) ([]ListRoomsRow, error) {
 			&i.Amenities,
 			&i.IsAccessible,
 			&i.AccessibilityFeatures,
-			&i.IsPetFriendly,
-			&i.PetFeeCents,
 			&i.SortOrder,
 		); err != nil {
 			return nil, err
@@ -1362,7 +1356,6 @@ SELECT
   b.checkin,
   b.checkout,
   b.guests,
-  b.with_pet,
   b.total_cents,
   b.amount_paid_cents,
   b.balance_due_cents,
@@ -1419,7 +1412,6 @@ type SearchBookingsRow struct {
 	Checkin               pgtype.Date
 	Checkout              pgtype.Date
 	Guests                int32
-	WithPet               bool
 	TotalCents            int64
 	AmountPaidCents       int64
 	BalanceDueCents       int64
@@ -1468,7 +1460,6 @@ func (q *Queries) SearchBookings(ctx context.Context, arg SearchBookingsParams) 
 			&i.Checkin,
 			&i.Checkout,
 			&i.Guests,
-			&i.WithPet,
 			&i.TotalCents,
 			&i.AmountPaidCents,
 			&i.BalanceDueCents,
@@ -1667,7 +1658,6 @@ SELECT
   b.checkin,
   b.checkout,
   b.guests,
-  b.with_pet,
   b.total_cents,
   b.amount_paid_cents,
   b.balance_charge_at,
@@ -1699,7 +1689,6 @@ type TodayBoardRow struct {
 	Checkin               pgtype.Date
 	Checkout              pgtype.Date
 	Guests                int32
-	WithPet               bool
 	TotalCents            int64
 	AmountPaidCents       int64
 	BalanceChargeAt       pgtype.Date
@@ -1751,7 +1740,6 @@ func (q *Queries) TodayBoard(ctx context.Context, onDate pgtype.Date) ([]TodayBo
 			&i.Checkin,
 			&i.Checkout,
 			&i.Guests,
-			&i.WithPet,
 			&i.TotalCents,
 			&i.AmountPaidCents,
 			&i.BalanceChargeAt,
@@ -1816,11 +1804,9 @@ UPDATE rooms SET
   amenities              = $5,
   is_accessible          = $6,
   accessibility_features = $7,
-  is_pet_friendly        = $8,
-  pet_fee_cents          = $9,
-  sort_order             = $10,
+  sort_order             = $8,
   updated_at             = now()
-WHERE id = $11
+WHERE id = $9
 `
 
 type UpdateRoomParams struct {
@@ -1831,8 +1817,6 @@ type UpdateRoomParams struct {
 	Amenities             []string
 	IsAccessible          bool
 	AccessibilityFeatures []string
-	IsPetFriendly         bool
-	PetFeeCents           int32
 	SortOrder             int32
 	ID                    int64
 }
@@ -1850,8 +1834,6 @@ func (q *Queries) UpdateRoom(ctx context.Context, arg UpdateRoomParams) (int64, 
 		arg.Amenities,
 		arg.IsAccessible,
 		arg.AccessibilityFeatures,
-		arg.IsPetFriendly,
-		arg.PetFeeCents,
 		arg.SortOrder,
 		arg.ID,
 	)

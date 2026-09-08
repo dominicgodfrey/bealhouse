@@ -67,7 +67,6 @@ export function Manage() {
             </p>
             <p className="text-sm text-neutral-600">
               {booking.guests} {booking.guests === 1 ? 'guest' : 'guests'}
-              {booking.withPet && ' · with a pet'}
             </p>
           </div>
 

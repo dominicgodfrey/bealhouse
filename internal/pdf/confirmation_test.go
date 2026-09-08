@@ -21,11 +21,10 @@ func stay() Confirmation {
 			{Date: start.AddDate(0, 0, 1), AmountCents: 24500},
 			{Date: start.AddDate(0, 0, 2), AmountCents: 28000},
 		},
-		PetFeeCents:     5000,
-		TaxCents:        6970,
-		TotalCents:      88970,
-		PaidCents:       44485,
-		BalanceCents:    44485,
+		TaxCents:        6545,
+		TotalCents:      83545,
+		PaidCents:       41773,
+		BalanceCents:    41772,
 		BalanceChargeOn: start.AddDate(0, 0, -7),
 	}
 }

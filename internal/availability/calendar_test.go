@@ -262,10 +262,10 @@ func TestTheCalendarAndTheSearchAgree(t *testing.T) {
 	}
 }
 
-// The filters are part of the calendar for the same reason they are part of the
-// search: dates only two-person rooms are free on are not dates a party of four
-// can pick.
-func TestCalendarHonoursCapacityAndPets(t *testing.T) {
+// The capacity filter is part of the calendar for the same reason it is part of
+// the search: dates only two-person rooms are free on are not dates a party of
+// four can pick.
+func TestCalendarHonoursCapacity(t *testing.T) {
 	ctx, q := setup(t)
 
 	req := window()
@@ -273,13 +273,6 @@ func TestCalendarHonoursCapacityAndPets(t *testing.T) {
 	cal := spans(t, ctx, q, req)
 	if len(cal.Rooms) != 1 || cal.Rooms[0].Slug != "garden-suite" {
 		t.Errorf("a party of four sees %d rooms, want just the garden suite", len(cal.Rooms))
-	}
-
-	req = window()
-	req.WithPet = true
-	cal = spans(t, ctx, q, req)
-	if len(cal.Rooms) != 1 || cal.Rooms[0].Slug != "back-lavender" {
-		t.Errorf("a guest with a pet sees %d rooms, want just back lavender", len(cal.Rooms))
 	}
 }
 

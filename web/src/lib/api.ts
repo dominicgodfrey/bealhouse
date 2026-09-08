@@ -9,7 +9,6 @@ import type { PhotoSources } from '../components/Photo'
 export type Quote = {
   nights: number
   roomSubtotalCents: number
-  petFeeCents: number
   taxableCents: number
   taxCents: number
   totalCents: number
@@ -31,7 +30,6 @@ export type Room = {
   beds: Bed[]
   photos: Photo[]
   placeholderPhotoUrl: string
-  isPetFriendly: boolean
   nightlyCents: number[]
   quote: Quote
 }
@@ -41,7 +39,6 @@ export type SearchResult = {
   checkout: string
   nights: number
   guests: number
-  withPet: boolean
   rooms: Room[]
   accessibilityNotice: string
 }
@@ -50,14 +47,12 @@ export type RoomDetail = Room & {
   isAccessible: boolean
   accessibilityFeatures: string[]
   accessibilityNotice: string
-  petFeeCentsPerStay?: number
   hasDates: boolean
   available: boolean
   checkin?: string
   checkout?: string
   nights?: number
   guests?: number
-  withPet?: boolean
 }
 
 /** An unbroken run of sellable nights in one room. */
@@ -67,7 +62,6 @@ export type Calendar = {
   from: string
   to: string
   guests: number
-  withPet: boolean
   rooms: { slug: string; spans: Span[] }[]
   /** The longest stay on sale. Longer ones are arranged with the inn directly. */
   maxStayNights: number
@@ -89,7 +83,6 @@ export type Booking = {
   checkout: string
   nights: number
   guests: number
-  withPet: boolean
   rooms: BookedRoom[]
   quote: Quote
   chargeNowCents: number
@@ -138,7 +131,6 @@ export type Stay = {
   checkin: string
   checkout: string
   guests: number
-  withPet: boolean
 }
 
 function stayQuery(stay: Stay): string {
@@ -146,7 +138,6 @@ function stayQuery(stay: Stay): string {
     checkin: stay.checkin,
     checkout: stay.checkout,
     guests: String(stay.guests),
-    ...(stay.withPet ? { pet: 'true' } : {}),
   }).toString()
 }
 
@@ -163,13 +154,11 @@ export function fetchCalendar(opts: {
   from: string
   to: string
   guests: number
-  withPet: boolean
 }): Promise<Calendar> {
   const query = new URLSearchParams({
     from: opts.from,
     to: opts.to,
     guests: String(opts.guests),
-    ...(opts.withPet ? { pet: 'true' } : {}),
   })
   return request<Calendar>(`/api/calendar?${query}`)
 }
@@ -276,7 +265,6 @@ export function createBooking(body: {
   checkin: string
   checkout: string
   guests: number
-  withPet: boolean
   expectedTotalCents: number
   guest: { name: string; email: string; phone: string }
   /**

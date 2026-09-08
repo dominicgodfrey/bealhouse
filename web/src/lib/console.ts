@@ -33,7 +33,6 @@ export type Stay = {
   checkout: string
   nights: number
   guests: number
-  withPet: boolean
   rooms: string
 
   guestId?: number
@@ -93,7 +92,6 @@ export type BookedRoom = {
 export type Quote = {
   nights: number
   roomSubtotalCents: number
-  petFeeCents: number
   taxableCents: number
   taxCents: number
   totalCents: number
@@ -174,7 +172,6 @@ export type ManualBooking = {
   checkin: string
   checkout: string
   guests: number
-  withPet: boolean
   name: string
   email: string
   phone: string
@@ -435,8 +432,6 @@ export type RoomContent = {
   amenities: string[]
   isAccessible: boolean
   accessibilityFeatures: string[]
-  isPetFriendly: boolean
-  petFeeCents: number
   sortOrder: number
   photos: Photo[]
   beds: Bed[]

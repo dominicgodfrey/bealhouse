@@ -92,7 +92,6 @@ type Request struct {
 	Checkin  time.Time
 	Checkout time.Time
 	Guests   int
-	WithPet  bool
 	Guest    Guest
 
 	// ExpectedTotalCents is the all-in total the guest was shown. Zero skips
@@ -181,7 +180,6 @@ type Booking struct {
 	Checkout string `json:"checkout"`
 	Nights   int    `json:"nights"`
 	Guests   int    `json:"guests"`
-	WithPet  bool   `json:"withPet"`
 	Rooms    []Room `json:"rooms"`
 
 	// Quote is read back from the booking's own snapshot, never recomputed:
@@ -212,8 +210,8 @@ type Booking struct {
 // Create books a room and holds it, in one transaction.
 //
 // Every rule the search applies is applied again here, by running the same
-// query rather than a second implementation of it: capacity, pets, occupancy,
-// full rate coverage, and the minimum stay. A hand-crafted one-night payload
+// query rather than a second implementation of it: capacity, occupancy, full
+// rate coverage, and the minimum stay. A hand-crafted one-night payload
 // fails here even though the date picker would never have offered it.
 //
 // The check is not what makes the room ours — a concurrent booker can pass the
@@ -243,7 +241,6 @@ func Create(ctx context.Context, beginner Beginner, req Request) (Booking, error
 		Checkin:  req.Checkin,
 		Checkout: req.Checkout,
 		Guests:   req.Guests,
-		WithPet:  req.WithPet,
 	})
 	if err != nil {
 		return Booking{}, err
@@ -358,13 +355,11 @@ func Get(ctx context.Context, q *db.Queries, code string) (Booking, error) {
 		Checkout: row.Checkout.Time.Format(time.DateOnly),
 		Nights:   civil.Nights(row.Checkin.Time, row.Checkout.Time),
 		Guests:   int(row.Guests),
-		WithPet:  row.WithPet,
 		Rooms:    make([]Room, 0, len(rooms)),
 		Quote: pricing.Quote{
 			Nights:            civil.Nights(row.Checkin.Time, row.Checkout.Time),
 			RoomSubtotalCents: row.RoomSubtotalCents,
-			PetFeeCents:       row.PetFeeCents,
-			TaxableCents:      row.RoomSubtotalCents + row.PetFeeCents,
+			TaxableCents:      row.RoomSubtotalCents,
 			TaxCents:          row.TaxCents,
 			TotalCents:        row.TotalCents,
 			DepositCents:      row.DepositCents,
@@ -430,9 +425,7 @@ func insertBooking(
 			Checkin:           pgtype.Date{Time: req.Checkin, Valid: true},
 			Checkout:          pgtype.Date{Time: req.Checkout, Valid: true},
 			Guests:            int32(req.Guests),
-			WithPet:           req.WithPet,
 			RoomSubtotalCents: room.Quote.RoomSubtotalCents,
-			PetFeeCents:       room.Quote.PetFeeCents,
 			TaxCents:          room.Quote.TaxCents,
 			TaxRateScaled:     settings.TaxRateScaled,
 			TotalCents:        room.Quote.TotalCents,
@@ -463,7 +456,6 @@ func view(req Request, room availability.Room, code string, expires time.Time) B
 		Checkout: req.Checkout.Format(time.DateOnly),
 		Nights:   civil.Nights(req.Checkin, req.Checkout),
 		Guests:   req.Guests,
-		WithPet:  req.WithPet,
 		Rooms: []Room{{
 			Slug:         room.Slug,
 			Name:         room.Name,

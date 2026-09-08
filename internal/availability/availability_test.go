@@ -116,64 +116,17 @@ func TestCapacityFilter(t *testing.T) {
 	}
 }
 
-// Checking the pet box narrows results to the only room that takes pets.
-func TestPetSearchReturnsOnlyBackLavender(t *testing.T) {
-	ctx, q := setup(t)
-
-	res := search(t, ctx, q, Request{Checkin: day(30), Checkout: day(32), Guests: 2, WithPet: true})
-
-	if len(res.Rooms) != 1 || res.Rooms[0].Slug != "back-lavender" {
-		t.Fatalf("pet search returned %v, want just back-lavender", slugs(res))
-	}
-	if fee := res.Rooms[0].Quote.PetFeeCents; fee != 5000 {
-		t.Errorf("pet fee %d cents, want 5000", fee)
-	}
-}
-
-// ...but leaving the box unchecked must not hide it. It is an ordinary room
-// that also happens to accept pets, and one of only two that sleep three.
-func TestBackLavenderIsOfferedToGuestsWithoutPets(t *testing.T) {
+// Back Lavender is an ordinary room now that the pet fee is withdrawn: it
+// sleeps three, it is offered to everyone, and nothing is added to its quote.
+func TestBackLavenderIsAnOrdinaryRoom(t *testing.T) {
 	ctx, q := setup(t)
 
 	res := search(t, ctx, q, Request{Checkin: day(30), Checkout: day(32), Guests: 2})
 	room := roomBySlug(t, res, "back-lavender")
 
-	if !room.IsPetFriendly {
-		t.Error("the room should still be flagged pet friendly")
-	}
-	if room.Quote.PetFeeCents != 0 {
-		t.Errorf("charged a %d cent pet fee to a guest with no pet", room.Quote.PetFeeCents)
-	}
-}
-
-// The fee is its own line so the price preview can show the guest what the
-// extra $50 is, rather than burying it in a larger subtotal.
-func TestPetFeeIsSeparatedAndTaxed(t *testing.T) {
-	ctx, q := setup(t)
-
-	res := search(t, ctx, q, Request{Checkin: day(30), Checkout: day(32), Guests: 2, WithPet: true})
-	q1 := res.Rooms[0].Quote
-
-	// Back Lavender at the seeded $150 base: 2 nights = $300, plus $50 pet fee,
-	// taxed together at 8.5%.
-	if q1.RoomSubtotalCents != 30000 {
-		t.Errorf("room subtotal %d, want 30000", q1.RoomSubtotalCents)
-	}
-	if q1.PetFeeCents != 5000 {
-		t.Errorf("pet fee %d, want 5000", q1.PetFeeCents)
-	}
-	if q1.TaxableCents != 35000 {
-		t.Errorf("taxable %d, want 35000 (the fee is taxed with the room)", q1.TaxableCents)
-	}
-	if q1.TaxCents != 2975 {
-		t.Errorf("tax %d, want 2975", q1.TaxCents)
-	}
-	if q1.TotalCents != 37975 {
-		t.Errorf("total %d, want 37975", q1.TotalCents)
-	}
-	// Odd total: the deposit takes the extra cent and the two still reconcile.
-	if q1.DepositCents != 18988 || q1.BalanceCents != 18987 {
-		t.Errorf("deposit/balance %d/%d, want 18988/18987", q1.DepositCents, q1.BalanceCents)
+	if room.Quote.TaxableCents != room.Quote.RoomSubtotalCents {
+		t.Errorf("taxable %d != room subtotal %d: something besides the room is being charged",
+			room.Quote.TaxableCents, room.Quote.RoomSubtotalCents)
 	}
 }
 

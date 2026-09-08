@@ -97,8 +97,8 @@ it the server still boots and reports `db: not_configured`.
 - **Civil dates, not instants.** Use `internal/civil` for anything calendar-shaped;
   it resolves in America/New_York with embedded tzdata.
 - **The database enforces the invariants**, not the handlers: the exclusion
-  constraint, the accessibility honesty rule, the pet-fee rule, hold expiry
-  agreement. Add new invariants there too where possible.
+  constraint, the accessibility honesty rule, the money reconciliation checks,
+  hold expiry agreement. Add new invariants there too where possible.
 - **Claiming a room goes through `occupancy.Create`**, never `q.CreateOccupancy`
   directly. It takes the per-room advisory lock that stops deadlocks and
   translates `23P01` into `ErrRoomTaken`. See the concurrency section in
@@ -257,7 +257,7 @@ Room descriptions, photos, amenities, and rate seasons are all managed through t
 admin console. Do not invent content, and do not seed guesses.
 
 **The seed is in two halves, and the split is the point.** `rooms.sql` is the
-seven rooms as *facts* — occupancy, beds, views, the pet room — and leaves every
+seven rooms as *facts* — occupancy, beds, views — and leaves every
 description `PLACEHOLDER` so a leak onto the live site is unmistakable rather
 than plausible. `content.sql` is *provisional copy transcribed from the inn's
 current site*: every sentence in it is the owner's own, taken off a page they
@@ -574,7 +574,7 @@ only the last two steps need one.
   The hold is a `room_occupancy` row with an expiry, so the exclusion constraint
   guards a checkout in progress exactly the way it guards a confirmed stay.
 - **The booking path re-runs the availability query rather than trusting the
-  client.** Capacity, pets, occupancy, rate coverage and min-stay are therefore
+  client.** Capacity, occupancy, rate coverage and min-stay are therefore
   re-checked by the same SQL that produced the search results — one rule set, not
   two that drift. A hand-crafted one-night payload is refused.
 - That check is not what claims the room. A concurrent booker can pass it a moment

@@ -74,8 +74,9 @@ function Rules({ terms }: { terms: PolicyTerms }) {
           not completed in that time the room goes back on sale.
         </Rule>
         <Rule label="Tax">
-          New Hampshire Meals &amp; Rooms tax of {terms.taxRatePercent}% is added to the room rate
-          and to the pet fee. Every price you are shown before paying already includes it.
+          New Hampshire Meals &amp; Rooms tax of {terms.taxRatePercent}% is added to the room
+          rate. There are no other fees, and every price you are shown before paying already
+          includes the tax.
         </Rule>
       </Section>
 

@@ -22,10 +22,9 @@ const DefaultCalendarMonths = 12
 // would happily offer a party of four a date only the two-person rooms are free
 // on.
 type CalendarRequest struct {
-	From    time.Time
-	To      time.Time
-	Guests  int
-	WithPet bool
+	From   time.Time
+	To     time.Time
+	Guests int
 }
 
 // Span is an unbroken run of sellable nights in one room.
@@ -53,11 +52,10 @@ type RoomSpans struct {
 // them. A picker built on the union would let a guest select that range and
 // then find nothing for sale (decision #14).
 type Calendar struct {
-	From    string      `json:"from"`
-	To      string      `json:"to"`
-	Guests  int         `json:"guests"`
-	WithPet bool        `json:"withPet"`
-	Rooms   []RoomSpans `json:"rooms"`
+	From   string      `json:"from"`
+	To     string      `json:"to"`
+	Guests int         `json:"guests"`
+	Rooms  []RoomSpans `json:"rooms"`
 
 	// MaxStayNights is the longest stay on sale (decision #27). Sent with the
 	// calendar rather than hardcoded in the client, so raising it in settings
@@ -89,7 +87,6 @@ func Spans(ctx context.Context, q *db.Queries, req CalendarRequest) (Calendar, e
 		FromDate: pgtype.Date{Time: from, Valid: true},
 		ToDate:   pgtype.Date{Time: to, Valid: true},
 		Guests:   int32(guests),
-		WithPet:  req.WithPet,
 	})
 	if err != nil {
 		return Calendar{}, fmt.Errorf("availability: listing sellable nights: %w", err)
@@ -99,7 +96,6 @@ func Spans(ctx context.Context, q *db.Queries, req CalendarRequest) (Calendar, e
 		From:          from.Format(time.DateOnly),
 		To:            to.Format(time.DateOnly),
 		Guests:        guests,
-		WithPet:       req.WithPet,
 		Rooms:         group(rows),
 		MaxStayNights: int(settings.MaxStayNights),
 	}, nil

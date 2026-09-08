@@ -8,7 +8,7 @@
 -- only how the row got its first value.
 --
 -- WHY THIS IS A SEPARATE FILE from rooms.sql. rooms.sql describes the seven
--- rooms as facts — occupancy, beds, views, the pet room — and argues in its own
+-- rooms as facts — occupancy, beds, views — and argues in its own
 -- header that descriptions stay PLACEHOLDER so a leak onto the live site is
 -- unmistakable rather than plausible. That argument still holds; this file is
 -- the copy, and deleting it is how you get back to the state that argument

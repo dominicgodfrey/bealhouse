@@ -71,7 +71,6 @@ func optionalStay(r *http.Request) (*availability.Request, error) {
 		Checkin:  checkin,
 		Checkout: checkout,
 		Guests:   guests,
-		WithPet:  query.Get("pet") == "true",
 	}, nil
 }
 

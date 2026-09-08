@@ -32,7 +32,7 @@ Stack constraint: **TypeScript/React + Go**. No launch deadline — one complete
 | 5 | Rate storage | Materialized nightly calendar `(room_id, date, price_cents, min_stay)` |
 | 6 | Payment | Deposit at booking; balance auto-charged off-session at **T-7 days** |
 | 7 | Short notice | Arrival < 8 days ⇒ charge **full amount** at booking, no deposit split, no scheduled job |
-| 8 | Deposit | **50% of the all-in total** (room + pet fee + tax), rounded up. Balance = total − deposit, so the two always reconcile *(revised; was first night + tax)* |
+| 8 | Deposit | **50% of the all-in total** (room + tax), rounded up. Balance = total − deposit, so the two always reconcile *(revised; was first night + tax)* |
 | 9 | Cancellation | ≥7 days: full refund **less the card processor's cut** (see #26). <7 days: **50% refund** — the forfeit is exactly the deposit *(revised twice)* |
 | 10 | Multi-room | Schema `booking → booking_rooms` from day one; v1 UI single-room |
 | 11 | Out of scope | Table reservations, guest accounts, gift certificates, event booking/deposits |
@@ -47,7 +47,7 @@ Stack constraint: **TypeScript/React + Go**. No launch deadline — one complete
 | 20 | **Minimum stay** | **Global default 2 nights**, stored in `settings` (not hardcoded). A season may override it upward (e.g. 3 on holiday weekends) |
 | 21 | **Rate administration** | Seasons are **owner-editable in admin** as a room × season price grid; saving regenerates the nightly calendar for **future dates only** |
 | 22 | **Accessibility** | **Filter switched off.** Every room requires stairs, including the two the owner considers most accessible, so no room sets `is_accessible`. The schema and its constraint remain; `settings.accessibility_notice` carries a stairs disclaimer shown with every search *(revised)* |
-| 23 | **Pet fee** | Back Lavender only: **$50 per stay**, taxed with the room charge, refundable on the same terms. The search checkbox does double duty — it filters to pet-friendly rooms *and* adds the fee. Unchecked, Back Lavender still appears at no fee |
+| 23 | **Pet fee** | **Withdrawn** *(revised 2026-09-07)*. The inn no longer takes pets in any room, so there is no pet room, no fee and no search checkbox; migration 00024 dropped the columns and the constraints that guarded them, and a booking that had paid a fee keeps its total with the fee folded into the room subtotal. It used to be Back Lavender only, $50 per stay, taxed with the room and refundable on the same terms |
 | 24 | **Payment after the room is gone** | A charge that lands once the hold has lapsed re-claims the room through the exclusion constraint. If it is still free the stay is confirmed; if it was resold the booking is **cancelled and the whole amount refunded**, penalty-free — the guest did not change their mind, so decision #9 does not apply |
 | 25 | **The ledger vs. the snapshot** | `bookings.amount_paid_cents` is the **gross** collected and only ever grows; refunds are rows in `payments`, never a subtraction. `pricing.Refund` derives from what was collected, so reducing it would make a second cancellation compute a smaller refund off an already-reduced figure |
 | 26 | **Processing retention** | Every refund keeps **3%** of what was collected, configurable in `settings.refund_processing_rate`. Stripe's fee is taken on the way in and is **not** returned when a payment is refunded, so a literal full refund costs the inn that much on a cancellation it had no part in. Retention is `max(cancellation penalty, processing fee)` — **not** their sum, because a late cancellation's forfeited deposit already covers the processor many times over and adding both would charge the same transaction twice. Rounded **up**, since the entire point is that the inn is never short |
@@ -684,10 +684,9 @@ Dependency-ordered, not deadline-driven (single launch).
   a 2-night query against a 3-night holiday season also returns nothing.
 - **Min-stay bypass:** `POST /api/bookings` with a hand-crafted 1-night payload must be rejected
   server-side, not merely hidden by the date picker. *(Done — the booking path re-runs the
-  availability query itself rather than trusting the client, so capacity, pets, occupancy, rate
+  availability query itself rather than trusting the client, so capacity, occupancy, rate
   coverage and min-stay are all re-checked by the same SQL that produced the search results.)*
-- **Pet fee:** `pet=true` returns only pet-friendly rooms and adds $50 to the quote as its own line;
-  unchecked, the same room appears at no fee.
+- **Pet fee:** *(withdrawn — decision #23)*
 - **Accessibility filter:** *(deferred — the filter is off; see Accessibility above)*
 - **Rate rebuild safety:** confirm a booking, edit the season covering its dates, rebuild, and assert
   the booking's total, nightly prices, and balance are **unchanged**.

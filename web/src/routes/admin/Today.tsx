@@ -120,7 +120,6 @@ function StayRow({ stay }: { stay: Stay }) {
       <div className="text-sm text-neutral-600">
         {stay.rooms || 'no room recorded'} · {stay.guests}{' '}
         {stay.guests === 1 ? 'guest' : 'guests'}
-        {stay.withPet && ' · with a pet'}
         <br />
         {formatLong(stay.checkin)} → {formatLong(stay.checkout)} ({stay.nights}{' '}
         {stay.nights === 1 ? 'night' : 'nights'})

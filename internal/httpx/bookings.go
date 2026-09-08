@@ -25,7 +25,6 @@ type bookingRequest struct {
 	Checkin            string        `json:"checkin"`
 	Checkout           string        `json:"checkout"`
 	Guests             int           `json:"guests"`
-	WithPet            bool          `json:"withPet"`
 	ExpectedTotalCents int64         `json:"expectedTotalCents"`
 	Guest              booking.Guest `json:"guest"`
 
@@ -66,7 +65,6 @@ func createBooking(beginner booking.Beginner) http.HandlerFunc {
 			Checkin:            checkin,
 			Checkout:           checkout,
 			Guests:             body.Guests,
-			WithPet:            body.WithPet,
 			Guest:              body.Guest,
 			ExpectedTotalCents: body.ExpectedTotalCents,
 			AcceptedPolicies:   body.AcceptedPolicies,

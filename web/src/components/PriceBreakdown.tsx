@@ -11,11 +11,8 @@ type Props = {
 }
 
 /**
- * What the stay costs, itemised.
- *
- * The pet fee gets its own line because it is its own field all the way down —
- * decision #23 is that a guest can see exactly what the extra $50 is for rather
- * than finding a subtotal that does not match the nightly rate.
+ * What the stay costs, itemised: the nights, the tax, and how the total splits
+ * between the deposit and the balance.
  */
 export function PriceBreakdown({ quote, nightlyCents, checkin, payment }: Props) {
   const flat = nightlyCents.every((cents) => cents === nightlyCents[0])
@@ -40,10 +37,6 @@ export function PriceBreakdown({ quote, nightlyCents, checkin, payment }: Props)
             </li>
           ))}
         </ul>
-      )}
-
-      {quote.petFeeCents > 0 && (
-        <Row label="Pet fee (per stay)" value={formatCents(quote.petFeeCents)} />
       )}
 
       <Row label="NH Meals & Rooms tax" value={formatCents(quote.taxCents)} />

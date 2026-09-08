@@ -21,9 +21,7 @@ SELECT
   max_occupancy,
   amenities,
   is_accessible,
-  accessibility_features,
-  is_pet_friendly,
-  pet_fee_cents
+  accessibility_features
 FROM rooms
 WHERE slug = $1
 `
@@ -38,8 +36,6 @@ type GetRoomBySlugRow struct {
 	Amenities             []string
 	IsAccessible          bool
 	AccessibilityFeatures []string
-	IsPetFriendly         bool
-	PetFeeCents           int32
 }
 
 // Everything the room page shows. Accessibility comes back even though the
@@ -59,8 +55,6 @@ func (q *Queries) GetRoomBySlug(ctx context.Context, slug string) (GetRoomBySlug
 		&i.Amenities,
 		&i.IsAccessible,
 		&i.AccessibilityFeatures,
-		&i.IsPetFriendly,
-		&i.PetFeeCents,
 	)
 	return i, err
 }

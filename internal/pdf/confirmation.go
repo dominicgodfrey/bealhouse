@@ -39,9 +39,8 @@ type Confirmation struct {
 	Nights   []Night
 	Guests   int
 
-	PetFeeCents int64
-	TaxCents    int64
-	TotalCents  int64
+	TaxCents   int64
+	TotalCents int64
 
 	// PaidCents is the gross collected. BalanceCents and BalanceChargeOn are
 	// zero and zero on a stay paid in full at booking (decision #7), which is how
@@ -219,9 +218,6 @@ func (d *render) nightly(in Confirmation) {
 	d.doc.Ln(1)
 
 	d.row("Room", money(room), false)
-	if in.PetFeeCents > 0 {
-		d.row("Pet fee", money(in.PetFeeCents), false)
-	}
 	d.row("Tax", money(in.TaxCents), false)
 	d.row("Total", money(in.TotalCents), true)
 

@@ -34,12 +34,6 @@ type Request struct {
 	Checkin  time.Time
 	Checkout time.Time
 	Guests   int
-
-	// WithPet does double duty, matching how the search form reads: it
-	// restricts results to pet-friendly rooms and adds the pet fee to their
-	// quotes. Leaving it false does not hide pet-friendly rooms — Back Lavender
-	// is an ordinary room that happens to accept pets.
-	WithPet bool
 }
 
 type Bed struct {
@@ -71,16 +65,15 @@ func PlaceholderPhoto(slug string) string {
 
 // Room is one sellable result, priced.
 type Room struct {
-	ID            int64    `json:"id"`
-	Slug          string   `json:"slug"`
-	Name          string   `json:"name"`
-	Description   string   `json:"description"`
-	View          string   `json:"view,omitempty"`
-	MaxOccupancy  int      `json:"maxOccupancy"`
-	Amenities     []string `json:"amenities"`
-	Beds          []Bed    `json:"beds"`
-	Photos        []Photo  `json:"photos"`
-	IsPetFriendly bool     `json:"isPetFriendly"`
+	ID           int64    `json:"id"`
+	Slug         string   `json:"slug"`
+	Name         string   `json:"name"`
+	Description  string   `json:"description"`
+	View         string   `json:"view,omitempty"`
+	MaxOccupancy int      `json:"maxOccupancy"`
+	Amenities    []string `json:"amenities"`
+	Beds         []Bed    `json:"beds"`
+	Photos       []Photo  `json:"photos"`
 
 	// PlaceholderPhotoURL is what to render while Photos is empty, so a room
 	// page has the right shape before the owner has uploaded anything.
@@ -90,9 +83,6 @@ type Room struct {
 	// what a stay is actually made of rather than one opaque total.
 	NightlyCents []int64 `json:"nightlyCents"`
 
-	// Quote keeps the pet fee as its own field rather than folding it into the
-	// subtotal, so the price preview can show the guest exactly what the extra
-	// $50 is for.
 	Quote pricing.Quote `json:"quote"`
 }
 
@@ -102,7 +92,6 @@ type Result struct {
 	Checkout string `json:"checkout"`
 	Nights   int    `json:"nights"`
 	Guests   int    `json:"guests"`
-	WithPet  bool   `json:"withPet"`
 	Rooms    []Room `json:"rooms"`
 
 	// Shown alongside results because every room requires stairs and a guest
@@ -131,7 +120,6 @@ func Search(ctx context.Context, q *db.Queries, req Request) (Result, error) {
 		Checkin:  pgtype.Date{Time: req.Checkin, Valid: true},
 		Checkout: pgtype.Date{Time: req.Checkout, Valid: true},
 		Guests:   int32(req.Guests),
-		WithPet:  req.WithPet,
 	})
 	if err != nil {
 		return Result{}, fmt.Errorf("availability: searching: %w", err)
@@ -153,7 +141,6 @@ func Search(ctx context.Context, q *db.Queries, req Request) (Result, error) {
 		Checkout:            req.Checkout.Format(time.DateOnly),
 		Nights:              civil.Nights(req.Checkin, req.Checkout),
 		Guests:              req.Guests,
-		WithPet:             req.WithPet,
 		Rooms:               make([]Room, 0, len(rows)),
 		AccessibilityNotice: settings.AccessibilityNotice,
 	}
@@ -162,14 +149,6 @@ func Search(ctx context.Context, q *db.Queries, req Request) (Result, error) {
 		nightly := make([]int64, len(row.NightlyPrices))
 		for i, cents := range row.NightlyPrices {
 			nightly[i] = int64(cents)
-		}
-
-		// The fee applies only when the guest said they are bringing a pet. A
-		// pet-friendly room shown to everyone else is priced as an ordinary
-		// room.
-		var petFee int64
-		if req.WithPet && row.IsPetFriendly {
-			petFee = int64(row.PetFeeCents)
 		}
 
 		result.Rooms = append(result.Rooms, Room{
@@ -183,11 +162,9 @@ func Search(ctx context.Context, q *db.Queries, req Request) (Result, error) {
 			Beds:                beds[row.ID],
 			Photos:              photos[row.ID],
 			PlaceholderPhotoURL: PlaceholderPhoto(row.Slug),
-			IsPetFriendly:       row.IsPetFriendly,
 			NightlyCents:        nightly,
 			Quote: pricing.Compute(pricing.Input{
 				NightlyCents: nightly,
-				PetFeeCents:  petFee,
 				TaxRate:      pricing.Rate(settings.TaxRateScaled),
 			}),
 		})

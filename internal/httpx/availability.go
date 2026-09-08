@@ -11,7 +11,7 @@ import (
 
 // searchAvailability serves GET /api/availability.
 //
-//	?checkin=2027-06-10&checkout=2027-06-13&guests=2&pet=true
+//	?checkin=2027-06-10&checkout=2027-06-13&guests=2
 //
 // Bad input is a 400 with a reason the UI can show, not a 500: a guest typing a
 // date in the past has not broken anything.
@@ -40,7 +40,6 @@ func searchAvailability(q *db.Queries) http.HandlerFunc {
 			Checkin:  checkin,
 			Checkout: checkout,
 			Guests:   guests,
-			WithPet:  query.Get("pet") == "true",
 		})
 		if err != nil {
 			if reason, ok := searchProblem(err); ok {

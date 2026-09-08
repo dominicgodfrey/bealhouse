@@ -44,17 +44,12 @@ type Props = {
 }
 
 /**
- * Dates, party size, and whether a pet is coming.
+ * Dates and party size.
  *
  * **The calendar starts closed, everywhere.** It used to be pinned open on the
  * home page, answering a question nobody had asked yet. Search opens it too: a
  * search with no dates has nothing to run, so the button opens the thing that
  * is missing rather than sitting greyed out with no explanation.
- *
- * The pet box does double duty, as decision #23 describes: it narrows results
- * to the one room that takes pets AND adds the $50. Leaving it unchecked does
- * not hide that room, because it is an ordinary room that happens to allow
- * them.
  */
 export function SearchForm({ initial, overlay = false }: Props) {
   const navigate = useNavigate()
@@ -62,7 +57,6 @@ export function SearchForm({ initial, overlay = false }: Props) {
   const [checkin, setCheckin] = useState<string | null>(initial?.checkin ?? null)
   const [checkout, setCheckout] = useState<string | null>(initial?.checkout ?? null)
   const [guests, setGuests] = useState(initial?.guests ?? 2)
-  const [withPet, setWithPet] = useState(initial?.withPet ?? false)
   const [open, setOpen] = useState(false)
   const panel = useRef<HTMLDivElement>(null)
 
@@ -112,7 +106,6 @@ export function SearchForm({ initial, overlay = false }: Props) {
       checkin,
       checkout,
       guests: String(guests),
-      ...(withPet ? { pet: 'true' } : {}),
     })
     navigate(`/search?${query}`)
   }
@@ -176,31 +169,12 @@ export function SearchForm({ initial, overlay = false }: Props) {
         </button>
       </div>
 
-      {/*
-        The whole label is the tap target and -my-2 py-2 makes it 44px tall
-        without moving anything: the checkbox itself is 16px, which is a
-        difficult thing to hit with a thumb and an easy one to miss into the
-        calendar below.
-      */}
-      <label className="-my-1 flex items-center gap-2 py-1 text-sm text-neutral-700">
-        <input
-          type="checkbox"
-          checked={withPet}
-          onChange={(e) => setWithPet(e.target.checked)}
-          className="size-4 shrink-0"
-        />
-        <span>
-          I am bringing a pet <span className="text-neutral-500">($50 pet charge per stay)</span>
-        </span>
-      </label>
-
       {open && (
         <div ref={panel} className={overlay ? floating : undefined}>
           <DateRangePicker
             checkin={checkin}
             checkout={checkout}
             guests={guests}
-            withPet={withPet}
             onChange={(from, to) => {
               setCheckin(from)
               setCheckout(to)

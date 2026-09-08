@@ -49,14 +49,7 @@ export function RoomCard({ room, stay }: { room: Room; stay: Stay }) {
 
         <p className="text-sm text-neutral-600">
           Sleeps {room.maxOccupancy} · {describeBeds(room)}
-          {room.isPetFriendly && ' · Pets welcome'}
         </p>
-
-        {room.quote.petFeeCents > 0 && (
-          <p className="text-sm text-neutral-600">
-            Includes a {formatCents(room.quote.petFeeCents)} pet fee for the stay.
-          </p>
-        )}
 
         {room.amenities.length > 0 && (
           <p className="text-sm text-neutral-600">{room.amenities.join(' · ')}</p>
