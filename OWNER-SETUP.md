@@ -19,43 +19,48 @@ editor is not loaded onto the live server. See §4.
 
 ## The one that must be done before taking a booking
 
-### 1. Real rates — `/admin/rates`
+### 1. Rates — `/admin/rates`
 
-**This is the only item on this page that can charge somebody the wrong amount.**
+**This is the only item on this page that can charge somebody the wrong amount**,
+which is why it is the one that ships already filled in with the inn's own
+numbers rather than a placeholder. The prices below are the ones the owner
+confirmed on 2026-09-07; what is left is to read them once on the screen that
+will change them from now on.
 
-Every other placeholder in this system renders as *nothing* — an empty
-description prints no paragraph, an unwritten page prints no prose. Rates cannot
-do that. A room with no price cannot be sold at all, so the seed ships one flat
-season to make the site usable, and its numbers are **a guess**: the "starting
-at" figures from the current site, halved, because those were quoted as two-night
-totals.
+What is in the database today, per night and before the 8.5% tax:
 
-What is in the database today:
+| | Mrs. Beal's · Garden · Flume | Rose · Blue · Washington · Back Lavender |
+|---|---|---|
+| **Standard** — every night | $200 | $150 |
+| **Fall** — August 14th to October 31st | $250 | $200 |
 
-| | |
-|---|---|
-| Seasons | **one**, named `Base rate (placeholder)` |
-| Covering | 2026-01-01 to 2032-12-31 |
-| Price | $200/night for Mrs. Beal's Suite, Garden Suite and Flume; $150/night for the other four |
-| Minimum stay | not set on the season, so it falls back to the 2 nights in Settings |
+The inn prices by five named seasons — Winter, Low Spring, Summer, Fall, Low
+Fall — and four of them carry the same price for every room. Only Fall differs,
+so that is how it is entered: a Standard row covering every night, and a Fall
+row laid over it each year at a higher priority. Two rows a year cannot leave a
+gap, where the five as written did (Fall ended on the 30th and Low Fall began on
+the 1st, and a night no season covers is a night no room can be sold on).
+
+There is no fee of any kind beyond the tax, and the minimum stay is two nights
+in every season with no holiday exceptions — so **Minimum stay** is blank on
+every row and the 2 in Settings applies.
 
 **What to do.** On `/admin/rates`:
 
-1. Create the seasons the inn actually prices by — a summer, a foliage season, a
-   winter, holiday weekends. Each has a **Name**, a **First night**, a **Last
-   night**, an optional **Minimum stay**, and a **Priority**.
-2. Fill in the room × season grid with real nightly prices.
-3. **Priority decides overlaps.** A holiday weekend sitting inside the summer
-   season needs a *higher* priority number than the season underneath it, or the
-   summer price wins on those nights.
-4. **Last night is inclusive.** "Jun 1 to Aug 31" means the guest can sleep on
-   August 31st. This is deliberately not the same convention as a check-out date.
-5. Press **preview before saving.** The preview applies the change, works out
+1. Read the grid against the table above. Search a Fall date and a Standard
+   date on the public site and see the two prices you expect.
+2. **Fall is seeded through 2030.** Before the autumn of 2029, add `Fall 2031`
+   — first night August 14th, last night October 31st, priority 1, the same
+   four prices — or that autumn sells at the Standard rate.
+3. To change a price, change it here; the calendar regenerates for future
+   nights only. **Priority decides overlaps** — a row laid over Standard needs a
+   higher number or Standard wins — and **last night is inclusive**: "Aug 14 to
+   Oct 31" means the guest can sleep on the 31st, which is deliberately not the
+   same convention as a check-out date.
+4. Press **preview before saving.** The preview applies the change, works out
    exactly which nights and prices move, and then undoes it — so the number it
    shows is the real answer including any lower-priority season underneath,
    rather than an estimate.
-6. Delete `Base rate (placeholder)` once the real seasons cover the calendar.
-   Leave it until then: deleting it first takes every room off sale.
 
 **Bookings already taken do not change.** A booking snapshots its own prices when
 it is made, so re-pricing a season never alters a stay somebody has already paid
@@ -211,7 +216,7 @@ without the owner deciding to.
 
 ## Before the site goes public
 
-- [ ] **Real rate seasons in, placeholder season deleted** (§1)
+- [ ] **The rate grid read once on `/admin/rates` and checked on the public site** (§1)
 - [ ] **The real menu in, or left empty on purpose** (§4)
 - [ ] Descriptions for the six rooms without one (§2)
 - [ ] Photographs for Back Lavender and Flume (§3)

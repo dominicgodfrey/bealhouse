@@ -78,10 +78,17 @@ func TestCreateHoldsTheRoom(t *testing.T) {
 		t.Errorf("hold expires in %v, want the seeded 15-minute TTL", until)
 	}
 
-	// Rose Chamber at the seeded $150: two nights, taxed at 8.5%.
-	if made.Quote.TotalCents != 32550 || made.Quote.DepositCents != 16275 {
-		t.Errorf("quote total/deposit %d/%d, want 32550/16275",
-			made.Quote.TotalCents, made.Quote.DepositCents)
+	// The quote is the calendar's own arithmetic, whichever season the window
+	// lands in: the nights add up to the subtotal, the subtotal and the tax to
+	// the total, and the two halves back to the total.
+	var nights int64
+	for _, c := range made.Rooms[0].NightlyCents {
+		nights += c
+	}
+	q1 := made.Quote
+	if q1.RoomSubtotalCents != nights || q1.TotalCents != q1.RoomSubtotalCents+q1.TaxCents ||
+		q1.DepositCents+q1.BalanceCents != q1.TotalCents || q1.TaxCents == 0 {
+		t.Errorf("quote does not add up: %+v against nights summing to %d", q1, nights)
 	}
 
 	// The point of the hold: the room is gone from the search that produced it.
@@ -186,16 +193,34 @@ func TestDateValidationIsSharedWithSearch(t *testing.T) {
 
 // Nobody is charged a price they were not shown.
 func TestPriceDisagreementIsRejected(t *testing.T) {
-	ctx, _, b := setup(t)
+	ctx, q, b := setup(t)
 
+	// The price the guest would have been shown, from the same search the
+	// booking re-runs — rather than a constant, which would be right only in
+	// whichever season the test window happened to land in.
 	req := request()
-	req.ExpectedTotalCents = 30000 // the guest saw a stale, cheaper quote
+	res, err := availability.Search(ctx, q, availability.Request{
+		Checkin: req.Checkin, Checkout: req.Checkout, Guests: req.Guests,
+	})
+	if err != nil {
+		t.Fatalf("searching: %v", err)
+	}
+	var shown int64
+	for _, room := range res.Rooms {
+		if room.Slug == req.RoomSlug {
+			shown = room.Quote.TotalCents
+		}
+	}
+	if shown == 0 {
+		t.Fatalf("%s is not on sale for the test window", req.RoomSlug)
+	}
 
+	req.ExpectedTotalCents = shown - 100 // the guest saw a stale, cheaper quote
 	if _, err := Create(ctx, b, req); !errors.Is(err, ErrPriceChanged) {
 		t.Errorf("got %v, want ErrPriceChanged", err)
 	}
 
-	req.ExpectedTotalCents = 32550
+	req.ExpectedTotalCents = shown
 	if _, err := Create(ctx, b, req); err != nil {
 		t.Errorf("the correct total was rejected: %v", err)
 	}

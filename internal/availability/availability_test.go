@@ -139,16 +139,35 @@ func TestPricingMatchesTheRateCalendar(t *testing.T) {
 	if len(rose.NightlyCents) != 2 {
 		t.Fatalf("got %d nightly prices, want 2", len(rose.NightlyCents))
 	}
+
+	// Night by night against the calendar itself rather than a constant: the
+	// seed carries the inn's real seasons, and which one a test window lands in
+	// depends on the day the test runs.
+	roomID, err := q.GetRoomIDBySlug(ctx, "rose-chamber")
+	if err != nil {
+		t.Fatalf("looking up rose-chamber: %v", err)
+	}
+	var subtotal int64
 	for i, cents := range rose.NightlyCents {
-		if cents != 15000 {
-			t.Errorf("night %d is %d cents, want the seeded 15000", i, cents)
+		night := day(30 + i)
+		entry, err := q.GetRateCalendarEntry(ctx, db.GetRateCalendarEntryParams{
+			RoomID: roomID,
+			Date:   pgtype.Date{Time: night, Valid: true},
+		})
+		if err != nil {
+			t.Fatalf("calendar has no entry for %s: %v", night.Format(time.DateOnly), err)
 		}
+		if cents != int64(entry.PriceCents) {
+			t.Errorf("night %d is %d cents, calendar says %d", i, cents, entry.PriceCents)
+		}
+		subtotal += cents
 	}
-	if rose.Quote.TotalCents != 32550 {
-		t.Errorf("all-in total %d, want 32550", rose.Quote.TotalCents)
+	if rose.Quote.RoomSubtotalCents != subtotal {
+		t.Errorf("room subtotal %d, want the nights' sum %d", rose.Quote.RoomSubtotalCents, subtotal)
 	}
-	if rose.Quote.DepositCents != 16275 {
-		t.Errorf("deposit %d, want 16275", rose.Quote.DepositCents)
+	if rose.Quote.DepositCents+rose.Quote.BalanceCents != rose.Quote.TotalCents {
+		t.Errorf("deposit %d + balance %d != total %d",
+			rose.Quote.DepositCents, rose.Quote.BalanceCents, rose.Quote.TotalCents)
 	}
 }
 

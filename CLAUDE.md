@@ -22,7 +22,7 @@ go tool goose -dir internal/db/migrations postgres "postgres://bealhouse:bealhou
 ```
 
 Then load the seed — **tests fail without it**, since they assert against the
-seven real rooms and the placeholder rate season:
+seven real rooms and a priced calendar:
 
 ```bash
 docker compose exec -T postgres psql -U bealhouse -d bealhouse -v ON_ERROR_STOP=1 -f - < internal/db/seed/rooms.sql
@@ -265,8 +265,11 @@ wrote, and it fills amenities and clears the placeholders. Five of the seven
 rooms are published there and only one carries a written description, so exactly
 one room gets one and the other six are blank on purpose. `menu-mock.sql` is
 neither — it is invented structure to exercise the editor, and it must not reach
-production. `rates.sql` is one flat placeholder season, and it is the one seed
-whose numbers charge a card.
+production. `rates.sql` is the inn's real grid — a Standard season and a Fall
+season per year, the owner's own numbers — and it is the one seed whose numbers
+charge a card. **Tests never assert a seeded price as a constant**: which season
+a relative test window lands in depends on the day the suite runs, so they read
+the calendar entry or check the quote's own arithmetic instead.
 
 `web/public/placeholders/*.svg` stands in for photos as a **UI fallback** rather
 than seeded rows — a placeholder in the database is one somebody has to remember

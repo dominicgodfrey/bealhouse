@@ -282,10 +282,11 @@ the only seeded content that is nobody's real words. A restaurant page with no
 menu correctly says the menu is not up and to ring the inn; a restaurant page
 with five invented dishes on it is a lie that stays up until somebody remembers.
 
-`rates.sql` is the one seed whose numbers charge a card — a single flat
-placeholder season, so the rooms are sellable on day one. Replacing it is the
-first item in [OWNER-SETUP.md](../OWNER-SETUP.md), and the only item there that
-can charge somebody the wrong amount.
+`rates.sql` is the one seed whose numbers charge a card — the inn's real grid, a
+Standard season and a Fall season per year through 2030, as the owner confirmed
+them. Reading it once on the console is the first item in
+[OWNER-SETUP.md](../OWNER-SETUP.md), and the only item there that can charge
+somebody the wrong amount.
 
 ### The first phone
 

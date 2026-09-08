@@ -113,7 +113,7 @@ internal/civil/          the inn's calendar in America/New_York
 internal/testdb/         test helpers: real Postgres, rolled-back transactions
 internal/db/migrations/  goose SQL migrations
 internal/db/queries/     hand-written SQL; sqlc generates Go into internal/db/gen
-internal/db/seed/        the seven rooms and a placeholder rate season
+internal/db/seed/        the seven rooms, the owner's copy, and the rate grid
 web/src/lib/             the API client, civil dates, money, span rules
 web/src/routes/          search, results, room, confirm, held
 web/embed.go             embeds web/dist into the binary
@@ -156,8 +156,8 @@ description `PLACEHOLDER`. `content.sql` is provisional copy transcribed off the
 inn's current site — the owner's own sentences — and fills amenities and clears
 those placeholders; only one of the seven rooms is described there, because only
 one is described on the site it came from. `menu-mock.sql` is invented structure
-for exercising the editor and must not reach production. `rates.sql` is a single
-flat placeholder season, and it is the one seed whose numbers charge a card.
+for exercising the editor and must not reach production. `rates.sql` is the
+inn's real seasons and prices, and it is the one seed whose numbers charge a card.
 
 **[OWNER-SETUP.md](OWNER-SETUP.md) is the checklist**: every screen that still
 needs the owner, where it is, and what is placeholder in the database today.
