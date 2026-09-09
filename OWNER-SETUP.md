@@ -77,8 +77,10 @@ menu is not up and to ring the inn. An unwritten room prints no paragraph.
 ### 2. Room descriptions — `/admin/rooms`
 
 **Six of the seven rooms have no description.** Only Mrs. Beal's Suite has one,
-because that is the only room the inn's current website describes. The rest were
-left blank on purpose rather than filled in with invented sentences.
+because that was the only room the inn's current website described when the
+copy was transcribed. The rest were left blank on purpose rather than filled in
+with invented sentences. *Since then the current site has gained a Flume Room
+page with a paragraph on it, in the inn's own words — worth pasting in here.*
 
 | Room | Description | Photographs |
 |---|---|---|
@@ -86,7 +88,7 @@ left blank on purpose rather than filled in with invented sentences.
 | Garden Suite | — | 5 |
 | Blue Room | — | 3 |
 | Rose Chamber | — | 3 |
-| Washington Room | — | 3 |
+| Washington Room | — | 4 |
 | **Back Lavender** | — | **none** |
 | **Flume** | — | **none** |
 
