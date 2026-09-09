@@ -10,10 +10,13 @@ Resend, the Sentry project, push keys) are in
 [deploy/README.md](deploy/README.md); what the code still needs is in
 [ARCHITECTURE.md](ARCHITECTURE.md).
 
-**The state below was read out of the development database on 2026-08-10.** The
-inn's live database is seeded from the same files and so starts in the same
-place, with one deliberate exception: the invented menu used to exercise the
-editor is not loaded onto the live server. See §4.
+**The state below was read out of the development database on 2026-08-10 and
+checked against the live site on 2026-09-09.** The inn's live database is seeded
+from the same files and so starts in the same place, with one deliberate
+exception: the invented menu used to exercise the editor is not loaded onto the
+live server. See §4. The photographs are in no seed file at all; the thirty on
+the development machine were copied to the live site on 2026-09-09, so the two
+match there too.
 
 ---
 
@@ -100,7 +103,9 @@ worth a read rather than a rewrite.
 ### 3. The two rooms with no photographs — `/admin/rooms` → a room → Photographs
 
 Back Lavender and Flume Suite currently show a grey placeholder graphic. Every other
-room's pictures came off the inn's current website.
+room's pictures came off the inn's current website — and every picture that site
+has is in already, checked photograph by photograph on 2026-09-09, so there is
+nothing more to take from it. These two rooms need a phone.
 
 - Upload straight from a phone. Pictures are resized and re-encoded on the way
   in, so a full-size phone photograph is the right thing to send.

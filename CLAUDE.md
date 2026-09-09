@@ -73,6 +73,17 @@ it the server still boots and reports `db: not_configured`.
 - **Do not rewrite Go or SQL files with PowerShell string replacement.** It mangles
   UTF-8; em-dashes in comments came back as mojibake. Use the Edit tool, and run
   `gofmt -l .` afterwards either way.
+- **The live box is reachable from here** as `inn@<host in ~/.ssh/known_hosts>`
+  with `~/.ssh/beal_ed25519`, passwordless sudo, exactly as `deploy/README.md`
+  provisions it. **Reads work from a session; writes do not.** The auto-mode
+  permission classifier refuses any `scp` to the box and any `ssh` that runs
+  `sudo` on it, whatever the phrasing — it refused tar, scp, a script
+  containing them, and a one-line `UPDATE`. Do not keep rephrasing: prepare the
+  files and the exact command, hand them to the user, and verify the result
+  afterwards over the public site or a read-only `ssh`. When handing over a
+  command, read the quoting traps under *The photographs, once* in
+  `deploy/README.md` first — three of the four commands handed over on
+  2026-09-09 failed on them.
 
 ## Conventions that matter
 
@@ -274,6 +285,12 @@ the calendar entry or check the quote's own arithmetic instead.
 `web/public/placeholders/*.svg` stands in for photos as a **UI fallback** rather
 than seeded rows — a placeholder in the database is one somebody has to remember
 to delete.
+
+**The photographs are on the live site** as of 2026-09-09 — thirty of them,
+five rooms and five pages, carried over by hand as `deploy/README.md` records
+under *The photographs, once*. Flume Suite (renamed from "Flume" the same day,
+slug unchanged) and Back Lavender have none anywhere, the old site included,
+and show `web/public/placeholders/*.svg` until the owner's phone supplies some.
 
 **What is still the owner's to write is tracked in [OWNER-SETUP.md](OWNER-SETUP.md)**,
 screen by screen, with what is placeholder in the database today. Keep it true

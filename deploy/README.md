@@ -204,7 +204,9 @@ ENV=production
 BEHIND_PROXY=true
 
 DATABASE_URL=postgres://bealhouse:<password>@127.0.0.1:5432/bealhouse?sslmode=disable
-SITE_URL=https://bealhouse.com
+# The staging address during the cutover period; the canonical and every
+# og:url are built on it, so it changes at the DNS cutover and not before.
+SITE_URL=https://new.thebealhouse.com
 
 # In neither the binary nor pg_dump. Under /var/lib so a deploy does not
 # overwrite it and backup.sh does reach it (decision #16).
@@ -306,6 +308,33 @@ Standard season and a Fall season per year through 2030, as the owner confirmed
 them. Reading it once on the console is the first item in
 [OWNER-SETUP.md](../OWNER-SETUP.md), and the only item there that can charge
 somebody the wrong amount.
+
+### The photographs, once — already done
+
+**No seed carries a photograph**, and the console is the only route for one
+from here on. The thirty that were on the development machine — five rooms and
+five pages, every picture the inn's old site had plus three it had added since
+— were carried to the live box on 2026-09-09 by hand: a tarball of their
+`MEDIA_DIR` files unpacked into `/var/lib/bealhouse/media` and `chown`ed to
+`bealhouse`, then thirty `INSERT ... SELECT id FROM rooms WHERE slug = ...`
+rows guarded by `NOT EXISTS`. Keyed on slug, not id, because the two databases
+were seeded separately and nothing guarantees their ids agree. That is a
+one-time move and not a procedure: a photograph added in the console lands in
+both places itself, and the nightly backup carries both from there.
+
+Three things bit on the way and are worth knowing before the next hand-run
+change on the box, from this Windows machine:
+
+- **Windows ssh drops unescaped double quotes** before bash sees them, and
+  PowerShell has its own ideas about the escaped ones. A `psql -c "..."` sent
+  as a one-line remote command arrives as loose words. **Open a shell on the
+  box and type it there**; one-liners are for commands with no quoting in them.
+- **`$LOCALAPPDATA` is not a PowerShell variable** (`$env:LOCALAPPDATA` is), so
+  a path built on it is silently a path from the root of the drive. Use a plain
+  path in an `scp`.
+- **`postgres` cannot read `/home/inn`**, so `sudo -u postgres psql -f
+  ~/file.sql` is "Permission denied" from psql. Feed it on standard input
+  instead: `sudo -u postgres psql -d bealhouse -1 < ~/file.sql`.
 
 ### The first phone
 

@@ -4,10 +4,12 @@ Booking engine, marketing site, and admin console for a 7-room inn. One Go binar
 serves the JSON API and an embedded React SPA. See [ARCHITECTURE.md](ARCHITECTURE.md)
 for the design and the build order this repo follows.
 
-**Status:** steps 1–3 are done and 4–7 are built. What is left is not code:
+**Status:** steps 1–3 are done and 4–7 are built, and the site is up on its
+staging address with the seed and the photographs in. What is left is not code:
 a Stripe account and the verification matrix that needs one, a Resend account
-and its DNS, and the owner's own words and photographs. `STRIPE_FAKE=true`
-walks the whole booking journey today without either account.
+and its DNS, the DNS cutover, and the owner's own words — plus photographs for
+the two rooms the old site never had. `STRIPE_FAKE=true` walks the whole
+booking journey today without either account.
 
 | Working today | Where |
 |---|---|
@@ -155,7 +157,8 @@ The seed is in halves. `rooms.sql` is the seven rooms as facts and marks every
 description `PLACEHOLDER`. `content.sql` is provisional copy transcribed off the
 inn's current site — the owner's own sentences — and fills amenities and clears
 those placeholders; only one of the seven rooms is described there, because only
-one is described on the site it came from. `menu-mock.sql` is invented structure
+one was described on the site it came from. (That site has since added a Flume
+Suite paragraph, not yet transcribed — see OWNER-SETUP §2.) `menu-mock.sql` is invented structure
 for exercising the editor and must not reach production. `rates.sql` is the
 inn's real seasons and prices, and it is the one seed whose numbers charge a card.
 
