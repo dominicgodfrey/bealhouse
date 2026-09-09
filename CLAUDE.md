@@ -478,6 +478,24 @@ can be as long as it needs to be, and unlike the About page `/local-area`
 replaced, it is never empty — the address and the map are facts about the inn
 rather than copy somebody has to write.
 
+**The privacy policy is the last section of `/policies`** ("Your details",
+anchored `#privacy`), written from what the system keeps — the guest row, the
+Stripe reference, the inquiry, the console's notes, the access log — and
+naming the third parties this repository actually has: Stripe and the email
+provider. It is prose in `Policies.tsx` beside the other rules rather than
+`page_copy`, because its facts are the code's: a change to what is stored or
+who receives it is a change to that section in the same commit. Deletion is a
+person: a guest emails or rings, and the owner removes the rows. The console
+can delete a guest's *note* but not the guest, so the section promises no
+button. The confirm page and both forms link to the anchor.
+
+**The tax line names its rate everywhere it appears** — "NH Meals & Rooms tax
+(8.5%)" — and the rate comes from the quote, not a constant. `pricing.Quote`
+carries `TaxRatePercent`, set by `Compute` and, for a stored booking, from the
+snapshot in `tax_rate_snapshot`, so a guest reading their hold or the PDF after
+a rate change still sees the rate they were charged at. The policies page reads
+its copy of the rate from `/api/policies` for the same reason.
+
 **The address and telephone are site chrome, not `page_copy`.** They are in the
 footer of every page including the ones with no prose slot at all, and an empty
 console field must not be able to take the telephone number off the site. They

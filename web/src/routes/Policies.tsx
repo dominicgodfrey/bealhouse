@@ -1,3 +1,7 @@
+import { useEffect } from 'react'
+import { useLocation } from 'react-router'
+
+import { inn } from '../lib/contact'
 import { fetchPageCopy, fetchPolicyTerms, paragraphs, type PolicyTerms } from '../lib/site'
 import { useAsync } from '../lib/useAsync'
 import { ErrorNote, Layout, Loading, Prose } from '../components/Layout'
@@ -20,6 +24,15 @@ import { Gallery, fromPagePhotos } from '../components/Gallery'
 export function Policies() {
   const copy = useAsync(() => fetchPageCopy('policies'), [])
   const terms = useAsync(fetchPolicyTerms, [])
+
+  // The forms and the confirm page link to `#privacy`. The browser tries the
+  // anchor when the document loads, which is before the sections exist — they
+  // render once the terms arrive — so the jump is made again at that moment.
+  const { hash } = useLocation()
+  useEffect(() => {
+    if (!terms.data || !hash) return
+    document.getElementById(hash.slice(1))?.scrollIntoView()
+  }, [terms.data, hash])
 
   return (
     <Layout>
@@ -113,13 +126,61 @@ function Rules({ terms }: { terms: PolicyTerms }) {
         </Rule>
       </Section>
 
+      {/*
+        The privacy policy, as one section of this page rather than a page of
+        its own. Written from what the system actually keeps — the guest row,
+        the Stripe reference, the two forms, the console's notes — and naming
+        only the third parties this site has. A generic policy that mentions
+        cookies this site never sets would be the same kind of lie as an
+        invented sentence about the food. Deletion is a person, not a button:
+        the guest writes or rings and the owner removes the rows, which is the
+        honest description of a seven-room inn.
+      */}
+      <Section id="privacy" title="Your details">
+        <Rule label="What we keep">
+          Your name, email address and telephone number, with the dates, room, price and tax rate
+          of each booking; what you send through the contact and events forms; and any short note
+          we make about your stay so a returning guest is remembered. Card details go straight to
+          Stripe, our card processor, and never reach us — we keep only Stripe's reference and
+          the amount. Where a balance is due later, Stripe holds the card, not us.
+        </Rule>
+        <Rule label="Who sees it">
+          The people who run the inn; Stripe, for payments; and our email provider, for the
+          messages we send you about a booking. We do not sell or share your details, we send no
+          newsletter, and this site sets no cookies and runs no trackers for visitors. Stripe's
+          own payment form may set its cookies on the payment page.
+        </Rule>
+        <Rule label="How long">
+          Booking and payment records for as long as tax and accounting law requires. Messages
+          and notes until they are no longer useful. Server logs are overwritten as they fill,
+          and backups are discarded after two weeks.
+        </Rule>
+        <Rule label="The link in your confirmation">
+          It shows your booking and can cancel it, and anyone holding it can do both until it
+          expires — so do not forward the email.
+        </Rule>
+        <Rule label="Seeing, correcting or deleting your details">
+          Email{' '}
+          <a href={`mailto:${inn.email}`} className="underline underline-offset-4 hover:text-neutral-900">
+            {inn.email}
+          </a>{' '}
+          or call{' '}
+          <a href={inn.phoneHref} className="underline underline-offset-4 hover:text-neutral-900">
+            {inn.phone}
+          </a>
+          . Once we have checked the request is yours, we will tell you what we hold, correct it,
+          or delete it — your name, contact details, messages and notes — keeping only the
+          amounts and dates of payments the law requires us to keep, with your details removed.
+        </Rule>
+      </Section>
     </div>
   )
 }
 
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
+/** `id` is an anchor: the forms and the confirm page link straight to a section. */
+function Section({ id, title, children }: { id?: string; title: string; children: React.ReactNode }) {
   return (
-    <section className="flex flex-col gap-4">
+    <section id={id} className="flex flex-col gap-4 scroll-mt-6">
       {/* Left, with the rules under it. A centred heading over left-aligned
           body copy reads as two different pages stacked. */}
       <h2 className="border-b border-sienna-line pb-2 text-2xl font-semibold tracking-tight">

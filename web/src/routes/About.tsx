@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { Link } from 'react-router'
 
 import { inn, mapEmbedUrl, mapLinkUrl } from '../lib/contact'
 import { fetchPageCopy, paragraphs, submitInquiry } from '../lib/site'
@@ -208,6 +209,14 @@ function ContactForm() {
         >
           {working ? 'Sending…' : 'Send it'}
         </button>
+
+        <p className="text-xs text-neutral-500">
+          What you send is kept so we can reply to it. The{' '}
+          <Link to="/policies#privacy" className="underline underline-offset-4 hover:text-neutral-900">
+            policies
+          </Link>{' '}
+          say what we keep and how to have it deleted.
+        </p>
       </form>
     </section>
   )

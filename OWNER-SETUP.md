@@ -157,6 +157,14 @@ the inn's current site:
   edits is the **photographs behind the search** (they cross-fade if there is
   more than one) and the **sentence a search engine prints under the inn's name**
   in its results. That sentence is worth writing.
+- **The policies page ends with "Your details"**, a short privacy section
+  written from what the site actually keeps: booking details, payment
+  references (never card numbers), messages from the two forms, and the notes
+  you keep about a guest. It says a guest can email or ring the inn to have
+  their details deleted or corrected. **That request lands with you.** The
+  console's guest screen can delete a note but not the guest, and the inbox
+  cannot delete a message, so a deletion is done by hand on the server for
+  now; keep whatever the tax records need.
 - **Plain text, not formatting.** A blank line starts a new paragraph. There is
   no bold and no headings on purpose.
 - **Emptying both boxes removes the words entirely** rather than leaving an empty

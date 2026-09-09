@@ -173,6 +173,24 @@ function ConfirmForm({ room, stay }: { room: RoomDetail; stay: Stay }) {
             </span>
           </label>
 
+          {/*
+            Not a second checkbox. What happens to the details typed above is
+            information offered at the moment they are typed; agreement is what
+            the box is for.
+          */}
+          <p className="text-xs text-neutral-500">
+            How we look after your details, and how to have them deleted, is under{' '}
+            <Link
+              to="/policies#privacy"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="underline underline-offset-4 hover:text-neutral-900"
+            >
+              Your details
+            </Link>{' '}
+            in the policies.
+          </p>
+
           {error && <ErrorNote error={new Error(error)} />}
 
           <button

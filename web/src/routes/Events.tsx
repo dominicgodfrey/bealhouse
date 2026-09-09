@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { Link } from 'react-router'
 
 import { fetchEvents, fetchPageCopy, paragraphs, submitInquiry, type EventItem } from '../lib/site'
 import { formatLong } from '../lib/dates'
@@ -233,6 +234,14 @@ function InquiryForm() {
         >
           {working ? 'Sending…' : 'Send it'}
         </button>
+
+        <p className="text-xs text-neutral-500">
+          What you send is kept so we can reply to it. The{' '}
+          <Link to="/policies#privacy" className="underline underline-offset-4 hover:text-neutral-900">
+            policies
+          </Link>{' '}
+          say what we keep and how to have it deleted.
+        </p>
       </form>
     </section>
   )
