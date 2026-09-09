@@ -22,6 +22,7 @@ func stay() Confirmation {
 			{Date: start.AddDate(0, 0, 2), AmountCents: 28000},
 		},
 		TaxCents:        6545,
+		TaxRatePercent:  "8.5",
 		TotalCents:      83545,
 		PaidCents:       41773,
 		BalanceCents:    41772,

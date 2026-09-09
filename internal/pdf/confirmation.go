@@ -39,8 +39,12 @@ type Confirmation struct {
 	Nights   []Night
 	Guests   int
 
-	TaxCents   int64
-	TotalCents int64
+	TaxCents int64
+	// TaxRatePercent labels the tax line with the rate it was charged at —
+	// "8.5" — which is the booking's own snapshot, so a document rendered after
+	// a rate change still says what the guest was actually charged.
+	TaxRatePercent string
+	TotalCents     int64
 
 	// PaidCents is the gross collected. BalanceCents and BalanceChargeOn are
 	// zero and zero on a stay paid in full at booking (decision #7), which is how
@@ -218,10 +222,21 @@ func (d *render) nightly(in Confirmation) {
 	d.doc.Ln(1)
 
 	d.row("Room", money(room), false)
-	d.row("Tax", money(in.TaxCents), false)
+	d.row(taxLabel(in.TaxRatePercent), money(in.TaxCents), false)
 	d.row("Total", money(in.TotalCents), true)
 
 	d.doc.Ln(4)
+}
+
+// taxLabel names the tax line by what it is and what it was charged at:
+// "NH Meals & Rooms tax (8.5%)". A document with no rate on it — which nothing
+// in the application produces — falls back to the bare name rather than
+// printing empty brackets.
+func taxLabel(ratePercent string) string {
+	if ratePercent == "" {
+		return "NH Meals & Rooms tax"
+	}
+	return "NH Meals & Rooms tax (" + ratePercent + "%)"
 }
 
 // payment is what has been taken and what has not.

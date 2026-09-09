@@ -152,7 +152,7 @@ function Quote({ detail }: { detail: Detail }) {
     <Section title="What it costs" note="Snapshotted when the guest booked. A rate change since then cannot reach it.">
       <Card>
         <Line label={`Room, ${quote.nights} ${quote.nights === 1 ? 'night' : 'nights'}`} cents={quote.roomSubtotalCents} />
-        <Line label="Tax" cents={quote.taxCents} />
+        <Line label={`NH Meals & Rooms tax (${quote.taxRatePercent}%)`} cents={quote.taxCents} />
         <Line label="Total" cents={quote.totalCents} strong />
 
         <hr className="border-neutral-200" />

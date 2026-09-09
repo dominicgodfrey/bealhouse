@@ -81,12 +81,13 @@ func confirmationPDF(q *db.Queries, links *booking.Links) http.HandlerFunc {
 // booked, so the document, the email and the page can never disagree.
 func confirmationFor(b booking.Booking, paid db.GetBookingForPaymentRow) pdf.Confirmation {
 	out := pdf.Confirmation{
-		Code:       b.Code,
-		Guest:      paid.GuestName,
-		Guests:     b.Guests,
-		TaxCents:   b.Quote.TaxCents,
-		TotalCents: b.Quote.TotalCents,
-		PaidCents:  paid.AmountPaidCents,
+		Code:           b.Code,
+		Guest:          paid.GuestName,
+		Guests:         b.Guests,
+		TaxCents:       b.Quote.TaxCents,
+		TaxRatePercent: b.Quote.TaxRatePercent,
+		TotalCents:     b.Quote.TotalCents,
+		PaidCents:      paid.AmountPaidCents,
 	}
 
 	// Dates are strings on the wire and civil dates everywhere else. A booking

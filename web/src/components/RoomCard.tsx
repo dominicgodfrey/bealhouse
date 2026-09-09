@@ -42,7 +42,8 @@ export function RoomCard({ room, stay }: { room: Room; stay: Stay }) {
           <div className="text-right">
             <p className="text-lg font-medium">{formatCentsShort(room.quote.totalCents)}</p>
             <p className="text-xs text-neutral-500">
-              total incl. {formatCents(room.quote.taxCents)} tax
+              total incl. {formatCents(room.quote.taxCents)} NH Meals &amp; Rooms tax (
+              {room.quote.taxRatePercent}%)
             </p>
           </div>
         </div>

@@ -361,6 +361,7 @@ func Get(ctx context.Context, q *db.Queries, code string) (Booking, error) {
 			RoomSubtotalCents: row.RoomSubtotalCents,
 			TaxableCents:      row.RoomSubtotalCents,
 			TaxCents:          row.TaxCents,
+			TaxRatePercent:    pricing.Rate(row.TaxRateScaled).Percent(),
 			TotalCents:        row.TotalCents,
 			DepositCents:      row.DepositCents,
 			BalanceCents:      row.BalanceDueCents,

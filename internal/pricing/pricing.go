@@ -109,9 +109,15 @@ type Quote struct {
 	// subtotal.
 	TaxableCents int64 `json:"taxableCents"`
 	TaxCents     int64 `json:"taxCents"`
-	TotalCents   int64 `json:"totalCents"`
-	DepositCents int64 `json:"depositCents"`
-	BalanceCents int64 `json:"balanceCents"`
+	// TaxRatePercent is the rate TaxCents was computed at, as a person writes
+	// it — "8.5". It rides on the quote so that every surface showing the tax
+	// line can label it with the rate it was actually charged at, which for a
+	// booking is the snapshot and not whatever settings says today. A string,
+	// because the browser must not be the one dividing a scaled integer.
+	TaxRatePercent string `json:"taxRatePercent"`
+	TotalCents     int64  `json:"totalCents"`
+	DepositCents   int64  `json:"depositCents"`
+	BalanceCents   int64  `json:"balanceCents"`
 }
 
 // Compute resolves an Input into a Quote.
@@ -128,6 +134,7 @@ func Compute(in Input) Quote {
 	// the advertised price is the all-in total, not a sum of rounded nights.
 	q.TaxableCents = q.RoomSubtotalCents
 	q.TaxCents = tax(q.TaxableCents, in.TaxRate)
+	q.TaxRatePercent = in.TaxRate.Percent()
 
 	q.TotalCents = q.TaxableCents + q.TaxCents
 

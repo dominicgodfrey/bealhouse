@@ -39,7 +39,13 @@ export function PriceBreakdown({ quote, nightlyCents, checkin, payment }: Props)
         </ul>
       )}
 
-      <Row label="NH Meals & Rooms tax" value={formatCents(quote.taxCents)} />
+      {/*
+        The rate is on the line, and it is the quote's own rather than a
+        constant here: a booking carries the rate it was charged at, so a guest
+        reading their hold or their manage page after a rate change still sees
+        the figure the tax was actually computed with.
+      */}
+      <Row label={`NH Meals & Rooms tax (${quote.taxRatePercent}%)`} value={formatCents(quote.taxCents)} />
 
       <div className="mt-1 border-t border-sienna-line pt-2">
         <Row label="Total" value={formatCents(quote.totalCents)} strong />

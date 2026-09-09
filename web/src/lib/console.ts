@@ -94,6 +94,8 @@ export type Quote = {
   roomSubtotalCents: number
   taxableCents: number
   taxCents: number
+  /** The rate the tax line was charged at, as written: '8.5'. */
+  taxRatePercent: string
   totalCents: number
   depositCents: number
   balanceCents: number
