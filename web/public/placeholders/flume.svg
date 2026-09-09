@@ -1,8 +1,8 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 800" role="img" aria-label="Placeholder image for Flume">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 800" role="img" aria-label="Placeholder image for Flume Suite">
   <rect width="1200" height="800" fill="#ece0d4"/>
   <rect x="24" y="24" width="1152" height="752" fill="none" stroke="#cdb4a7" stroke-width="2" stroke-dasharray="14 10"/>
   <g fill="#7a625c" font-family="ui-sans-serif, system-ui, -apple-system, sans-serif" text-anchor="middle">
-    <text x="600" y="378" font-size="48" font-weight="600">Flume</text>
+    <text x="600" y="378" font-size="48" font-weight="600">Flume Suite</text>
     <text x="600" y="438" font-size="26" letter-spacing="2">PHOTO PLACEHOLDER</text>
     <text x="600" y="486" font-size="20" fill="#a8938c">Replaced when the owner uploads in admin</text>
   </g>

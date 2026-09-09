@@ -5,7 +5,7 @@
 --
 --   Rates.       Nightly prices belong to rate_season_prices. The owner's
 --                "starting at" figures are 2-night totals, so the base
---                per-night rates are $200 (Mrs. Beal's, Garden, Flume) and
+--                per-night rates are $200 (Mrs. Beal's, Garden, Flume Suite) and
 --                $150 (Rose, Blue, Washington, Back Lavender).
 --
 --   Amenities.   Left empty deliberately. The owner adds and removes these in
@@ -38,7 +38,7 @@ VALUES
    'PLACEHOLDER — final copy to be supplied by the owner.',
    'Front room has mountain and street view; back room has hill view', 4, 2),
 
-  ('flume', 'Flume',
+  ('flume', 'Flume Suite',
    'PLACEHOLDER — final copy to be supplied by the owner.',
    'Street and mountain view', 2, 3),
 

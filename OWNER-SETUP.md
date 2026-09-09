@@ -29,7 +29,7 @@ will change them from now on.
 
 What is in the database today, per night and before the 8.5% tax:
 
-| | Mrs. Beal's · Garden · Flume | Rose · Blue · Washington · Back Lavender |
+| | Mrs. Beal's · Garden · Flume Suite | Rose · Blue · Washington · Back Lavender |
 |---|---|---|
 | **Standard** — every night | $200 | $150 |
 | **Fall** — August 14th to October 31st | $250 | $200 |
@@ -90,7 +90,7 @@ page with a paragraph on it, in the inn's own words — worth pasting in here.*
 | Rose Chamber | — | 3 |
 | Washington Room | — | 4 |
 | **Back Lavender** | — | **none** |
-| **Flume** | — | **none** |
+| **Flume Suite** | — | **none** |
 
 On `/admin/rooms`, open a room and fill in **Description** — a paragraph or two,
 in the inn's own voice. **View**, **Sleeps** and **Amenities** are on the same
@@ -99,7 +99,7 @@ worth a read rather than a rewrite.
 
 ### 3. The two rooms with no photographs — `/admin/rooms` → a room → Photographs
 
-Back Lavender and Flume currently show a grey placeholder graphic. Every other
+Back Lavender and Flume Suite currently show a grey placeholder graphic. Every other
 room's pictures came off the inn's current website.
 
 - Upload straight from a phone. Pictures are resized and re-encoded on the way
@@ -221,7 +221,7 @@ without the owner deciding to.
 - [ ] **The rate grid read once on `/admin/rates` and checked on the public site** (§1)
 - [ ] **The real menu in, or left empty on purpose** (§4)
 - [ ] Descriptions for the six rooms without one (§2)
-- [ ] Photographs for Back Lavender and Flume (§3)
+- [ ] Photographs for Back Lavender and Flume Suite (§3)
 - [ ] A sentence for the home page's search-engine description (§6)
 - [ ] A read of the eight emails (§7)
 - [ ] Settings confirmed, especially the tax rate and the check-in/out times (§8)
