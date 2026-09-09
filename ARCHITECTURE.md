@@ -41,7 +41,7 @@ Stack constraint: **TypeScript/React + Go**. No launch deadline — one complete
 | 14 | Date picker | No flexible ±1 search. Calendar greys out unselectable dates live |
 | 15 | Admin auth | **Passkeys (WebAuthn), no password anywhere.** Single shared owner account, a real `users` table behind it, one credential per phone. *(revised; was a password plus TOTP)* The console is opened from the two owners' phones, so the authenticator is the handset itself: a private key it will only use after Face ID or a fingerprint. What that buys over the original plan is that **nothing stored server-side is a credential** — a leaked dump contains public keys — and that it **cannot be phished**, because the browser binds every signature to the origin. There is also no shared secret two people have to hand to each other and rotate. Sessions are **rows**, hashed, rolling **365 days** from last use, so a phone in regular use never signs in again and a lost one can be struck off. Enrollment is a **single-use** invitation, minted by `bealhouse enroll` on the server or from an already-signed-in console. **No step-up auth** on refunds: the owners' call, and the phones are locked |
 | 16 | Media | Owner uploads in admin → VPS disk, Go generates AVIF/WebP variants, Cloudflare free CDN. **Built:** `internal/media` decodes an upload — which is also the only real check that it is an image — scales it to 2400px on the longest side, re-encodes it as JPEG, and stores it under the SHA-256 of its own bytes in `MEDIA_DIR`. Content addressing means the same photograph uploaded twice is one file and the URL can be served `immutable`; it also means **removing a photo does not delete the file**, since two rooms may point at the same bytes. `/media/*` is registered ahead of the SPA fallback, or a missing photograph would answer index.html with a 200 and render as a broken image with no error anywhere. **Built, less AVIF:** an upload now produces a ladder — 480/960/1600/2400, in JPEG and WebP — and the page picks with `srcset`. The widths are the larger half of that by far: the 960px JPEG measured 76 KB against 955 KB at 2400px, where WebP saves a further half at the same width, so a card four hundred CSS pixels wide was downloading twelve times what it could use. The rung is **in the filename**, which is what makes `media.Sources` a pure function and keeps a srcset from ever naming a file that was not written — a 404 inside one does not fall back, it is a broken image. The encoder is `gen2brain/webp`, libwebp under wazero, chosen because it builds with `CGO_ENABLED=0` on a machine with no C compiler; the pure-Go alternatives are lossless-only and larger than the JPEG they replace. **AVIF is feasible and deliberately deferred**: −61% at full size, but 5.3 MB of binary and ~1.7s per upload, which would move the work into a background job and require the API to report which variants exist yet. `MEDIA_DIR` is in neither the binary nor `pg_dump`, so it needs its own place on the VPS and its own line in the backup |
-| 17 | Email | Resend. SPF/DKIM/DMARC at Bluehost DNS (SPF must include Resend *and* the mailbox host) |
+| 17 | Email | Resend. **Revised, and in place as of 2026-09-09:** Resend's current DNS is a DKIM record at `resend._domainkey` and a `send.` subdomain pointed at Resend's sending host, which carries Resend's own SPF. The apex SPF stays the mailbox host's alone, so the earlier note that it must include Resend as well no longer applies. DMARC is `p=none` for now |
 | 18 | Launch | Placeholder site today → clean cutover. Google Business Profile + Search Console on day one |
 | 19 | Guest self-service | Signed expiring link in confirmation email → view booking + **cancel**, refund executes automatically. Date changes go through the owner. **Built:** an HMAC over the code and an expiry (`BOOKING_LINK_SECRET`), not a stored token — stateless, valid for bookings made before the feature existed, and expiring thirty days after checkout. Cancelling is refused once the stay has begun, because decision #9's arithmetic does not describe a visit in progress |
 | 20 | **Minimum stay** | **Global default 2 nights**, stored in `settings` (not hardcoded). A season may override it upward (e.g. 3 on holiday weekends) |
@@ -439,13 +439,14 @@ Dependency-ordered, not deadline-driven (single launch).
    holds everything Stripe-shaped; `internal/payments` still does not import the SDK, which is what
    keeps the hard cases testable against real Postgres with no key and no network.
 
-   **What genuinely remains needs keys:** exercising `gateway.Stripe` against the real API at all —
-   every line of it is written and none of it has ever made a request — plus the publishable key
-   for the card form, and the verification matrix below (test cards, 3-D Secure, Test Clocks).
-   Until then `STRIPE_FAKE=true` substitutes a processor that mints ids and takes no money, so the
-   whole journey is walkable in a browser. It refuses to exist unless no Stripe variable is set at
-   all and `ENV=dev`, because ENV defaults to `dev` and an unconfigured production deploy would
-   otherwise look exactly like a laptop.
+   **The verification matrix below was run in full against a Stripe sandbox on 2026-09-09** —
+   test cards, a decline, 3-D Secure, duplicate and out-of-order delivery, and Test Clocks through
+   T-8 and T-7 — and the staging box runs `gateway.Stripe` on sandbox keys. What remains is the
+   switch to live keys and a webhook endpoint on the final domain, which is configuration.
+   `STRIPE_FAKE=true` remains for a machine with no keys: it substitutes a processor that mints
+   ids and takes no money, so the whole journey is walkable in a browser. It refuses to exist
+   unless no Stripe variable is set at all and `ENV=dev`, because ENV defaults to `dev` and an
+   unconfigured production deploy would otherwise look exactly like a laptop.
 
    *A review of the half that is built found and fixed four things worth naming, since three of
    them would have cost money rather than merely looked wrong: the idempotency key was `stripe_id`
@@ -458,8 +459,9 @@ Dependency-ordered, not deadline-driven (single launch).
 
    - **The provider.** `email.Resend` implements `Sender` over plain `net/http` — one endpoint,
      one JSON body, one bearer token, no SDK — and takes over the moment `RESEND_API_KEY` and
-     `EMAIL_FROM` are both set. Like `gateway.Stripe` it is written and has never made a request;
-     its tests hold the far end with an `httptest` server. Half a configuration is an error in
+     `EMAIL_FROM` are both set, as they are on the staging box, with the domain's DKIM and
+     sending records in place at the registrar (decision #17). Its tests hold the far end with an
+     `httptest` server. Half a configuration is an error in
      the log and is treated as none, but does not stop the binary booting: the whole reason mail
      is queued is that email must never fail a booking.
    - **The letterhead.** The inn's mark now ships in the repo — `web/public/logo.svg`, its square
@@ -816,7 +818,8 @@ now reaches the caller as a deadlock, and running the work again is the caller's
 Verified over 200 runs of the full occupancy suite plus a deliberately adversarial staggered-overlap
 test that asserts a caller never sees anything except success or a clean "room taken".
 
-**Payments** — Stripe CLI (`stripe listen --forward-to localhost:8080/webhooks/stripe`) for the full
+**Payments** *(run in full against a sandbox, 2026-09-09)* — Stripe CLI (`stripe listen
+--forward-to localhost:8080/webhooks/stripe`) for the full
 matrix: success, decline, 3DS required, duplicate webhook delivery (must be idempotent), out-of-order
 delivery. Critically, use **Stripe Test Clocks** to fast-forward a real test booking through T-8 and
 T-7 and verify the warning email, the off-session charge, and the failure path — this is the only

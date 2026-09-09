@@ -4,12 +4,12 @@ Booking engine, marketing site, and admin console for a 7-room inn. One Go binar
 serves the JSON API and an embedded React SPA. See [ARCHITECTURE.md](ARCHITECTURE.md)
 for the design and the build order this repo follows.
 
-**Status:** steps 1–3 are done and 4–7 are built, and the site is up on its
-staging address with the seed and the photographs in. What is left is not code:
-a Stripe account and the verification matrix that needs one, a Resend account
-and its DNS, the DNS cutover, and the owner's own words — plus photographs for
-the two rooms the old site never had. `STRIPE_FAKE=true` walks the whole
-booking journey today without either account.
+**Status:** steps 1–7 are done, and the site is up on its staging address with
+the seed, the photographs, Resend and sandbox Stripe keys — the full Stripe
+verification matrix was run against that sandbox on 2026-09-09. What is left
+is not code: the owner's own words and photographs for the two rooms the old
+site never had, the switch to live keys, and the DNS cutover.
+`STRIPE_FAKE=true` walks the whole booking journey on a machine with no keys.
 
 | Working today | Where |
 |---|---|
@@ -172,11 +172,12 @@ rather than code — see the checklist at the end of
 [deploy/README.md](deploy/README.md). The deploy layer itself is written and the
 restore drill has been run.
 
-What genuinely needs an account: `gateway.Stripe` and `email.Resend` are both
-written and neither has ever made a request. Add the keys and they are used
-automatically, and then the Stripe verification matrix in ARCHITECTURE.md —
-test cards, 3-D Secure, `stripe listen`, Test Clocks — which cannot be faked.
-Push notifications need no account, only a `bealhouse vapid` key pair.
+What needs an account is in: `gateway.Stripe` has been through the verification
+matrix in ARCHITECTURE.md against a sandbox — test cards, 3-D Secure,
+`stripe listen`, Test Clocks — and `email.Resend` sends from the staging box.
+Going live is swapping the three Stripe keys for the live set and registering
+the webhook on the final domain. Push notifications need no account, only a
+`bealhouse vapid` key pair, which the box has.
 
 What needs the owner: real rate seasons, room descriptions, photographs, the
 menu, the page prose, and a pass over the eight email messages — all of it in

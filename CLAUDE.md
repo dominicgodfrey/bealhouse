@@ -6,11 +6,13 @@ Direct booking engine, marketing site, and admin console for a 7-room inn.
 anything about money, dates, or availability — several were revised after the
 document was first written and the revisions are marked.
 
-**Build-order steps 1, 2 and 3 are done. Step 4, payments, is built end to end —
-the pay endpoint, the webhook, both balance jobs and the card form — and none of
-it has ever talked to Stripe. See *Step 4* below for what the account is still
-needed for, and for `STRIPE_FAKE`, which makes the whole journey walkable
-today.**
+**Build-order steps 1 through 7 are done and the site is up on its staging
+address with sandbox Stripe keys and Resend configured.** The full Stripe
+verification matrix in ARCHITECTURE.md was run against a sandbox on 2026-09-09.
+What is left is the owner's content, the switch to live keys and the DNS
+cutover — see *Step 4* below and the checklist at the end of
+`deploy/README.md`. `STRIPE_FAKE` is for a laptop with no keys, so the whole
+journey stays walkable locally.
 
 ## Local setup
 
@@ -700,20 +702,25 @@ only the last two steps need one.
   outage delays a confirmation instead of failing the booking that earned it.
   `Resend` implements `Sender` over plain `net/http` — one endpoint, one JSON
   body — and is selected the moment `RESEND_API_KEY` and `EMAIL_FROM` are both
-  set. Like `gateway.Stripe`, it is written and has never made a request. Half a
+  set — which it is on the live box, where the domain's DKIM and sending
+  records are in place. Half a
   configuration logs an error and is treated as none: the binary still starts,
   because the reason mail is queued at all is that email must never stop the inn
   taking bookings.
 - The Payment Element, and the return-polling page behind it.
 
-**What the account is still for:** `gateway.Stripe` is written and has never made
-a request. Add `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET` and
-`STRIPE_PUBLISHABLE_KEY` and it is used automatically — no code moves. Then the
-verification matrix in ARCHITECTURE.md, which genuinely cannot be faked: test
-cards, 3-D Secure, `stripe listen`, and **Test Clocks** for T-8 and T-7.
+**`gateway.Stripe` has been through the whole verification matrix against a
+sandbox** — test cards, a decline, 3-D Secure, duplicate and out-of-order
+webhook delivery through `stripe listen`, and **Test Clocks** through T-8 and
+T-7 — on 2026-09-09. The live box runs on sandbox keys today. Going live is a
+configuration change and not a code one: swap `STRIPE_SECRET_KEY`,
+`STRIPE_WEBHOOK_SECRET` and `STRIPE_PUBLISHABLE_KEY` for the live set, register
+the webhook endpoint on the final domain, and run one success and one decline
+against it.
 
-**`STRIPE_FAKE=true` until then.** It substitutes a processor that mints ids and
-takes no money, and the pay page offers a stand-in button instead of a card form.
+**`STRIPE_FAKE=true` is for a machine with no keys.** It substitutes a processor
+that mints ids and takes no money, and the pay page offers a stand-in button
+instead of a card form.
 Everything past that button is real: `POST /api/dev/pay/{code}` builds a properly
 signed delivery and sends it through the same webhook handler, signature
 verification and state machine a live payment would use. It refuses to exist

@@ -217,8 +217,9 @@ MEDIA_DIR=/var/lib/bealhouse/media
 # can cancel any guest's stay. `openssl rand -base64 32`. Treat as permanent.
 BOOKING_LINK_SECRET=
 
-# Not yet — see ARCHITECTURE.md. Until both Stripe keys are set the endpoints
-# that move money refuse and everything else works.
+# Sandbox keys on the staging box; the live set goes in at the cutover, with the
+# webhook endpoint re-registered on the final domain. Until both Stripe keys are
+# set the endpoints that move money refuse and everything else works.
 STRIPE_SECRET_KEY=
 STRIPE_WEBHOOK_SECRET=
 STRIPE_PUBLISHABLE_KEY=
@@ -265,7 +266,13 @@ cp deploy/bealhouse.service \
 install -m 0755 deploy/backup.sh deploy/restore.sh /usr/local/share/bealhouse/
 systemctl daemon-reload
 systemctl enable --now bealhouse bealhouse-backup.timer bealhouse-verify.timer
+systemctl list-timers bealhouse-backup.timer bealhouse-verify.timer
 ```
+
+The second line is the check. A timer that is *enabled* but shows no next
+trigger is one that was enabled without `--now` and will not fire until the
+next boot — which is how the live box sat for a day with the nightly backup
+never having run.
 
 ### The seed, once
 
@@ -458,10 +465,21 @@ being alerted.
   is also what would turn a failed restore drill from a line in the journal into
   something somebody hears about.
 - **DNS cutover**, Search Console (`/sitemap.xml` is live and generated), and
-  the Google Business Profile.
-- **Stripe live keys**, after the verification matrix in ARCHITECTURE.md.
-- **Resend DNS** — SPF, DKIM and DMARC at Bluehost (decision #17); SPF has to
-  include Resend *and* the mailbox host.
+  the Google Business Profile. `SITE_URL` in the env file and `BEAL_DOMAIN` in
+  `/etc/default/caddy` change in the same breath as the A records.
+- **Stripe live keys.** The verification matrix in ARCHITECTURE.md was run in
+  full against a sandbox on 2026-09-09 and the box runs on sandbox keys. Swap
+  the three keys for the live set, register the webhook on the final domain,
+  and run one success and one decline against it.
+- ~~Resend DNS~~ — done: DKIM at `resend._domainkey` and the `send.` subdomain
+  at Resend (decision #17, revised). DMARC is `p=none`; tighten it once a few
+  weeks of real mail have gone out clean.
+- **The two timers, started.** On 2026-09-09 the box had
+  `bealhouse-backup.timer` and `bealhouse-verify.timer` *enabled* and
+  *inactive* — enabled without `--now` and no reboot since — so the nightly
+  backup had never fired and the one set on disk predated the photographs.
+  `systemctl list-timers` after provisioning is the check; an enabled timer
+  with no next trigger is one that will not run until the next boot.
 - **An off-box copy of the backups.** The nightly set and the weekly drill both
   live on the same disk as the database they protect, which covers a bad
   migration and a deleted row and does not cover losing the box. That needs a
