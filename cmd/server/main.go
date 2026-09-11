@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"net"
 	"net/http"
 	"os"
 	"os/signal"
@@ -247,6 +248,18 @@ func run(cfg config.Config) error {
 		go runner.Run(ctx)
 	}
 
+	// Behind a proxy the forwarded headers are believed, which is only safe if
+	// the proxy is the only thing that can reach this port. Bound to every
+	// interface, anyone who can reach the box directly names their own address
+	// and walks around every rate limit. The runbook binds to loopback and the
+	// firewall closes the port; this is the line in the log for the day one of
+	// those was missed.
+	if cfg.BehindProxy && listensEverywhere(cfg.Addr) {
+		slog.Warn("BEHIND_PROXY is set but ADDR binds every interface; "+
+			"anyone reaching this port directly can forge X-Forwarded-For. Bind to 127.0.0.1",
+			"addr", cfg.Addr)
+	}
+
 	srv := &http.Server{
 		Addr: cfg.Addr,
 		Handler: httpx.NewRouter(httpx.Deps{
@@ -292,6 +305,20 @@ func run(cfg config.Config) error {
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
 	return srv.Shutdown(shutdownCtx)
+}
+
+// listensEverywhere reports whether an address binds every interface: no host
+// at all (":8080"), or one of the unspecified addresses.
+func listensEverywhere(addr string) bool {
+	host, _, err := net.SplitHostPort(addr)
+	if err != nil {
+		return false
+	}
+	if host == "" {
+		return true
+	}
+	ip := net.ParseIP(host)
+	return ip != nil && ip.IsUnspecified()
 }
 
 // adminConsole builds admin authentication, or explains why there is none.
