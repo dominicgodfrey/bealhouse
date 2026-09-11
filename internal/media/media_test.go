@@ -2,6 +2,8 @@ package media
 
 import (
 	"bytes"
+	"encoding/binary"
+	"hash/crc32"
 	"image"
 	"image/color"
 	"image/jpeg"
@@ -411,4 +413,43 @@ func decodeStored(t *testing.T, store *Store, storedPath string) image.Image {
 		t.Fatalf("what was stored is not a JPEG: %v", err)
 	}
 	return img
+}
+
+// A small file can claim an enormous picture. The PNG below is under a
+// hundred bytes and declares thirty thousand pixels a side; decoding it would
+// allocate over three gigabytes on a box with four. The header is read first
+// and the claim refused before a byte of the picture is allocated.
+func TestAnImageClaimingAnEnormousSizeIsRefusedBeforeDecoding(t *testing.T) {
+	store := newStore(t)
+
+	_, err := store.Save(bytes.NewReader(pngHeaderClaiming(30000, 30000)))
+	if err != ErrTooManyPixels {
+		t.Fatalf("err = %v, want ErrTooManyPixels", err)
+	}
+
+	entries, _ := os.ReadDir(store.Dir())
+	if len(entries) != 0 {
+		t.Errorf("%d files written for a refused upload, want none", len(entries))
+	}
+}
+
+// pngHeaderClaiming is a PNG signature and an IHDR chunk and nothing else. It
+// is enough for DecodeConfig to read the dimensions and nothing like a picture.
+func pngHeaderClaiming(width, height int) []byte {
+	ihdr := make([]byte, 13)
+	binary.BigEndian.PutUint32(ihdr[0:], uint32(width))
+	binary.BigEndian.PutUint32(ihdr[4:], uint32(height))
+	ihdr[8] = 8  // bit depth
+	ihdr[9] = 6  // RGBA
+	ihdr[10] = 0 // compression
+	ihdr[11] = 0 // filter
+	ihdr[12] = 0 // interlace
+
+	var out bytes.Buffer
+	out.Write([]byte{0x89, 'P', 'N', 'G', '\r', '\n', 0x1a, '\n'})
+	binary.Write(&out, binary.BigEndian, uint32(len(ihdr)))
+	chunk := append([]byte("IHDR"), ihdr...)
+	out.Write(chunk)
+	binary.Write(&out, binary.BigEndian, crc32.ChecksumIEEE(chunk))
+	return out.Bytes()
 }

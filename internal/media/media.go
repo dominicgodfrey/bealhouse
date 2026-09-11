@@ -75,6 +75,7 @@
 package media
 
 import (
+	"bytes"
 	"crypto/sha256"
 	"encoding/hex"
 	"errors"
@@ -146,6 +147,22 @@ var ladder = [...]int{480, 960, 1600, maxEdge}
 // says so and lets them try again.
 var ErrNotAnImage = errors.New("media: that file is not an image we can read")
 
+// maxPixels is the most an image may declare before it is decoded.
+//
+// The size of the file says nothing about the size of the picture: a PNG a few
+// hundred kilobytes long can declare thirty thousand pixels a side, and
+// decoding that allocates four bytes per pixel — over three gigabytes, on a box
+// with four. The header is read first and the picture refused on what it
+// claims, before a byte of it is allocated. Forty megapixels is more than any
+// phone produces and half again what the biggest cameras do.
+const maxPixels = 40_000_000
+
+// ErrTooManyPixels is an image whose declared dimensions are past maxPixels.
+//
+// Separate from ErrNotAnImage because it is an image, and the sentence the
+// owner needs is a different one.
+var ErrTooManyPixels = errors.New("media: that image has too many pixels to process")
+
 // Store is a directory of uploaded files.
 type Store struct{ dir string }
 
@@ -174,12 +191,30 @@ func (s *Store) Dir() string { return s.dir }
 // `<img src>` points at, and the one every browser can render whatever it makes
 // of the rest. [Sources] derives the others from it.
 func (s *Store) Save(r io.Reader) (string, error) {
-	// Bounded before it is decoded, not after. An image bomb is a small file
-	// that decodes to something enormous, so the limit on the way in is the only
-	// one that helps — and image.Decode below allocates from what it reads.
-	limited := io.LimitReader(r, MaxUpload+1)
+	// Bounded on the way in, and then held in memory so the header can be read
+	// twice: once to learn what the picture claims to be, and once to decode it
+	// if the claim is reasonable. The file is at most MaxUpload, which is
+	// nothing beside what decoding an unchecked one could allocate.
+	raw, err := io.ReadAll(io.LimitReader(r, MaxUpload+1))
+	if err != nil {
+		return "", fmt.Errorf("media: reading the upload: %w", err)
+	}
+	if len(raw) > MaxUpload {
+		return "", ErrNotAnImage
+	}
 
-	source, _, err := image.Decode(limited)
+	// The header first. DecodeConfig reads the dimensions and nothing else, so
+	// an image that claims a size nothing here should allocate is refused
+	// before image.Decode is asked to allocate it.
+	config, _, err := image.DecodeConfig(bytes.NewReader(raw))
+	if err != nil {
+		return "", ErrNotAnImage
+	}
+	if config.Width <= 0 || config.Height <= 0 || config.Width*config.Height > maxPixels {
+		return "", ErrTooManyPixels
+	}
+
+	source, _, err := image.Decode(bytes.NewReader(raw))
 	if err != nil {
 		return "", ErrNotAnImage
 	}

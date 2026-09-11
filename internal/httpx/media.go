@@ -27,9 +27,24 @@ import (
 // references rather than a half-edited room.
 func uploadPhoto(store *media.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		// The whole request is bounded before the multipart parser reads any
+		// of it. The size check on the part below runs only after the parser
+		// has spooled the entire body to disk, so on its own it bounds nothing
+		// — Caddy's request_body cap covers the deployed shape, and this covers
+		// the binary on its own. A megabyte of slack is for the multipart
+		// framing around a photograph that is exactly at the limit.
+		r.Body = http.MaxBytesReader(w, r.Body, media.MaxUpload+(1<<20))
+
 		// The multipart reader buffers to disk past this, so it bounds memory
-		// rather than the upload; media.MaxUpload below is what bounds the file.
+		// rather than the upload; media.MaxUpload is what bounds the file.
 		if err := r.ParseMultipartForm(4 << 20); err != nil {
+			var tooBig *http.MaxBytesError
+			if errors.As(err, &tooBig) {
+				writeJSON(w, http.StatusRequestEntityTooLarge, map[string]string{
+					"error": "that photograph is too large; 25 MB is the limit",
+				})
+				return
+			}
 			badRequest(w, "that upload could not be read")
 			return
 		}
@@ -54,6 +69,10 @@ func uploadPhoto(store *media.Store) http.HandlerFunc {
 		path, err := store.Save(file)
 		if errors.Is(err, media.ErrNotAnImage) {
 			badRequest(w, "that file is not an image we can read; JPEG, PNG, GIF and WebP all work")
+			return
+		}
+		if errors.Is(err, media.ErrTooManyPixels) {
+			badRequest(w, "that image has too many pixels to process; anything under 40 megapixels works")
 			return
 		}
 		if err != nil {
