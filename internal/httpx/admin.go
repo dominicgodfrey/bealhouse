@@ -578,7 +578,7 @@ func adminPushUnsubscribe(d adminDeps) http.HandlerFunc {
 			return
 		}
 
-		if err := d.ops.ForgetPushSubscription(r.Context(), body.Endpoint); err != nil {
+		if err := d.ops.ForgetPushSubscription(r.Context(), currentAdmin(r).UserID, body.Endpoint); err != nil {
 			consoleError(w, r, err)
 			return
 		}

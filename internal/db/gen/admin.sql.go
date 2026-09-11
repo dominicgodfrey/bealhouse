@@ -233,6 +233,27 @@ func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (User, e
 	return i, err
 }
 
+const deleteOwnPushSubscription = `-- name: DeleteOwnPushSubscription :execrows
+DELETE FROM push_subscriptions
+WHERE endpoint = $1 AND user_id = $2
+`
+
+type DeleteOwnPushSubscriptionParams struct {
+	Endpoint string
+	UserID   int64
+}
+
+// A browser switching itself off, from the console. Scoped to the account the
+// request is signed in as, so the day a second account exists one cannot
+// silence the other's phones by naming an endpoint.
+func (q *Queries) DeleteOwnPushSubscription(ctx context.Context, arg DeleteOwnPushSubscriptionParams) (int64, error) {
+	result, err := q.db.Exec(ctx, deleteOwnPushSubscription, arg.Endpoint, arg.UserID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const deletePasskey = `-- name: DeletePasskey :execrows
 DELETE FROM user_passkeys WHERE id = $1 AND user_id = $2
 `
@@ -259,6 +280,8 @@ const deletePushSubscription = `-- name: DeletePushSubscription :execrows
 DELETE FROM push_subscriptions WHERE endpoint = $1
 `
 
+// The push service saying a browser is gone. No account in the key, because
+// the service does not know which account subscribed, only which endpoint died.
 func (q *Queries) DeletePushSubscription(ctx context.Context, endpoint string) (int64, error) {
 	result, err := q.db.Exec(ctx, deletePushSubscription, endpoint)
 	if err != nil {

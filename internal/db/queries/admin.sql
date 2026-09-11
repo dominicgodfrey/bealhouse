@@ -278,8 +278,17 @@ ORDER BY created_at;
 -- name: CountPushSubscriptions :one
 SELECT count(*) FROM push_subscriptions;
 
+-- The push service saying a browser is gone. No account in the key, because
+-- the service does not know which account subscribed, only which endpoint died.
 -- name: DeletePushSubscription :execrows
 DELETE FROM push_subscriptions WHERE endpoint = sqlc.arg(endpoint);
+
+-- A browser switching itself off, from the console. Scoped to the account the
+-- request is signed in as, so the day a second account exists one cannot
+-- silence the other's phones by naming an endpoint.
+-- name: DeleteOwnPushSubscription :execrows
+DELETE FROM push_subscriptions
+WHERE endpoint = sqlc.arg(endpoint) AND user_id = sqlc.arg(user_id);
 
 -- name: TouchPushSubscription :exec
 UPDATE push_subscriptions SET last_sent_at = now() WHERE endpoint = sqlc.arg(endpoint);

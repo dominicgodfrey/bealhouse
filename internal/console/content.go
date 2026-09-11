@@ -1201,11 +1201,18 @@ func (o *Ops) SavePushSubscription(ctx context.Context, userID int64, sub PushSu
 // earlier, so a handset can switch itself off with what it already has and
 // without first asking which row it is. There is nothing to leak: knowing an
 // endpoint is knowing the address you are already subscribed at.
-func (o *Ops) ForgetPushSubscription(ctx context.Context, endpoint string) error {
+//
+// Scoped to the signed-in account all the same. One account today, so it
+// changes nothing; the day there are two, it is what stops one silencing the
+// other's phones by naming an endpoint.
+func (o *Ops) ForgetPushSubscription(ctx context.Context, userID int64, endpoint string) error {
 	if strings.TrimSpace(endpoint) == "" {
 		return badf("no subscription was named")
 	}
-	if _, err := o.q.DeletePushSubscription(ctx, endpoint); err != nil {
+	if _, err := o.q.DeleteOwnPushSubscription(ctx, db.DeleteOwnPushSubscriptionParams{
+		Endpoint: endpoint,
+		UserID:   userID,
+	}); err != nil {
 		return fmt.Errorf("console: forgetting a push subscription: %w", err)
 	}
 	return nil
