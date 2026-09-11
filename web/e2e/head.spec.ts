@@ -25,16 +25,23 @@ test('every marketing page describes itself, and only itself', async ({ request 
     const titles = [...html.matchAll(/<title>(.*?)<\/title>/gs)].map((m) => m[1])
 
     // Two titles is the failure that looks fine on screen: a browser takes the
-    // first and a crawler may take either, so "Beal House" ends up on all seven
-    // room results.
+    // first and a crawler may take either, so one document ends up with two
+    // answers to the same question.
     expect(titles, `${path} should have exactly one <title>`).toHaveLength(1)
-    expect(titles[0].trim()).not.toBe('')
 
-    // A page sharing another's title is the state this replaced, and the whole
-    // of the site's search presence.
-    const already = seen.get(titles[0])
-    expect(already, `${path} has the same title as ${already}`).toBeUndefined()
-    seen.set(titles[0], path)
+    // The tab reads the same everywhere, by request. What still has to differ
+    // per page is og:title, which is the shared-link card and the thing a page
+    // sharing another's identity would actually cost.
+    expect(titles[0].trim()).toBe('Beal House')
+
+    const og = html.match(/<meta property="og:title" content="([^"]+)"/)?.[1]
+    expect(og, `${path} has no og:title`).toBeTruthy()
+
+    // A page sharing another's og:title is the state this replaced, and the
+    // whole of the site's search presence.
+    const already = seen.get(og!)
+    expect(already, `${path} has the same og:title as ${already}`).toBeUndefined()
+    seen.set(og!, path)
 
     const canonical = html.match(/<link rel="canonical" href="([^"]+)"/)?.[1]
     expect(canonical, `${path} has no canonical`).toBeTruthy()
@@ -49,7 +56,7 @@ test('a room page carries its own structured offer', async ({ request }) => {
   const room = rooms[0]
   const html = await (await request.get(`/rooms/${room.slug}`)).text()
 
-  expect(html).toContain(`<title>`)
+  expect(html).toContain(`<title>Beal House</title>`)
   expect(html).toContain(room.name)
 
   // The JSON-LD is the reason the head exists at all on this route: a room page

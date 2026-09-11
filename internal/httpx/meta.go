@@ -54,6 +54,12 @@ const (
 	innPhone    = "+1-603-444-2661"
 	innEmail    = "info@thebealhouse.com"
 
+	// tabTitle is the document title on every page without exception, so the
+	// browser tab reads the same thing wherever a visitor is. It is the one
+	// value here that is deliberately not per-page: see headMeta.Title, which
+	// still varies and still reaches og:title.
+	tabTitle = "Beal House"
+
 	// From OpenStreetMap's own record of the building, so the pin agrees with
 	// the map the About page embeds.
 	innLatitude  = 44.3086662
@@ -84,6 +90,10 @@ const metaDescriptionLimit = 155
 // what keeps "the owner has not written this yet" from turning into an empty
 // meta description on the public internet.
 type headMeta struct {
+	// Title is the page's own name for itself. It is *not* the browser tab:
+	// the document title is the constant tabTitle on every page, by request,
+	// so this reaches og:title alone and a shared room link still names the
+	// room in the card a chat app draws for it.
 	Title       string
 	Description string
 	Canonical   string
@@ -145,13 +155,13 @@ func (s *siteMeta) forPath(ctx context.Context, path string) headMeta {
 	return meta
 }
 
-// title composes "Rooms · The Beal House", and leaves the home page as just the
-// inn's name — a home page titled "Home · The Beal House" wastes the most
-// valuable characters in a search result on the word "home".
+// title composes "Rooms · The Beal House" for og:title, and leaves the home
+// page as just the inn's name: a home page called "Home · The Beal House"
+// wastes the most valuable characters in a shared link on the word "home".
 func title(section string) string { return section + " · " + innName }
 
 func (s *siteMeta) home(ctx context.Context, meta headMeta) headMeta {
-	meta.Title = innName + " — inn in " + innLocality + ", New Hampshire"
+	meta.Title = innName + ", inn in " + innLocality + ", New Hampshire"
 
 	// The one page that speaks for itself when the owner has written nothing,
 	// on the same terms as the About page's fallback: both sentences below are
@@ -671,7 +681,7 @@ func summarise(body string) string {
 // that there is no way to put markup on the public site from the console. This
 // is the other half of that promise.
 var headTemplate = template.Must(template.New("head").Parse(
-	`<title>{{.Title}}</title>` +
+	`<title>` + tabTitle + `</title>` +
 		`{{with .Description}}<meta name="description" content="{{.}}">{{end}}` +
 		`{{if .NoIndex}}<meta name="robots" content="noindex, nofollow">{{end}}` +
 		`{{with .Canonical}}<link rel="canonical" href="{{.}}">{{end}}` +

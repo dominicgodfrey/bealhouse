@@ -512,6 +512,14 @@ also has a form on it, no API key, and one CSP entry rather than two.
 SPA is one document for every address, so the fallback fills in that page's title, description,
 canonical, Open Graph tags and JSON-LD before serving it.
 
+- **The `<title>` is the constant "Beal House" on every page**, booking flow and console
+  included, because that is what the owner asked the tab to say. It is written into the
+  template as a literal, so a page cannot reach it. **`headMeta.Title` still varies and now
+  feeds `og:title` alone**, so a shared room link still names the room in the card a chat app
+  draws for it. The trade is real and was made with it in front of us: a constant title is
+  the strongest on-page signal spent, and seven room pages now share one. Google rewrites
+  titles from the `h1` more often than not, which is most of what softens it.
+
 - **It reimplements no read model.** The rooms in the head come from `roomCards`, which is what
   `GET /api/rooms` answers with; the menu is `ops.PublicMenu`; the prose is `ops.PageFor`. A
   second query assembling them slightly differently is how the document a crawler indexes ends

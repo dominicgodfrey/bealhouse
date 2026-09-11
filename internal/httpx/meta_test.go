@@ -62,6 +62,7 @@ func page(t *testing.T, m *siteMeta, path string) string {
 var (
 	ldBlock   = regexp.MustCompile(`(?s)<script type="application/ld\+json">(.*?)</script>`)
 	titleTag  = regexp.MustCompile(`(?is)<title>(.*?)</title>`)
+	ogTitle   = regexp.MustCompile(`<meta property="og:title" content="([^"]*)"`)
 	descrTag  = regexp.MustCompile(`<meta name="description" content="([^"]*)"`)
 	canonTag  = regexp.MustCompile(`<link rel="canonical" href="([^"]*)"`)
 	robotsTag = regexp.MustCompile(`<meta name="robots" content="([^"]*)"`)
@@ -107,9 +108,9 @@ func TestEveryMarketingPageGetsItsOwnHead(t *testing.T) {
 	for _, path := range []string{"/", "/rooms", "/restaurant", "/events", "/about", "/local-area", "/policies"} {
 		doc := page(t, m, path)
 
-		title := only(t, titleTag, doc, "<title>")
+		title := only(t, ogTitle, doc, "og:title")
 		if title == "" {
-			t.Errorf("%s has no title", path)
+			t.Errorf("%s has no og:title", path)
 		}
 		if before, ok := seen[title]; ok {
 			t.Errorf("%s and %s share the title %q", before, path, title)
@@ -126,9 +127,23 @@ func TestEveryMarketingPageGetsItsOwnHead(t *testing.T) {
 }
 
 // Vite's index.html ships a static <title>. Left in place every page would have
-// two of them — the browser shows the first and a crawler may take either,
-// which is the failure that looks fine in a browser and puts "Beal House" on
-// all seven room results.
+// two of them: the browser shows the first and a crawler may take either, which
+// is the failure that looks fine in a browser and leaves two answers to the
+// same question in one document.
+// The browser tab reads the same on every page, by request. The <title> is a
+// constant, so a page that computes one for itself must not be able to reach
+// the tab: what varies is og:title, which is the shared-link card and not the
+// tab.
+func TestTheTabSaysTheSameThingOnEveryPage(t *testing.T) {
+	m, _ := meta(t, "https://bealhouse.test")
+
+	for _, path := range []string{"/", "/rooms", "/restaurant", "/events", "/about", "/local-area", "/policies", "/book", "/bookings/BH-ABCDEF", "/nowhere"} {
+		if got := only(t, titleTag, page(t, m, path), "<title>"); got != tabTitle {
+			t.Errorf("%s has the tab title %q, want %q", path, got, tabTitle)
+		}
+	}
+}
+
 func TestTheShellsOwnTitleIsReplacedRatherThanJoined(t *testing.T) {
 	m, _ := meta(t, "https://bealhouse.test")
 
@@ -136,8 +151,11 @@ func TestTheShellsOwnTitleIsReplacedRatherThanJoined(t *testing.T) {
 	if n := strings.Count(strings.ToLower(doc), "<title>"); n != 1 {
 		t.Fatalf("the document has %d <title> tags, want exactly 1", n)
 	}
-	if title := only(t, titleTag, doc, "<title>"); !strings.HasPrefix(title, "Local area") {
-		t.Errorf("title is %q; the shell's static one survived", title)
+	if title := only(t, titleTag, doc, "<title>"); title != tabTitle {
+		t.Errorf("title is %q, want %q; the shell's static one survived", title, tabTitle)
+	}
+	if og := only(t, ogTitle, doc, "og:title"); !strings.HasPrefix(og, "Local area") {
+		t.Errorf("og:title is %q; the page does not name itself", og)
 	}
 	// ...and the rest of the shell is untouched, or the SPA does not boot.
 	if !strings.Contains(doc, `<div id="root">`) || !strings.Contains(doc, "<!doctype html") {
@@ -260,8 +278,8 @@ func TestWithoutAnOriginThereAreNoAbsoluteURLs(t *testing.T) {
 	}
 	// The page still describes itself. Losing the origin costs the URLs, not
 	// the title and not the structured data.
-	if only(t, titleTag, doc, "<title>") == "" {
-		t.Error("no title without an origin")
+	if only(t, ogTitle, doc, "og:title") == "" {
+		t.Error("no og:title without an origin")
 	}
 	if len(jsonLD(t, doc)) == 0 {
 		t.Error("no structured data without an origin")
