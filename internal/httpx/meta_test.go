@@ -307,17 +307,32 @@ func TestARoomPageDescribesThatRoomAtThePriceTheAPIQuotes(t *testing.T) {
 	// Unescaped before comparing, because the name reaches the document through
 	// html/template: a room called "Mrs. Beal's Suite" arrives as
 	// `Mrs. Beal&#39;s Suite`, which is the escaping working rather than a bug.
-	if title := html.UnescapeString(only(t, titleTag, doc, "<title>")); !strings.Contains(title, card.Name) {
-		t.Errorf("title is %q, want the room's name in it", title)
+	if title := html.UnescapeString(only(t, ogTitle, doc, "og:title")); !strings.Contains(title, card.Name) {
+		t.Errorf("og:title is %q, want the room's name in it", title)
 	}
 
-	blocks := jsonLD(t, doc)
-	if len(blocks) != 1 {
-		t.Fatalf("got %d structured-data blocks, want 1", len(blocks))
+	// The room, and the trail to it. Exactly one of each: a second HotelRoom on
+	// one URL is two rooms as far as a search engine is concerned.
+	var room map[string]any
+	var crumbs int
+	for _, block := range jsonLD(t, doc) {
+		switch block["@type"] {
+		case "HotelRoom":
+			if room != nil {
+				t.Fatal("the page publishes two HotelRooms")
+			}
+			room = block
+		case "BreadcrumbList":
+			crumbs++
+		default:
+			t.Errorf("unexpected structured data of type %v", block["@type"])
+		}
 	}
-	room := blocks[0]
-	if room["@type"] != "HotelRoom" {
-		t.Errorf("@type is %v, want HotelRoom", room["@type"])
+	if room == nil {
+		t.Fatal("the page publishes no HotelRoom")
+	}
+	if crumbs != 1 {
+		t.Errorf("got %d breadcrumb trails, want 1", crumbs)
 	}
 	if room["name"] != card.Name {
 		t.Errorf("name is %v, want %q", room["name"], card.Name)

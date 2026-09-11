@@ -547,6 +547,62 @@ canonical, Open Graph tags and JSON-LD before serving it.
 - **Nothing here may fail a request.** A query that errors costs the structured data and logs a
   warning; the visible page is what the visitor came for.
 
+**The body is written by the server too** (`internal/httpx/prerender.go`), and it is the half
+that matters to anything that is not Google.
+
+- **Google renders the bundle; the crawlers behind the assistants do not.** GPTBot, ClaudeBot,
+  PerplexityBot and the rest fetch HTML and read what arrives. Until this existed they got a
+  head and `<div id="root"></div>`: no words, no prices, and **no links to any other page**,
+  so the only route into the site was the sitemap.
+- **It goes inside `<div id="root">`, and React clears it** on its first render. Deliberately
+  not a `<noscript>`, which text-extraction pipelines strip along with `<script>` often
+  enough to have made the whole thing a coin flip. The visible cost is that a visitor on a
+  slow connection sees a plain version of the page first, which is a better First
+  Contentful Paint than a blank screen and the reason the small `<style>` block is there.
+- **It issues no query of its own and reimplements no read model.** Every page is filled from
+  the rows `forPath` already fetched, in the same pass. `copyFor` now returns the prose once
+  and is read twice, cut for the description and whole for the body. Three pages cost one
+  extra single-row query each: settings on `/` and `/policies`, the attractions list on
+  `/local-area`.
+- **Every `NoIndex` route renders no body at all.** A body full of links under `/book` is an
+  invitation to walk into a hold (decision #29).
+- `html/template`, so the owner's console text is escaped into the body exactly as it is into
+  the head. `TestTheOwnersWordsCannotEscapeTheServedBody` is the other half of
+  `TestTheOwnersWordsCannotEscapeTheDocument`.
+
+**The inn is one schema.org entity, named `{SITE_URL}/#inn`.** Before this each page described
+the same house separately (a `LodgingBusiness` on the home page, a second one inside the About
+page's `ContactPage`, a `Place` inside every event, seven `HotelRoom`s attached to nothing), which
+a search engine may read as several businesses at one address. The full node lives on the home
+page as a **`BedAndBreakfast`** (the narrower type, with `checkinTime`, `checkoutTime`,
+`priceRange`, `numberOfRooms` and `petsAllowed: false`); everything else points at it by `@id`
+through `innRef()`. Room pages also carry a `BreadcrumbList`.
+
+**`robots.txt` welcomes crawlers outright**, with `Allow: /` in **one** `User-agent: *` group and
+the console, the API and the booking flow disallowed. **One group, never one per crawler**: a
+named group *replaces* the `*` group for that agent rather than adding to it, so a well-meant
+`User-agent: GPTBot` + `Allow: /` would hand that one crawler the booking flow with the Disallow
+lines silently not applying. The welcome agents are named in a comment instead.
+
+**`/llms.txt` is the inn in plain text** (`internal/httpx/llms.go`): the rooms with what they
+cost, the check-in and check-out times, the tax, the cancellation window, the menu, what is on,
+what is nearby, and the contact details. Generated from the same read models as everything else,
+so there is nothing in it to keep in step. The convention is not honoured by contract by anyone
+and may never be; it costs one route and no maintenance, which is the whole argument for it.
+
+**`sitemap.xml` carries `<lastmod>` and no `<priority>`.** Google has said for years that it
+ignores priority and changefreq, and a number nobody reads is a number somebody maintains. The
+dates are real (`rooms.updated_at` per room, `page_copy.updated_at` per page) and **absent**
+rather than guessed for a page nobody has written, because a file that stamps everything with
+"now" teaches a crawler to ignore the field.
+
+**What is deliberately not here.** `FAQPage` on the policies page: Google restricted those rich
+results to authoritative sites in 2023, so it would buy nothing a search engine shows, and the
+answers a model wants are now in the served body and `/llms.txt` anyway. A second copy of the
+policy sentences in Go, drifting from `Policies.tsx`, would buy nothing. `sameAs` links to the Google
+Business Profile and the social accounts: nobody has supplied them, and they are the highest-value
+thing still missing, tracked in `OWNER-SETUP.md`.
+
 **Photographs upload from the console** (`internal/media`, decision #16). An
 image arrives, is decoded, scaled so its longest side is at most 2400px,
 re-encoded as JPEG and written to `MEDIA_DIR` under a name that is the SHA-256

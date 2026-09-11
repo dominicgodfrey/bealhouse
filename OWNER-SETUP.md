@@ -248,3 +248,22 @@ without the owner deciding to.
   current site and are already in. Read them; they are unlikely to need work.
 - **Anything that renders as nothing** — an unwritten page, a room without a
   description — is behaving correctly. It is not a bug and there is no rush.
+
+## Listings and social accounts (nothing in the site yet)
+
+The site tells a search engine where the inn is and what it costs, but it does not
+yet say **that this website and your listings are the same business**. That link
+is `sameAs` in the structured data, and it is the single most useful thing still
+missing: it is what lets Google, and an assistant somebody asks for a place to
+stay near Franconia Notch, be confident the site, the Google listing, the reviews
+and the telephone number all belong to one house.
+
+Send whichever of these exist and they go in as one list:
+
+- The **Google Business Profile** for the inn (claimed, ideally, since the reviews
+  on it are the other thing no code here can supply).
+- Facebook, Instagram.
+- TripAdvisor, Booking.com, Expedia, or any other listing page.
+
+Nothing is invented in the meantime: with no URLs the site simply says nothing
+about listings rather than guessing at them.

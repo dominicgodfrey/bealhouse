@@ -284,6 +284,7 @@ func NewRouter(d Deps) http.Handler {
 	// parsing that as a rule set behaves unpredictably.
 	r.Get("/robots.txt", robotsTXT(d.SiteURL))
 	r.Get("/sitemap.xml", sitemapXML(pageMeta))
+	r.Get("/llms.txt", llmsTXT(pageMeta))
 
 	// Everything that is not /api is the SPA. No CORS, no second origin.
 	//

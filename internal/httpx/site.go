@@ -2,6 +2,7 @@ package httpx
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"time"
@@ -50,6 +51,12 @@ type RoomCard struct {
 	PlaceholderPhotoURL string `json:"placeholderPhotoUrl"`
 
 	FromCents *int64 `json:"fromCents,omitempty"`
+
+	// When the owner last changed this room, for the sitemap's <lastmod>. Not
+	// on the wire: it is a crawl-scheduling hint and no part of what the page
+	// shows, and a timestamp on a public payload is a thing somebody eventually
+	// renders.
+	UpdatedAt time.Time `json:"-"`
 }
 
 // Photo mirrors the guest-side shape the results page already uses.
@@ -125,6 +132,7 @@ func roomCards(ctx context.Context, q *db.Queries) ([]RoomCard, error) {
 			Amenities:           room.Amenities,
 			Photos:              byRoom[room.ID],
 			PlaceholderPhotoURL: availability.PlaceholderPhoto(room.Slug),
+			UpdatedAt:           room.UpdatedAt,
 		}
 		if room.View != nil {
 			card.View = *room.View
@@ -227,29 +235,40 @@ type policyTerms struct {
 // policies serves GET /api/policies.
 func policies(q *db.Queries) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		s, err := q.GetSettings(r.Context())
+		terms, err := policyTermsFor(r.Context(), q)
 		if err != nil {
 			serverError(w, r, err)
 			return
 		}
-
-		writeJSON(w, http.StatusOK, policyTerms{
-			MinStayNights: int(s.DefaultMinStay),
-			MaxStayNights: int(s.MaxStayNights),
-			CheckinTime:   hhmm(s.CheckinTime.Microseconds),
-			CheckoutTime:  hhmm(s.CheckoutTime.Microseconds),
-			HoldMinutes:   int(s.HoldTtlMinutes),
-
-			TaxRatePercent:          pricing.Rate(s.TaxRateScaled).Percent(),
-			RefundProcessingPercent: pricing.Rate(s.RefundProcessingRateScaled).Percent(),
-
-			// Half the all-in total, rounded up — pricing.Quote's own rule.
-			DepositPercent:           50,
-			BalanceLeadDays:          pricing.BalanceLeadDays,
-			ShortNoticeDays:          pricing.ShortNoticeDays,
-			FreeCancellationLeadDays: pricing.BalanceLeadDays,
-		})
+		writeJSON(w, http.StatusOK, terms)
 	}
+}
+
+// policyTermsFor reads the terms once, for whoever needs them: the endpoint
+// above, and the server-rendered policies page, which publishes the figures to
+// a reader that never calls it (prerender.go).
+func policyTermsFor(ctx context.Context, q *db.Queries) (policyTerms, error) {
+	s, err := q.GetSettings(ctx)
+	if err != nil {
+		return policyTerms{}, err
+	}
+
+	return policyTerms{
+		MinStayNights: int(s.DefaultMinStay),
+		MaxStayNights: int(s.MaxStayNights),
+		CheckinTime:   hhmm(s.CheckinTime.Microseconds),
+		CheckoutTime:  hhmm(s.CheckoutTime.Microseconds),
+		HoldMinutes:   int(s.HoldTtlMinutes),
+
+		TaxRatePercent:          pricing.Rate(s.TaxRateScaled).Percent(),
+		RefundProcessingPercent: pricing.Rate(s.RefundProcessingRateScaled).Percent(),
+
+		// Half the all-in total, rounded up — pricing.Quote's own rule.
+		DepositPercent:           50,
+		BalanceLeadDays:          pricing.BalanceLeadDays,
+		ShortNoticeDays:          pricing.ShortNoticeDays,
+		FreeCancellationLeadDays: pricing.BalanceLeadDays,
+	}, nil
 }
 
 // hhmm renders a time-of-day column as "15:00". The console has its own copy
@@ -259,19 +278,29 @@ func hhmm(micros int64) string {
 	return fmt.Sprintf("%02d:%02d", int(d.Hours()), int(d.Minutes())%60)
 }
 
-// submitInquiry serves POST /api/inquiries, the events form.
+// maxInquiryBody bounds the two public forms.
+//
+// Its own limit rather than decodeBody's, which is sized for the console: a
+// whole menu is half a megabyte, and a message to the inn is a few paragraphs.
+// The fields themselves are capped again inside SubmitInquiry; this is what
+// stops an anonymous caller making the server read half a megabyte of JSON
+// before finding that out.
+const maxInquiryBody = 8 << 10
+
+// submitInquiry serves POST /api/inquiries, the events form and the contact
+// form.
 //
 // The one write an anonymous visitor performs on this whole site apart from
 // creating a booking, and unlike that one it takes no inventory off sale and
-// spends nothing — so it shares the readers' allowance rather than needing its
-// own. What it does do is put a row in a table somebody reads, which is why it
-// answers 201 with nothing: there is no resource to hand back, and the page
-// says thank you.
+// spends nothing. What it does do is put a row in a table somebody reads and a
+// notification on their phone, which is why it has its own allowance in the
+// router. It answers 201 with nothing: there is no resource to hand back, and
+// the page says thank you.
 func submitInquiry(ops *console.Ops) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var in console.NewInquiry
-		if err := decodeBody(w, r, &in); err != nil {
-			consoleError(w, r, err)
+		if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, maxInquiryBody)).Decode(&in); err != nil {
+			badRequest(w, "the message could not be read as JSON")
 			return
 		}
 

@@ -49,6 +49,36 @@ test('every marketing page describes itself, and only itself', async ({ request 
   }
 })
 
+test('a crawler that runs no JavaScript still gets the page', async ({ request }) => {
+  const rooms = await (await request.get('/api/rooms')).json()
+  expect(rooms.length).toBeGreaterThan(0)
+
+  const html = await (await request.get('/rooms/' + rooms[0].slug)).text()
+
+  // Inside the element React mounts into, so a visitor never sees two copies
+  // and a reader that never runs the bundle sees one.
+  const root = html.slice(html.indexOf('<div id="root">'))
+  expect(root, 'the served document has an empty root element').toContain('<h1>')
+  expect(root).toContain('href="/rooms"')
+
+  // The whole point: the room is named and priced in the bytes, not after a
+  // render. Fetched rather than driven, because a crawler fetches.
+  expect(root).toContain(rooms[0].name.replace(/'/g, '&#39;'))
+})
+
+test('the plain-text summary lists the rooms', async ({ request }) => {
+  const rooms = await (await request.get('/api/rooms')).json()
+  const llms = await request.get('/llms.txt')
+
+  expect(llms.status()).toBe(200)
+  expect(llms.headers()['content-type']).toContain('text/plain')
+
+  const body = await llms.text()
+  for (const room of rooms) {
+    expect(body, `/llms.txt should list ${room.slug}`).toContain(`/rooms/${room.slug}`)
+  }
+})
+
 test('a room page carries its own structured offer', async ({ request }) => {
   const rooms = await (await request.get('/api/rooms')).json()
   expect(rooms.length).toBeGreaterThan(0)

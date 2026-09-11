@@ -4,6 +4,7 @@ import (
 	"encoding/xml"
 	"net/http"
 	"strings"
+	"time"
 )
 
 // robots.txt and sitemap.xml.
@@ -18,18 +19,42 @@ import (
 // and a crawler reading a page of HTML as a robots.txt does not behave in any
 // way anybody would predict.
 
-// robotsTXT tells crawlers what not to walk.
+// robotsTXT welcomes crawlers, and says which four corners of the site are not
+// for them.
+//
+// The welcome is the point and it is deliberate: an inn wants to be found, by a
+// search engine and equally by whatever is answering somebody's question about
+// where to stay near Franconia Notch. `Allow: /` is stated rather than left
+// implied so that the intent survives somebody reading this file in two years
+// and wondering whether the omission was on purpose.
+//
+// **One group, not one per crawler.** A named group replaces the `*` group
+// wholesale for that agent rather than adding to it, so `User-agent: GPTBot`
+// followed by `Allow: /` would hand that one crawler the booking flow with the
+// Disallow lines silently not applying to it. Every crawler worth having obeys
+// `*`; the ones that do not would ignore a group addressed to them as well.
+// So the agents below are named in a comment and governed by the same rules as
+// everybody else.
 //
 // The disallowed prefixes are the same ones the head marks noindex, and they
 // are listed in both places on purpose: noindex keeps a page out of the results
 // once it has been fetched, and Disallow stops it being fetched at all. The
-// booking flow is the one that matters — /book and /bookings take a real room
-// off sale for the hold TTL, so a crawler walking them is a crawler quietly
+// booking flow is the one that matters, because /book and /bookings take a real
+// room off sale for the hold TTL: a crawler walking them is a crawler quietly
 // emptying the inn's inventory (decision #29 is about the same risk from the
 // other direction).
 func robotsTXT(siteURL string) http.HandlerFunc {
 	var b strings.Builder
+	b.WriteString("# " + innName + ", " + innStreet + ", " + innLocality + ", " + innRegion + ".\n")
+	b.WriteString("# Crawling and indexing are welcome, search engines and assistants alike:\n")
+	b.WriteString("# Googlebot, Bingbot, GPTBot, ClaudeBot, PerplexityBot, Applebot,\n")
+	b.WriteString("# Google-Extended, OAI-SearchBot and anything else that reads this file.\n")
+	b.WriteString("# The four prefixes below are the console, the API and the booking flow,\n")
+	b.WriteString("# which take real rooms off sale when walked. Everything else is yours.\n")
+	b.WriteString("# There is a summary of the inn in plain text at /llms.txt.\n\n")
+
 	b.WriteString("User-agent: *\n")
+	b.WriteString("Allow: /\n")
 	for _, path := range []string{"/admin", "/api", "/book/", "/bookings/", "/booking/", "/search", "/health"} {
 		b.WriteString("Disallow: " + path + "\n")
 	}
@@ -54,8 +79,26 @@ type urlset struct {
 }
 
 type sitemap struct {
-	Loc      string `xml:"loc"`
-	Priority string `xml:"priority,omitempty"`
+	Loc string `xml:"loc"`
+
+	// W3C datetime, which is what the schema asks for and what Google reads to
+	// decide whether a page it already has is worth fetching again.
+	//
+	// <priority> and <changefreq> used to be here and are gone: Google has said
+	// for years that it ignores both, and a number nobody reads is a number
+	// somebody eventually maintains. Omitted per URL rather than guessed — a
+	// lastmod of "now" on every page, which is what a generated file drifts
+	// into, teaches a crawler to ignore the field.
+	LastMod string `xml:"lastmod,omitempty"`
+}
+
+// w3cDate formats a timestamp for a <lastmod>, and formats nothing for a zero
+// one.
+func w3cDate(t time.Time) string {
+	if t.IsZero() {
+		return ""
+	}
+	return t.UTC().Format(time.RFC3339)
 }
 
 // sitemapXML lists the pages worth indexing: the five marketing pages and one
@@ -72,14 +115,19 @@ func sitemapXML(meta *siteMeta) http.HandlerFunc {
 			return
 		}
 
+		// When the owner last edited each page's prose, so the five marketing
+		// pages carry a true lastmod rather than a shared guess. A page with no
+		// row has never been written and gets none.
+		edited := meta.pageEdits(r.Context())
+
 		pages := []sitemap{
-			{Loc: meta.absolute("/"), Priority: "1.0"},
-			{Loc: meta.absolute("/rooms"), Priority: "0.9"},
-			{Loc: meta.absolute("/restaurant"), Priority: "0.8"},
-			{Loc: meta.absolute("/events"), Priority: "0.7"},
-			{Loc: meta.absolute("/local-area"), Priority: "0.5"},
-			{Loc: meta.absolute("/about"), Priority: "0.5"},
-			{Loc: meta.absolute("/policies"), Priority: "0.3"},
+			{Loc: meta.absolute("/"), LastMod: w3cDate(edited["home"])},
+			{Loc: meta.absolute("/rooms"), LastMod: w3cDate(edited["rooms"])},
+			{Loc: meta.absolute("/restaurant"), LastMod: w3cDate(edited["restaurant"])},
+			{Loc: meta.absolute("/events"), LastMod: w3cDate(edited["events"])},
+			{Loc: meta.absolute("/local-area"), LastMod: w3cDate(edited["local-area"])},
+			{Loc: meta.absolute("/about"), LastMod: w3cDate(edited["about"])},
+			{Loc: meta.absolute("/policies"), LastMod: w3cDate(edited["policies"])},
 		}
 
 		// One entry per room, from the same read model the rooms index and the
@@ -91,11 +139,20 @@ func sitemapXML(meta *siteMeta) http.HandlerFunc {
 		// response: the five pages above are still true, and an empty sitemap
 		// would tell a crawler the room pages had been withdrawn.
 		if cards, ok := meta.cards(r.Context()); ok {
+			newest := time.Time{}
 			for _, card := range cards {
 				pages = append(pages, sitemap{
-					Loc:      meta.absolute("/rooms/" + card.Slug),
-					Priority: "0.8",
+					Loc:     meta.absolute("/rooms/" + card.Slug),
+					LastMod: w3cDate(card.UpdatedAt),
 				})
+				if card.UpdatedAt.After(newest) {
+					newest = card.UpdatedAt
+				}
+			}
+			// The index changes when any room on it does, which is later than
+			// the last time anybody wrote prose for the page itself.
+			if pages[1].LastMod == "" || w3cDate(newest) > pages[1].LastMod {
+				pages[1].LastMod = w3cDate(newest)
 			}
 		}
 

@@ -8,6 +8,7 @@ import (
 	"log/slog"
 	"net/url"
 	"strings"
+	"time"
 	"unicode"
 
 	"bealhouse/internal/console"
@@ -66,6 +67,39 @@ const (
 	innLongitude = -71.7815120
 )
 
+// innID is the one name for the house, on every page and in every block that
+// mentions it.
+//
+// Without it each page published its own unconnected description of the same
+// inn: a LodgingBusiness on the home page, a second one nested inside the About
+// page's ContactPage, a Place inside every event, and seven HotelRooms attached
+// to nothing at all. A search engine is entitled to read that as several
+// businesses at one address. One @id, referenced everywhere else, is what makes
+// them one thing — and it is the same fact an assistant needs to be sure the
+// site, the listing and the telephone number are the same house.
+//
+// Empty without a SITE_URL, because an @id is a URL. The blocks then name the
+// inn outright instead, which is what they did before.
+func (s *siteMeta) innID() string {
+	if s.siteURL == "" {
+		return ""
+	}
+	return strings.TrimSuffix(s.siteURL, "/") + "/#inn"
+}
+
+// innRef is the house as a reference rather than a repeat: a room's
+// containedInPlace, the restaurant's, an event's location.
+func (s *siteMeta) innRef() map[string]any {
+	if id := s.innID(); id != "" {
+		return map[string]any{"@id": id}
+	}
+	return map[string]any{
+		"@type":   "BedAndBreakfast",
+		"name":    innName,
+		"address": postalAddress(),
+	}
+}
+
 // postalAddress is the inn's address as schema.org wants it. One copy: it goes
 // on the lodging business, the restaurant and every event.
 func postalAddress() map[string]any {
@@ -110,6 +144,12 @@ type headMeta struct {
 	// and & by default, so nothing in here can close the script element it sits
 	// in, whatever the owner typed into the console.
 	LD []template.JS
+
+	// Doc is the page's visible content as plain HTML, for a reader that does
+	// not run the bundle (prerender.go). Filled from the same rows the tags
+	// above were, in this same pass, so it costs no extra query. Nil on every
+	// route marked NoIndex, which is every route a crawler has no business on.
+	Doc *bodyDoc
 }
 
 // siteMeta builds the head for a path. Every field may be absent: with no
@@ -167,26 +207,43 @@ func (s *siteMeta) home(ctx context.Context, meta headMeta) headMeta {
 	// on the same terms as the About page's fallback: both sentences below are
 	// already in the site footer, so this states nothing new about a house we
 	// know nothing about.
-	meta.Description = s.copyFor(ctx, "home")
+	meta.Description, _ = s.copyFor(ctx, "home")
 	if meta.Description == "" {
 		meta.Description = "An inn at " + innStreet + " in " + innLocality +
 			", New Hampshire. Book direct."
 	}
 
+	// The home page's copy slot is its backdrop photograph and this sentence,
+	// not a paragraph anybody reads on screen — the visible page is one
+	// screenful with the house behind it. The served body says the sentence the
+	// document's own description already says, and then does the job the
+	// visible page does: it points at the rooms.
+	meta.Doc = &bodyDoc{Heading: innName, Paras: []string{meta.Description}}
+
 	cards, ok := s.cards(ctx)
 	if !ok {
 		return meta
 	}
+	meta.Doc.section("Rooms", roomItems(cards))
 
 	meta.Image = s.leadPhoto(cards)
 
+	// BedAndBreakfast rather than LodgingBusiness: both are true and the
+	// narrower one is the one a search engine can do something with. This is the
+	// canonical node — the full description of the house, published here and
+	// referenced by @id from every other page.
 	business := map[string]any{
 		"@context":  "https://schema.org",
-		"@type":     "LodgingBusiness",
+		"@type":     "BedAndBreakfast",
 		"name":      innName,
 		"address":   postalAddress(),
 		"telephone": innPhone,
 		"email":     innEmail,
+		// Withdrawn in 2026 (decision #23, revised), and saying so is a
+		// kindness: a guest searching for somewhere that takes a dog should
+		// find out here rather than on arrival.
+		"petsAllowed":        false,
+		"currenciesAccepted": "USD",
 		// The same pair the About page's map is centred on.
 		"geo": map[string]any{
 			"@type":     "GeoCoordinates",
@@ -196,6 +253,15 @@ func (s *siteMeta) home(ctx context.Context, meta headMeta) headMeta {
 	}
 	if len(cards) > 0 {
 		business["numberOfRooms"] = len(cards)
+		// The cheapest and dearest nightly starting price on the calendar
+		// today, which is what the room cards say. Absent when no season prices
+		// anything, because then there is no price to state.
+		if from, to, ok := priceSpan(cards); ok {
+			business["priceRange"] = from + "-" + to
+		}
+	}
+	if id := s.innID(); id != "" {
+		business["@id"] = id
 	}
 	if s.siteURL != "" {
 		business["url"] = s.siteURL
@@ -204,20 +270,52 @@ func (s *siteMeta) home(ctx context.Context, meta headMeta) headMeta {
 	if meta.Image != "" {
 		business["image"] = meta.Image
 	}
+	// The two facts somebody asks for by name. One settings read, on the one
+	// page carrying the full description of the house.
+	if terms, ok := s.terms(ctx); ok {
+		business["checkinTime"] = terms.CheckinTime
+		business["checkoutTime"] = terms.CheckoutTime
+	}
 
 	meta.LD = append(meta.LD, marshalLD(business))
 	return meta
 }
 
+// priceSpan is the range of nightly starting prices across the rooms, as whole
+// dollars. Rooms no season prices are left out rather than counted as free.
+func priceSpan(cards []RoomCard) (from, to string, ok bool) {
+	var low, high int64
+	for _, card := range cards {
+		if card.FromCents == nil {
+			continue
+		}
+		cents := *card.FromCents
+		if !ok || cents < low {
+			low = cents
+		}
+		if !ok || cents > high {
+			high = cents
+		}
+		ok = true
+	}
+	if !ok {
+		return "", "", false
+	}
+	return fmt.Sprintf("$%d", low/100), fmt.Sprintf("$%d", high/100), true
+}
+
 func (s *siteMeta) rooms(ctx context.Context, meta headMeta) headMeta {
 	meta.Title = title("Rooms")
-	meta.Description = s.copyFor(ctx, "rooms")
+	var paras []string
+	meta.Description, paras = s.copyFor(ctx, "rooms")
+	meta.Doc = &bodyDoc{Heading: "The rooms", Paras: paras}
 
 	cards, ok := s.cards(ctx)
 	if !ok {
 		return meta
 	}
 	meta.Image = s.leadPhoto(cards)
+	meta.Doc.section("", roomItems(cards))
 
 	items := make([]any, 0, len(cards))
 	for i, card := range cards {
@@ -236,7 +334,38 @@ func (s *siteMeta) rooms(ctx context.Context, meta headMeta) headMeta {
 		"numberOfItems":   len(items),
 		"itemListElement": items,
 	}))
+	s.crumbs(&meta, crumb{"Home", "/"}, crumb{"Rooms", "/rooms"})
 	return meta
+}
+
+// crumb is one step of the trail, as a name and a path.
+type crumb struct {
+	Name string
+	Path string
+}
+
+// crumbs publishes the trail to this page, which is what a search result shows
+// in place of a bare URL and what tells a reader with no navigation where the
+// page sits. Absent without a SITE_URL: a ListItem's item is an absolute URL,
+// and a trail of relative ones is no trail.
+func (s *siteMeta) crumbs(meta *headMeta, trail ...crumb) {
+	if s.siteURL == "" || len(trail) == 0 {
+		return
+	}
+	items := make([]any, 0, len(trail))
+	for i, step := range trail {
+		items = append(items, map[string]any{
+			"@type":    "ListItem",
+			"position": i + 1,
+			"name":     step.Name,
+			"item":     s.absolute(step.Path),
+		})
+	}
+	meta.LD = append(meta.LD, marshalLD(map[string]any{
+		"@context":        "https://schema.org",
+		"@type":           "BreadcrumbList",
+		"itemListElement": items,
+	}))
 }
 
 func (s *siteMeta) room(ctx context.Context, meta headMeta, slug string) headMeta {
@@ -261,6 +390,21 @@ func (s *siteMeta) room(ctx context.Context, meta headMeta, slug string) headMet
 			meta.Image = s.absolute(card.Photos[0].URL)
 		}
 		meta.LD = append(meta.LD, marshalLD(s.roomLD(card, true)))
+		s.crumbs(&meta, crumb{"Home", "/"}, crumb{"Rooms", "/rooms"},
+			crumb{card.Name, "/rooms/" + card.Slug})
+
+		// The whole description, not the cut-down one: the tag is a search
+		// result's worth and this is the page.
+		meta.Doc = &bodyDoc{Heading: card.Name, Paras: paragraphs(card.Description)}
+		if line := roomFacts(card); line != "" {
+			meta.Doc.Paras = append(meta.Doc.Paras, line)
+		}
+		if len(card.Amenities) > 0 {
+			meta.Doc.Sections = append(meta.Doc.Sections, bodySection{
+				Heading: "In this room",
+				Paras:   []string{strings.Join(card.Amenities, ", ")},
+			})
+		}
 		return meta
 	}
 
@@ -280,6 +424,9 @@ func (s *siteMeta) roomLD(card RoomCard, standalone bool) map[string]any {
 	room := map[string]any{
 		"@type": "HotelRoom",
 		"name":  card.Name,
+		// Which house this room is in. Without it seven HotelRooms sit at no
+		// address at all, and the offer on each is an offer from nobody.
+		"containedInPlace": s.innRef(),
 	}
 	if standalone {
 		room["@context"] = "https://schema.org"
@@ -332,7 +479,9 @@ func (s *siteMeta) roomLD(card RoomCard, standalone bool) map[string]any {
 
 func (s *siteMeta) restaurant(ctx context.Context, meta headMeta) headMeta {
 	meta.Title = title("Restaurant")
-	meta.Description = s.copyFor(ctx, "restaurant")
+	var paras []string
+	meta.Description, paras = s.copyFor(ctx, "restaurant")
+	meta.Doc = &bodyDoc{Heading: "The restaurant", Paras: paras}
 
 	if s.ops == nil {
 		return meta
@@ -342,13 +491,37 @@ func (s *siteMeta) restaurant(ctx context.Context, meta headMeta) headMeta {
 		s.warn("menu", err)
 		return meta
 	}
+	for _, course := range sections {
+		if len(course.Items) == 0 {
+			continue
+		}
+		dishes := make([]bodyItem, 0, len(course.Items))
+		for _, item := range course.Items {
+			dish := bodyItem{Name: item.Name, Text: item.Description}
+			// Zero is a market-price special or a side inside a set menu, and
+			// "$0.00" would be a lie the kitchen then has to explain.
+			if item.PriceCents > 0 {
+				dish.Meta = "$" + dollars(item.PriceCents)
+			}
+			dishes = append(dishes, dish)
+		}
+		meta.Doc.Sections = append(meta.Doc.Sections, bodySection{
+			Heading: course.Name,
+			Paras:   trimmed(course.Description),
+			Items:   dishes,
+		})
+	}
 
 	restaurant := map[string]any{
-		"@context":  "https://schema.org",
-		"@type":     "Restaurant",
-		"name":      "The restaurant at the Beal House",
-		"address":   postalAddress(),
-		"telephone": innPhone,
+		"@context":         "https://schema.org",
+		"@type":            "Restaurant",
+		"name":             "The restaurant at the Beal House",
+		"address":          postalAddress(),
+		"telephone":        innPhone,
+		"containedInPlace": s.innRef(),
+	}
+	if id := s.innID(); id != "" {
+		restaurant["@id"] = strings.TrimSuffix(s.siteURL, "/") + "/#restaurant"
 	}
 	if url := s.absolute("/restaurant"); url != "" {
 		restaurant["url"] = url
@@ -437,7 +610,9 @@ func suitableForDiet(item console.MenuItem) []any {
 
 func (s *siteMeta) events(ctx context.Context, meta headMeta) headMeta {
 	meta.Title = title("Events")
-	meta.Description = s.copyFor(ctx, "events")
+	var paras []string
+	meta.Description, paras = s.copyFor(ctx, "events")
+	meta.Doc = &bodyDoc{Heading: "Events", Paras: paras}
 
 	if s.ops == nil {
 		return meta
@@ -447,6 +622,16 @@ func (s *siteMeta) events(ctx context.Context, meta headMeta) headMeta {
 		s.warn("events", err)
 		return meta
 	}
+
+	happening := make([]bodyItem, 0, len(list))
+	for _, event := range list {
+		happening = append(happening, bodyItem{
+			Name: event.Title,
+			Meta: event.HappensOn,
+			Text: event.Description,
+		})
+	}
+	meta.Doc.section("", happening)
 
 	for _, event := range list {
 		// An event with no date is one the owner is still drafting the details
@@ -462,11 +647,9 @@ func (s *siteMeta) events(ctx context.Context, meta headMeta) headMeta {
 			"@type":     "Event",
 			"name":      event.Title,
 			"startDate": event.HappensOn,
-			"location": map[string]any{
-				"@type":   "Place",
-				"name":    innName,
-				"address": postalAddress(),
-			},
+			// The same house as everywhere else, not a Place that happens to
+			// share its address.
+			"location": s.innRef(),
 		}
 		if event.Description != "" {
 			block["description"] = event.Description
@@ -484,30 +667,54 @@ func (s *siteMeta) events(ctx context.Context, meta headMeta) headMeta {
 
 func (s *siteMeta) localArea(ctx context.Context, meta headMeta) headMeta {
 	meta.Title = title("Local area")
-	meta.Description = s.copyFor(ctx, "local-area")
+	var paras []string
+	meta.Description, paras = s.copyFor(ctx, "local-area")
+	meta.Doc = &bodyDoc{Heading: "The local area", Paras: paras}
+
+	if s.ops == nil {
+		return meta
+	}
+	// The one query this page did not already make. It is what the page is: a
+	// list of places with distances, and the long-tail search this inn can
+	// actually win is somebody asking what is near Littleton.
+	places, err := s.ops.Attractions(ctx)
+	if err != nil {
+		s.warn("local attractions", err)
+		return meta
+	}
+
+	nearby := make([]bodyItem, 0, len(places))
+	for _, place := range places {
+		nearby = append(nearby, bodyItem{
+			Name: place.Name,
+			URL:  place.URL,
+			Meta: place.Distance,
+			Text: place.Description,
+		})
+	}
+	meta.Doc.section("", nearby)
 	return meta
 }
 
 // about carries the address and telephone in words, so it carries them as
 // structured data too.
 //
-// ContactPage rather than a second LodgingBusiness: two of those at two URLs is
-// how a search engine ends up with two entries for one house.
+// ContactPage naming the inn by @id rather than describing it again: two full
+// descriptions at two URLs is how a search engine ends up with two entries for
+// one house.
 func (s *siteMeta) about(ctx context.Context, meta headMeta) headMeta {
 	meta.Title = title("About us")
-	meta.Description = s.copyFor(ctx, "about")
+	var paras []string
+	meta.Description, paras = s.copyFor(ctx, "about")
+	// The address and telephone are in the footer of every served body, so this
+	// page needs no second copy of them here.
+	meta.Doc = &bodyDoc{Heading: "About us", Paras: paras}
 
 	block := map[string]any{
 		"@context": "https://schema.org",
 		"@type":    "ContactPage",
 		"name":     title("About us"),
-		"about": map[string]any{
-			"@type":     "LodgingBusiness",
-			"name":      innName,
-			"address":   postalAddress(),
-			"telephone": innPhone,
-			"email":     innEmail,
-		},
+		"about":    s.innRef(),
 	}
 	if url := s.absolute("/about"); url != "" {
 		block["url"] = url
@@ -523,35 +730,73 @@ func (s *siteMeta) about(ctx context.Context, meta headMeta) headMeta {
 // thing this page exists to stop.
 func (s *siteMeta) policyPage(ctx context.Context, meta headMeta) headMeta {
 	meta.Title = title("Policies")
-	meta.Description = s.copyFor(ctx, "policies")
+	var paras []string
+	meta.Description, paras = s.copyFor(ctx, "policies")
+	meta.Doc = &bodyDoc{Heading: innName + " policies", Paras: paras}
+
+	// The numbers, not the prose. The page's sentences live in Policies.tsx and
+	// a second copy of them here is exactly the drift this file refuses
+	// everywhere else; the figures are settings, which both sides read. They are
+	// also the half somebody actually asks for — what time is check-in, how late
+	// can I cancel — and the half a model can answer from.
+	terms, ok := s.terms(ctx)
+	if !ok {
+		return meta
+	}
+	meta.Doc.section("", []bodyItem{
+		{Name: "Check-in", Meta: "From " + terms.CheckinTime},
+		{Name: "Check-out", Meta: "By " + terms.CheckoutTime},
+		{Name: "Shortest stay", Meta: nights(terms.MinStayNights)},
+		{Name: "Longest stay", Meta: nights(terms.MaxStayNights)},
+		{Name: "Deposit", Meta: fmt.Sprintf("%d%% of the total at booking, the balance %d days before arrival",
+			terms.DepositPercent, terms.BalanceLeadDays)},
+		{Name: "Free cancellation", Meta: fmt.Sprintf("Up to %d days before arrival", terms.FreeCancellationLeadDays)},
+		{Name: "NH Meals & Rooms tax", Meta: terms.TaxRatePercent + "%"},
+		{Name: "Card processing retained on a refund", Meta: terms.RefundProcessingPercent + "%"},
+	})
 	return meta
 }
 
-// copyFor is the owner's prose for a page, cut to a description's length.
+// nights renders a count the way the policies page does, because "1 nights" is
+// the sort of thing a person notices and a model repeats.
+func nights(n int) string {
+	if n == 1 {
+		return "1 night"
+	}
+	return fmt.Sprintf("%d nights", n)
+}
+
+// copyFor is the owner's prose for a page, read once and returned twice over:
+// cut to a sentence for the meta description, and whole for the body the server
+// renders (prerender.go).
 //
-// Empty when they have not written any, which emits no meta description at
-// all. That is the same choice the page makes when it renders no paragraph, and
-// it is the right one: an invented sentence about the food would sit in search
+// Both empty when they have not written any, which emits no meta description at
+// all and renders no paragraph. That is the same choice the page makes, and it
+// is the right one: an invented sentence about the food would sit in search
 // results long after somebody stopped remembering it was invented.
-func (s *siteMeta) copyFor(ctx context.Context, slug string) string {
+//
+// One call rather than one per consumer, because this runs on every document
+// the fallback serves and the second read would be pure cost.
+func (s *siteMeta) copyFor(ctx context.Context, slug string) (description string, paras []string) {
 	if s.ops == nil {
-		return ""
+		return "", nil
 	}
 	page, err := s.ops.PageFor(ctx, slug)
 	if err != nil {
 		s.warn("page copy for "+slug, err)
-		return ""
+		return "", nil
 	}
 	if !page.Written {
-		return ""
+		return "", nil
 	}
 	// The body, not the heading: a heading is two or three words and a
 	// description wants a sentence. Falls back to the heading for a page that
 	// has one and no body.
-	if summary := summarise(page.Body); summary != "" {
-		return summary
+	description = summarise(page.Body)
+	if description == "" {
+		description = summarise(page.Heading)
 	}
-	return summarise(page.Heading)
+	return description, paragraphs(page.Body)
 }
 
 // cards is the rooms index read model — the same one GET /api/rooms answers
@@ -616,6 +861,42 @@ func (s *siteMeta) absolute(path string) string {
 		return path
 	}
 	return strings.TrimSuffix(s.siteURL, "/") + path
+}
+
+// pageEdits is when each page's prose was last saved, keyed by slug, for the
+// sitemap's <lastmod>.
+//
+// One query for all of them rather than one per page. A slug with no row has
+// never been written and is absent rather than zero, which is what keeps an
+// unwritten page from claiming it changed at the epoch.
+func (s *siteMeta) pageEdits(ctx context.Context) map[string]time.Time {
+	edited := map[string]time.Time{}
+	if s.q == nil {
+		return edited
+	}
+	rows, err := s.q.ListPageCopy(ctx)
+	if err != nil {
+		s.warn("page copy timestamps", err)
+		return edited
+	}
+	for _, row := range rows {
+		edited[row.Slug] = row.UpdatedAt
+	}
+	return edited
+}
+
+// terms is the policy figures for the served policies page, from the same
+// settings row GET /api/policies answers with.
+func (s *siteMeta) terms(ctx context.Context) (policyTerms, bool) {
+	if s.q == nil {
+		return policyTerms{}, false
+	}
+	terms, err := policyTermsFor(ctx, s.q)
+	if err != nil {
+		s.warn("policy terms", err)
+		return policyTerms{}, false
+	}
+	return terms, true
 }
 
 func (s *siteMeta) warn(what string, err error) {

@@ -1268,7 +1268,11 @@ SELECT
   amenities,
   is_accessible,
   accessibility_features,
-  sort_order
+  sort_order,
+  -- For the sitemap's <lastmod>, which is the one thing a crawler reads to
+  -- decide whether a page it already has is worth fetching again. Carried on
+  -- this query rather than its own, so it costs nothing.
+  updated_at
 FROM rooms
 ORDER BY sort_order, id
 `
@@ -1284,6 +1288,7 @@ type ListRoomsRow struct {
 	IsAccessible          bool
 	AccessibilityFeatures []string
 	SortOrder             int32
+	UpdatedAt             time.Time
 }
 
 // ---------------------------------------------------------------------------
@@ -1309,6 +1314,7 @@ func (q *Queries) ListRooms(ctx context.Context) ([]ListRoomsRow, error) {
 			&i.IsAccessible,
 			&i.AccessibilityFeatures,
 			&i.SortOrder,
+			&i.UpdatedAt,
 		); err != nil {
 			return nil, err
 		}

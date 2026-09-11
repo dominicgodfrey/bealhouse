@@ -66,7 +66,8 @@ func serveSPA(dist fs.FS, meta *siteMeta) http.HandlerFunc {
 // surprise on the first request.
 type shell struct {
 	head []byte // everything before </head>, with Vite's static <title> removed
-	tail []byte // </head> onwards
+	mid  []byte // </head> through <div id="root">
+	tail []byte // everything after it
 	full []byte // the document untouched, for when it could not be split
 }
 
@@ -77,6 +78,12 @@ type shell struct {
 // works in testing and puts "The Beal House" on all seven room results.
 var staticTitle = regexp.MustCompile(`(?is)<title>.*?</title>`)
 
+// rootElement matches the element React mounts into, which is where the
+// server-rendered body goes (prerender.go). Written by hand in
+// web/index.html, so the spelling is this repository's, but matched loosely
+// because a build tool is entitled to reformat the document it emits.
+var rootElement = regexp.MustCompile(`(?is)<div[^>]*\bid=["']root["'][^>]*>`)
+
 func newShell(index []byte) shell {
 	// Case-insensitive because the tag is the build tool's to spell, and a
 	// document that cannot be split is served exactly as it is rather than
@@ -86,9 +93,25 @@ func newShell(index []byte) shell {
 		slog.Warn("index.html has no </head>; serving it without per-route metadata")
 		return shell{full: index}
 	}
+
+	// The second split, at the opening tag of the element React mounts into.
+	// Its absence costs the served body and nothing else: the head is the half
+	// that decides what a page is called, and a document with no root element
+	// is one this build tool has stopped producing.
+	rest := index[at:]
+	root := rootElement.FindIndex(rest)
+	if root == nil {
+		slog.Warn(`index.html has no <div id="root">; serving it without a rendered body`)
+		return shell{
+			head: staticTitle.ReplaceAll(index[:at], nil),
+			mid:  rest,
+		}
+	}
+
 	return shell{
 		head: staticTitle.ReplaceAll(index[:at], nil),
-		tail: index[at:],
+		mid:  rest[:root[1]],
+		tail: rest[root[1]:],
 	}
 }
 
@@ -97,20 +120,29 @@ func (s shell) render(r *http.Request, meta *siteMeta) []byte {
 		return s.full
 	}
 
-	var head []byte
+	var head, body []byte
 	if meta != nil {
-		rendered, err := meta.forPath(r.Context(), canonicalPath(r.URL.Path)).render()
+		page := meta.forPath(r.Context(), canonicalPath(r.URL.Path))
+
+		rendered, err := page.render()
 		if err != nil {
 			// The visible page does not depend on any of this. Losing the head
 			// is a search-engine problem; failing the request is everybody's.
 			slog.Error("rendering page metadata", "err", err, "path", r.URL.Path)
 		}
 		head = rendered
+
+		// Inside <div id="root">, so React clears it on its first render and a
+		// visitor never sees two copies of the page. A reader that runs no
+		// JavaScript keeps it, which is the whole point (prerender.go).
+		body = page.renderBody()
 	}
 
-	out := make([]byte, 0, len(s.head)+len(head)+len(s.tail))
+	out := make([]byte, 0, len(s.head)+len(head)+len(s.mid)+len(body)+len(s.tail))
 	out = append(out, s.head...)
 	out = append(out, head...)
+	out = append(out, s.mid...)
+	out = append(out, body...)
 	return append(out, s.tail...)
 }
 
