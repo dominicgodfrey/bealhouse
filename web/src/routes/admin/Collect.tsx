@@ -81,7 +81,7 @@ function Form({ payment, code }: { payment: CardPayment; code: string }) {
       <Card>
         <p className="text-lg font-medium">{formatCents(payment.amountCents)}</p>
         <p className="text-sm text-neutral-600">
-          The amount is the booking's, not something typed here — the same figure the guest would
+          The amount is the booking's, not something typed here, and the same figure the guest would
           see paying it themselves.
         </p>
       </Card>
@@ -152,7 +152,7 @@ function CardForm({ code }: { code: string }) {
       </Button>
 
       <p className="text-sm text-neutral-600">
-        If it is refused, nothing has been taken and the booking is unaffected — the room is still
+        If it is refused, nothing has been taken and the booking is unaffected; the room is still
         theirs and you can try another card or send them a link instead.
       </p>
     </form>

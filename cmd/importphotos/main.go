@@ -188,12 +188,12 @@ func fetchAndStore(client *http.Client, store *media.Store, name string) string 
 
 		resp, err := client.Do(req)
 		if err != nil {
-			log.Printf("fetching %s: %v — retrying", name, err)
+			log.Printf("fetching %s: %v, retrying", name, err)
 			continue
 		}
 		if resp.StatusCode != http.StatusOK {
 			resp.Body.Close()
-			log.Printf("fetching %s: %s — retrying", name, resp.Status)
+			log.Printf("fetching %s: %s, retrying", name, resp.Status)
 			continue
 		}
 

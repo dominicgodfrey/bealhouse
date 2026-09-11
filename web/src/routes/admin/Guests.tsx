@@ -106,7 +106,7 @@ export function GuestFile() {
                   </div>
                   <p className="text-sm text-neutral-600">
                     {formatShort(stay.checkin)} → {formatShort(stay.checkout)} ·{' '}
-                    {stay.rooms || '—'}
+                    {stay.rooms || '-'}
                   </p>
                   <MoneyLine stay={stay} />
                 </Card>

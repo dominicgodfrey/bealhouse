@@ -48,7 +48,7 @@ export function PageCopyEditor() {
       {pages.error && <ErrorNote error={pages.error} />}
 
       <Aside>
-        Pick a page to edit it. Emptying the words empties the page again — the section simply does
+        Pick a page to edit it. Emptying the words empties the page again; the section simply does
         not render, rather than showing an empty box to a visitor. The same goes for the
         photographs.
       </Aside>
@@ -103,7 +103,7 @@ function Nearby() {
       <div className="flex flex-col gap-1">
         <span className="font-medium">Nearby highlights</span>
         <span className="text-sm text-neutral-500">
-          The list on the local area page. The link and the description are both optional — with no
+          The list on the local area page. The link and the description are both optional; with no
           link the name shows as plain text rather than as a link going nowhere, and with no
           description the entry is a name and a distance, as it was before.
         </span>
@@ -153,7 +153,7 @@ function Nearby() {
           <Textarea
             rows={2}
             value={place.description}
-            placeholder="What this place is — a sentence or two. Optional."
+            placeholder="What this place is, in a sentence or two. Optional."
             onChange={(e) => set(i, { ...place, description: e.target.value })}
           />
         </div>

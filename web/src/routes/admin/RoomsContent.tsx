@@ -100,7 +100,7 @@ function RoomEditor({ room, onSaved }: { room: RoomContent; onSaved: () => void 
       </Field>
 
       <div className="grid gap-3 sm:grid-cols-2">
-        <Field label="View" hint="Optional — “over the garden”, “towards the mountains”.">
+        <Field label="View" hint="Optional: “over the garden”, “towards the mountains”.">
           <Input value={draft.view ?? ''} onChange={(e) => set('view', e.target.value)} />
         </Field>
         <Field label="Sleeps" hint="A capacity filter only, never a price input.">
@@ -240,7 +240,7 @@ function Accessibility({
       {draft.isAccessible && (
         <Field
           label="What makes it accessible"
-          hint="One per line — step-free entry, ground floor, roll-in shower, grab bars, wide doorway. At least one is required."
+          hint="One per line: step-free entry, ground floor, roll-in shower, grab bars, wide doorway. At least one is required."
         >
           <Textarea
             rows={3}

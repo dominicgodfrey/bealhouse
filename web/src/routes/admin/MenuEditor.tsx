@@ -152,7 +152,7 @@ function Section({
             <Input
               inputMode="decimal"
               value={centsToInput(item.priceCents)}
-              placeholder="—"
+              placeholder="-"
               onChange={(e) => setItem(i, { ...item, priceCents: inputToCents(e.target.value) })}
               className="w-28"
             />
@@ -208,7 +208,7 @@ function Section({
       ))}
 
       <p className="text-xs text-neutral-500">
-        Leaving one of the three unticked means the dish has not been assessed for it — the menu
+        Leaving one of the three unticked means the dish has not been assessed for it; the menu
         prints no mark and makes no claim. Only tick what the kitchen can stand behind.
       </p>
 

@@ -1,4 +1,4 @@
-{{define "owner_notification_subject"}}New booking{{if .Data}} — {{.Data.GuestName}}, {{.Data.Checkin}} ({{.Data.Code}}){{end}}{{end}}
+{{define "owner_notification_subject"}}New booking{{if .Data}}: {{.Data.GuestName}}, {{.Data.Checkin}} ({{.Data.Code}}){{end}}{{end}}
 
 {{define "owner_notification_body"}}{{if .Data}}
   {{/*

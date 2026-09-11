@@ -28,9 +28,9 @@ DELETE FROM menu_sections;
 
 WITH s AS (
   INSERT INTO menu_sections (name, description, sort_order) VALUES
-    ('Starters', 'Mock course — placeholder content, not the kitchen''s menu.', 0),
-    ('Mains',    'Mock course — placeholder content, not the kitchen''s menu.', 1),
-    ('Desserts', 'Mock course — placeholder content, not the kitchen''s menu.', 2)
+    ('Starters', 'Mock course: placeholder content, not the kitchen''s menu.', 0),
+    ('Mains',    'Mock course: placeholder content, not the kitchen''s menu.', 1),
+    ('Desserts', 'Mock course: placeholder content, not the kitchen''s menu.', 2)
   RETURNING id, name
 )
 INSERT INTO menu_items (
@@ -46,7 +46,7 @@ FROM s JOIN (VALUES
 
   ('Mains',    'Food item #3', 'Ingredient six, ingredient seven, ingredient eight, a grain', 2600, true,  false, false, false, 0),
   -- No price of its own: the page must print nothing here, not "$0.00".
-  ('Mains',    'Food item #4', 'Whatever the market had that morning — ask us',                  0, true,  true,  false, true,  1),
+  ('Mains',    'Food item #4', 'Whatever the market had that morning, ask us',                  0, true,  true,  false, true,  1),
 
   ('Desserts', 'Food item #5', 'Ingredient nine, ingredient ten, cream',                      1100, true,  false, false, true,  0)
 ) AS i(section, name, description, price_cents, is_available, gf, vegan, veg, sort_order)

@@ -49,7 +49,7 @@ export function EmailCopy() {
 
       <Aside>
         A save applies to the very next message, not the next deploy. Copy that will not render is
-        refused here rather than at send time — which would be after a guest’s card had been
+        refused here rather than at send time, which would be after a guest’s card had been
         charged.
       </Aside>
 
@@ -149,7 +149,7 @@ function Message({ copy, onChanged }: { copy: Copy; onChanged: () => void }) {
           ))}
         </p>
         <p className="mt-2 text-neutral-600">
-          Money and dates arrive already written out — “$1,240.00”, “Monday, June 14, 2027” — so
+          Money and dates arrive already written out (“$1,240.00”, “Monday, June 14, 2027”), so
           they read the same here as they do on the booking page. A field that is empty on this
           particular booking, like the balance on a stay paid in full, is how the copy can tell the
           two cases apart: <code>{'{{if .Data.BalanceDue}}'}</code>.
@@ -185,7 +185,7 @@ function Message({ copy, onChanged }: { copy: Copy; onChanged: () => void }) {
           />
 
           <p className="text-xs text-neutral-500">
-            Rendered against a sample booking — Sample Guest, code SAMPLE — not a real one. The
+            Rendered against a sample booking (Sample Guest, code SAMPLE), not a real one. The
             figures are invented.
           </p>
         </div>

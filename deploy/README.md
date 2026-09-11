@@ -293,7 +293,7 @@ deliberately leaves every description as the literal string
 plausible. `content.sql` is what clears them: the owner's own sentences,
 transcribed from the inn's current site, and with them the amenities and the
 prose on six pages. **Run rooms and stop, and seven room pages say
-"PLACEHOLDER — final copy to be supplied by the owner." to the public internet.**
+"PLACEHOLDER: final copy to be supplied by the owner." to the public internet.**
 
 ```bash
 cd /path/to/checkout

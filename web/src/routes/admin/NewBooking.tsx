@@ -95,7 +95,7 @@ export function NewBooking() {
               onChange={(e) => set('checkin', e.target.value)}
             />
           </Field>
-          <Field label="Check-out" hint="Not a night — the morning they leave.">
+          <Field label="Check-out" hint="Not a night, the morning they leave.">
             <Input
               type="date"
               value={form.checkout}
@@ -127,7 +127,7 @@ export function NewBooking() {
         </Field>
         {/* The server refuses a booking without one, website or console alike,
             so the hint is here rather than a surprise at "Book it". */}
-        <Field label="Phone" hint="Required — every booking needs a number the inn can ring.">
+        <Field label="Phone" hint="Required: every booking needs a number the inn can ring.">
           <Input type="tel" value={form.phone} onChange={(e) => set('phone', e.target.value)} />
         </Field>
 
@@ -139,7 +139,7 @@ export function NewBooking() {
 
         <p className="text-sm text-neutral-600">
           If the room is not actually free, or the stay is shorter than the minimum for those
-          nights, this is refused — the same check the website runs.
+          nights, this is refused, by the same check the website runs.
         </p>
       </Card>
     </Screen>
@@ -170,7 +170,7 @@ function Payment({
     {
       value: 'link',
       label: 'Email them a link to pay',
-      hint: 'They pay it themselves, whenever. The room is theirs regardless — nothing expires.',
+      hint: 'They pay it themselves, whenever. The room is theirs regardless; nothing expires.',
     },
     {
       value: 'card',

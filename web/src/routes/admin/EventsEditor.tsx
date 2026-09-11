@@ -62,7 +62,7 @@ export function EventsEditor() {
 
       <Aside>
         Only published events appear on the site, and only ones that have not already happened.
-        Booking an event is not something this system does — the page collects an inquiry and you
+        Booking an event is not something this system does; the page collects an inquiry and you
         answer it.
       </Aside>
 
@@ -141,7 +141,7 @@ function EventCard({
           checked={event.published}
           onChange={(e) => onChange({ ...event, published: e.target.checked })}
         />
-        Published — visible on the site
+        Published, visible on the site
       </label>
 
       <Button onClick={onRemove}>Remove this event</Button>

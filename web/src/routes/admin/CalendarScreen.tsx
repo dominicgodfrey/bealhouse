@@ -108,7 +108,7 @@ function Legend() {
     <div className="flex flex-wrap gap-4 text-xs text-neutral-600">
       {[
         ['booking', 'Booked'],
-        ['hold', 'Held — somebody is paying'],
+        ['hold', 'Held, somebody is paying'],
         ['block', 'Blocked by you'],
       ].map(([kind, label]) => (
         <span key={kind} className="flex items-center gap-1.5">
@@ -274,7 +274,7 @@ function Blocks({ rooms, onChanged }: { rooms: CalendarRoom[]; onChanged: () => 
 
         <Aside>
           If a guest is halfway through paying for those nights, this is refused rather than
-          overriding them — the same exclusion constraint decides for you as for them.
+          overriding them; the same exclusion constraint decides for you as for them.
         </Aside>
       </Card>
 

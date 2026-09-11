@@ -1,4 +1,4 @@
-{{define "payment_request_subject"}}Your stay at The Beal House{{if .Data}} — payment for {{.Data.Code}}{{end}}{{end}}
+{{define "payment_request_subject"}}Your stay at The Beal House{{if .Data}}: payment for {{.Data.Code}}{{end}}{{end}}
 
 {{define "payment_request_body"}}{{if .Data}}
   {{/*
@@ -15,7 +15,7 @@
   <p style="margin:0 0 16px 0;">Dear {{.Data.GuestName}},</p>
 
   <p style="margin:0 0 16px 0;">
-    Thank you for booking with us over the telephone. Your room is held in your name — this
+    Thank you for booking with us over the telephone. Your room is held in your name. This
     is simply the bill.
   </p>
 
@@ -61,7 +61,7 @@
   {{end}}{{end}}
 
   <p style="margin:0;">
-    If you would rather pay on arrival or over the telephone, that is no trouble at all —
+    If you would rather pay on arrival or over the telephone, that is no trouble at all;
     simply reply and let us know.
   </p>
 {{end}}{{end}}

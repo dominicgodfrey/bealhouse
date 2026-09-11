@@ -56,7 +56,7 @@ export function Today() {
               {board.data.flagged === 1
                 ? '1 booking has a refused card'
                 : `${board.data.flagged} bookings have refused cards`}{' '}
-              — open them →
+              · open them →
             </Link>
           )}
 

@@ -68,7 +68,7 @@ func New(cfg config.Config) (payments.Gateway, string, error) {
 	if cfg.StripeSecretKey != "" || cfg.StripeWebhookSecret != "" {
 		return nil, "", fmt.Errorf(
 			"gateway: STRIPE_FAKE is set alongside real Stripe settings; " +
-				"remove one — a half-configured processor must not be replaced by a fake")
+				"remove one; a half-configured processor must not be replaced by a fake")
 	}
 	if !cfg.IsDev() {
 		return nil, "", fmt.Errorf("gateway: STRIPE_FAKE is set with ENV=%q; the fake is for development only", cfg.Env)

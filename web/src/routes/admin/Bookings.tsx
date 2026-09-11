@@ -123,7 +123,7 @@ export function Bookings() {
         !searching && stays.data?.map((stay) => <StayRow key={stay.code} stay={stay} />)
       )}
 
-      {nothingAnywhere && <Empty>Nothing matches that — no bookings and nobody.</Empty>}
+      {nothingAnywhere && <Empty>Nothing matches that: no bookings and nobody.</Empty>}
       {!searching && stays.data?.length === 0 && <Empty>No bookings match that.</Empty>}
     </Screen>
   )
@@ -239,7 +239,7 @@ function StayRow({ stay }: { stay: Stay }) {
       </div>
 
       <div className="text-sm text-neutral-600">
-        {formatShort(stay.checkin)} → {formatShort(stay.checkout)} · {stay.rooms || '—'} ·{' '}
+        {formatShort(stay.checkin)} → {formatShort(stay.checkout)} · {stay.rooms || '-'} ·{' '}
         {stay.guests} {stay.guests === 1 ? 'guest' : 'guests'}
       </div>
 

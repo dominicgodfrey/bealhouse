@@ -148,7 +148,7 @@ func (o *Ops) SaveRoom(ctx context.Context, in RoomContent) error {
 		return badf("a room sleeps at least one person")
 	}
 	if in.IsAccessible && len(in.AccessibilityFeatures) == 0 {
-		return badf("a room marked accessible has to say what makes it accessible — step-free entry, a roll-in shower, grab bars. The promise is one a guest plans a trip around")
+		return badf("a room marked accessible has to say what makes it accessible: step-free entry, a roll-in shower, grab bars. The promise is one a guest plans a trip around")
 	}
 	for _, p := range in.Photos {
 		if strings.TrimSpace(p.Alt) == "" {

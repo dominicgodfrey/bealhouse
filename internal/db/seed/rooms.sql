@@ -31,31 +31,31 @@ BEGIN;
 INSERT INTO rooms (slug, name, description, view, max_occupancy, sort_order)
 VALUES
   ('mrs-beals-suite', 'Mrs. Beal''s Suite',
-   'PLACEHOLDER — final copy to be supplied by the owner.',
+   'PLACEHOLDER: final copy to be supplied by the owner.',
    'Street and mountain view in front, hill view in back', 3, 1),
 
   ('garden-suite', 'Garden Suite',
-   'PLACEHOLDER — final copy to be supplied by the owner.',
+   'PLACEHOLDER: final copy to be supplied by the owner.',
    'Front room has mountain and street view; back room has hill view', 4, 2),
 
   ('flume', 'Flume Suite',
-   'PLACEHOLDER — final copy to be supplied by the owner.',
+   'PLACEHOLDER: final copy to be supplied by the owner.',
    'Street and mountain view', 2, 3),
 
   ('rose-chamber', 'Rose Chamber',
-   'PLACEHOLDER — final copy to be supplied by the owner.',
+   'PLACEHOLDER: final copy to be supplied by the owner.',
    'Backyard, obstructed view', 2, 4),
 
   ('washington-room', 'Washington Room',
-   'PLACEHOLDER — final copy to be supplied by the owner.',
+   'PLACEHOLDER: final copy to be supplied by the owner.',
    'Street and mountain view', 2, 5),
 
   ('blue-room', 'Blue Room',
-   'PLACEHOLDER — final copy to be supplied by the owner.',
+   'PLACEHOLDER: final copy to be supplied by the owner.',
    'Hill view at the back', 2, 6),
 
   ('back-lavender', 'Back Lavender',
-   'PLACEHOLDER — final copy to be supplied by the owner.',
+   'PLACEHOLDER: final copy to be supplied by the owner.',
    'Hill view over the backyard', 3, 7)
 
 ON CONFLICT (slug) DO UPDATE SET

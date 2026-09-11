@@ -1,4 +1,4 @@
-{{define "balance_failed_subject"}}We could not take the balance{{if .Data}} — {{.Data.Code}}{{end}}{{end}}
+{{define "balance_failed_subject"}}We could not take the balance{{if .Data}}: {{.Data.Code}}{{end}}{{end}}
 
 {{define "balance_failed_body"}}{{if .Data}}
   {{/*
@@ -11,8 +11,8 @@
 
   <p style="margin:0 0 16px 0;">
     We tried to take the remaining <strong>{{.Data.Outstanding}}</strong> for your stay and
-    the payment was declined. It happens often enough — usually an expiry date or a bank
-    being cautious — and it is easily sorted.
+    the payment was declined. It happens often enough, usually an expiry date or a bank
+    being cautious, and it is easily sorted.
   </p>
 
   <p style="margin:0 0 16px 0;">

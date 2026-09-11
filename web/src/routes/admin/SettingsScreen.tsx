@@ -59,7 +59,7 @@ export function SettingsScreen() {
                 </Field>
                 <Field
                   label="Longest stay"
-                  hint="Beyond this, guests are told to contact you — the deposit split and cleaning a month-plus booking needs are not what this engine does."
+                  hint="Beyond this, guests are told to contact you; the deposit split and cleaning a month-plus booking needs are not what this engine does."
                 >
                   <Input
                     type="number"
@@ -149,7 +149,7 @@ export function SettingsScreen() {
             <Card>
               <Aside>
                 Shown with every search. Every room here requires stairs, and a guest with mobility
-                needs must not find that out on arrival — this sentence is the only place the site
+                needs must not find that out on arrival; this sentence is the only place the site
                 says so.
               </Aside>
               <Textarea

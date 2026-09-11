@@ -43,7 +43,7 @@ PUSH_VAPID_PRIVATE_KEY=%s
 The public key goes out to browsers and can do nothing on its own. The private
 key signs deliveries and must not be logged, committed, or shared.
 
-Generating another pair turns every phone's notifications off — they subscribe
+Generating another pair turns every phone's notifications off; they subscribe
 against the public key, and the push service will not accept anything signed by
 a different one.
 `, public, private)

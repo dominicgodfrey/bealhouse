@@ -1,4 +1,4 @@
-{{define "balance_warning_subject"}}A note before we take the balance{{if .Data}} — {{.Data.Code}}{{end}}{{end}}
+{{define "balance_warning_subject"}}A note before we take the balance{{if .Data}}: {{.Data.Code}}{{end}}{{end}}
 
 {{define "balance_warning_body"}}{{if .Data}}
   {{/*

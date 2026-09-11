@@ -1,4 +1,4 @@
-{{define "checkout_reminder_subject"}}Leaving us today{{if .Data}} — checkout is {{.Data.CheckoutTime}}{{end}}{{end}}
+{{define "checkout_reminder_subject"}}Leaving us today{{if .Data}}: checkout is {{.Data.CheckoutTime}}{{end}}{{end}}
 
 {{define "checkout_reminder_body"}}{{if .Data}}
   {{/*
@@ -21,7 +21,7 @@
 
   <p style="margin:0 0 16px 0;">
     Checkout is at <strong>{{.Data.CheckoutTime}}</strong> today. There is no need to do
-    anything on your way out — leave the key in the room and we will see to the rest. If you
+    anything on your way out. Leave the key in the room and we will see to the rest. If you
     would like to leave a bag with us for the day, just ask.
   </p>
 

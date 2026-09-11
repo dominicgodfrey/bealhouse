@@ -1,4 +1,4 @@
-{{define "cancellation_refund_subject"}}Your booking has been cancelled{{if .Data}} — {{.Data.Code}}{{end}}{{end}}
+{{define "cancellation_refund_subject"}}Your booking has been cancelled{{if .Data}}: {{.Data.Code}}{{end}}{{end}}
 
 {{define "cancellation_refund_body"}}{{if .Data}}
   {{/*

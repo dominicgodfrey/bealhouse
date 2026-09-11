@@ -76,7 +76,7 @@ function Rules({ terms }: { terms: PolicyTerms }) {
         <Rule label="Length of stay">
           The shortest stay is {nights(terms.minStayNights)}. Some dates carry a longer minimum,
           and the date picker greys out anything it cannot sell you. The longest stay you can book
-          here is {nights(terms.maxStayNights)} — for anything longer, please contact the inn and
+          here is {nights(terms.maxStayNights)}. For anything longer, please contact the inn and
           we will do our best to accommodate your needs.
         </Rule>
         <Rule label="Arriving and leaving">
@@ -113,7 +113,7 @@ function Rules({ terms }: { terms: PolicyTerms }) {
           returned.
         </Rule>
         <Rule label="Processing cost">
-          Our card processor keeps its fee — {terms.refundProcessingPercent}% — on a payment even
+          Our card processor keeps its fee of {terms.refundProcessingPercent}% on a payment even
           when it is refunded, so that much is retained on any refund. It is not a charge we
           receive.
         </Rule>
@@ -141,7 +141,7 @@ function Rules({ terms }: { terms: PolicyTerms }) {
           Your name, email address and telephone number, with the dates, room, price and tax rate
           of each booking; what you send through the contact and events forms; and any short note
           we make about your stay so a returning guest is remembered. Card details go straight to
-          Stripe, our card processor, and never reach us — we keep only Stripe's reference and
+          Stripe, our card processor, and never reach us; we keep only Stripe's reference and
           the amount. Where a balance is due later, Stripe holds the card, not us.
         </Rule>
         <Rule label="Who sees it">
@@ -157,7 +157,7 @@ function Rules({ terms }: { terms: PolicyTerms }) {
         </Rule>
         <Rule label="The link in your confirmation">
           It shows your booking and can cancel it, and anyone holding it can do both until it
-          expires — so do not forward the email.
+          expires, so do not forward the email.
         </Rule>
         <Rule label="Seeing, correcting or deleting your details">
           Email{' '}
@@ -169,7 +169,7 @@ function Rules({ terms }: { terms: PolicyTerms }) {
             {inn.phone}
           </a>
           . Once we have checked the request is yours, we will tell you what we hold, correct it,
-          or delete it — your name, contact details, messages and notes — keeping only the
+          or delete it (your name, contact details, messages and notes), keeping only the
           amounts and dates of payments the law requires us to keep, with your details removed.
         </Rule>
       </Section>

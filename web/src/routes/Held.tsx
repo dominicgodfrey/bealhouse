@@ -66,12 +66,12 @@ export function Held() {
             // that something went wrong would be both alarming and untrue.
             <p className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
               Your payment went through and we are still finishing your booking. Nothing more
-              is needed from you — your confirmation email will arrive shortly. Keep the
+              is needed from you. Your confirmation email will arrive shortly. Keep the
               reference above if you would like to check with us.
             </p>
           ) : (
             <p className="rounded-lg border border-sienna-line bg-sienna px-4 py-3 text-sm">
-              Payment received — confirming your booking…
+              Payment received. Confirming your booking…
             </p>
           ))}
 
@@ -230,7 +230,7 @@ function Countdown({ expiresAt }: { expiresAt?: string }) {
       <span className="font-mono font-medium">
         {minutes}:{String(seconds).padStart(2, '0')}
       </span>{' '}
-      <span className="text-neutral-600">— nobody else can book it in the meantime.</span>
+      <span className="text-neutral-600">and nobody else can book it in the meantime.</span>
     </p>
   )
 }

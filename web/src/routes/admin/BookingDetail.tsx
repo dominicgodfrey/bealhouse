@@ -235,7 +235,7 @@ function Collecting({ detail, onSignedOut }: { detail: Detail; onSignedOut: () =
         {error && <ErrorNote error={error} />}
         {sent && (
           <p className="text-sm text-emerald-900">
-            Sent. They can pay it whenever — the room is theirs either way, and nothing expires.
+            Sent. They can pay it whenever; the room is theirs either way, and nothing expires.
           </p>
         )}
 
@@ -365,7 +365,7 @@ function Cancel({
 
         {confirming && (
           <p className="text-sm text-neutral-600">
-            This puts the room back on sale, queues the refund and emails the guest — all together,
+            This puts the room back on sale, queues the refund and emails the guest, all together,
             so none of them can happen without the others.
           </p>
         )}
@@ -417,7 +417,7 @@ function Refund({
   return (
     <Section
       title="Refund without cancelling"
-      note="For a no-show, a shortened stay, or a gesture — anything the cancellation policy does not describe."
+      note="For a no-show, a shortened stay, or a gesture: anything the cancellation policy does not describe."
     >
       <Card>
         {error && <ErrorNote error={error} />}

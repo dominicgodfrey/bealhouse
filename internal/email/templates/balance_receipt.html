@@ -1,4 +1,4 @@
-{{define "balance_receipt_subject"}}Balance received{{if .Data}} — {{.Data.Code}}{{end}}{{end}}
+{{define "balance_receipt_subject"}}Balance received{{if .Data}}: {{.Data.Code}}{{end}}{{end}}
 
 {{define "balance_receipt_body"}}{{if .Data}}
   {{/*
@@ -10,7 +10,7 @@
   <p style="margin:0 0 16px 0;">Dear {{.Data.GuestName}},</p>
 
   <p style="margin:0 0 16px 0;">
-    Thank you — we have received <strong>{{.Data.Amount}}</strong> and your stay is now paid
+    Thank you. We have received <strong>{{.Data.Amount}}</strong> and your stay is now paid
     in full.
   </p>
 

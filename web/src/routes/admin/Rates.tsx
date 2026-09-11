@@ -66,14 +66,14 @@ function Board({ board, onChanged }: { board: RateBoard; onChanged: () => void }
           {board.horizon
             ? `The calendar is only priced to ${formatShort(board.horizon)}.`
             : 'No nights are priced at all, so no room can be sold.'}{' '}
-          Nights past the end of it cannot be booked, silently — the room just stops appearing in
+          Nights past the end of it cannot be booked, silently; the room just stops appearing in
           searches. Rebuild below, and check the monthly job is running.
         </p>
       )}
 
       <Aside>
         A season’s dates are <strong>inclusive</strong>: the last night is a night somebody sleeps
-        here, not a checkout. Where seasons overlap, the higher priority wins — that is how a
+        here, not a checkout. Where seasons overlap, the higher priority wins, which is how a
         holiday weekend sits inside a longer season.
       </Aside>
 
@@ -118,7 +118,7 @@ function Board({ board, onChanged }: { board: RateBoard; onChanged: () => void }
                               <Money cents={cents} />
                             </span>
                           ) : (
-                            <span className="text-neutral-400">—</span>
+                            <span className="text-neutral-400">-</span>
                           )}
                         </span>
                       )
@@ -221,7 +221,7 @@ function Editor({
             onChange={(e) => set('startsOn', e.target.value)}
           />
         </Field>
-        <Field label="Last night" hint="Inclusive — a night somebody sleeps here.">
+        <Field label="Last night" hint="Inclusive: a night somebody sleeps here.">
           <Input type="date" value={draft.endsOn} onChange={(e) => set('endsOn', e.target.value)} />
         </Field>
       </div>
@@ -259,7 +259,7 @@ function Editor({
                 inputMode="decimal"
                 value={centsToInput(draft.prices[String(room.id)] ?? 0)}
                 onChange={(e) => price(room.id, e.target.value)}
-                placeholder="—"
+                placeholder="-"
               />
             </Field>
           ))}
@@ -336,7 +336,7 @@ function Diff({ change }: { change: RateChange }) {
               change.confirmedBookings === 1 ? 'stay falls' : 'stays fall'
             } in this range and ${
               change.confirmedBookings === 1 ? 'is' : 'are'
-            } not affected — every booking keeps the nightly prices and tax rate it was sold at.`}
+            } not affected; every booking keeps the nightly prices and tax rate it was sold at.`}
       </p>
     </div>
   )

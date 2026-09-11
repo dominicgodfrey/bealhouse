@@ -453,7 +453,7 @@ function NotificationsPanel() {
         <div className="flex flex-col gap-1">
           <span className="font-medium">A booking or a message reaches this phone</span>
           <span className="text-sm text-neutral-600">
-            Arrives whether or not the console is open. It says who and when, and nothing else —
+            Arrives whether or not the console is open. It says who and when, and nothing else;
             tapping it opens the booking.
           </span>
         </div>
