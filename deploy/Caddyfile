@@ -64,5 +64,21 @@ www.{$BEAL_DOMAIN} {
 			roll_size 20MiB
 			roll_keep 10
 		}
+
+		# Two query parameters are capabilities and must not sit in a log file
+		# for the life of ten rolls. `t` is the signed manage-booking link,
+		# good until thirty days after checkout and enough to cancel the stay.
+		# `payment_intent_client_secret` is what Stripe appends to the return
+		# URL after a card is confirmed. The request is still logged, with the
+		# path and everything else; only those two values are replaced.
+		format filter {
+			wrap json
+			fields {
+				request>uri query {
+					replace t REDACTED
+					replace payment_intent_client_secret REDACTED
+				}
+			}
+		}
 	}
 }

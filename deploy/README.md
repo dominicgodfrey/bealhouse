@@ -256,6 +256,12 @@ on the box, because `www.new.thebealhouse.com` has no record and Caddy would
 otherwise ask Let's Encrypt for it forever. Reinstalling `deploy/Caddyfile` at
 cutover restores it.
 
+**The access log redacts two query parameters**, through the `format filter`
+block: `t`, which is the signed manage-booking link and enough to cancel a
+stay for thirty days after checkout, and `payment_intent_client_secret`, which
+Stripe appends to the return URL. Everything else about the request is logged
+as before. When the Caddyfile on the box is edited by hand, keep that block.
+
 ### The units
 
 ```bash
