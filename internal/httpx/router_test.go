@@ -216,3 +216,22 @@ func TestSteadyStreamDoesNotRefillForFree(t *testing.T) {
 		}
 	}
 }
+
+// The features nothing here uses are switched off in the browser, and the
+// window is cut off from whatever opened it.
+func TestUnusedBrowserFeaturesAreSwitchedOff(t *testing.T) {
+	rec := get(t, router(t, false), http.MethodGet, "/", nil)
+
+	policy := rec.Header().Get("Permissions-Policy")
+	for _, want := range []string{"camera=()", "microphone=()", "geolocation=()", "payment=("} {
+		if !strings.Contains(policy, want) {
+			t.Errorf("Permissions-Policy is missing %q\ngot: %s", want, policy)
+		}
+	}
+	if got := rec.Header().Get("Cross-Origin-Opener-Policy"); got != "same-origin-allow-popups" {
+		t.Errorf("Cross-Origin-Opener-Policy = %q, want same-origin-allow-popups", got)
+	}
+	if got := rec.Header().Get("Cross-Origin-Resource-Policy"); got != "" {
+		t.Errorf("Cross-Origin-Resource-Policy = %q; it would block the email letterhead", got)
+	}
+}

@@ -64,6 +64,21 @@ const contentSecurityPolicy = "default-src 'self'; " +
 	"frame-src https://js.stripe.com https://hooks.stripe.com https://www.openstreetmap.org; " +
 	"connect-src 'self' https://api.stripe.com"
 
+// permissionsPolicy switches off the browser features nothing here uses.
+//
+// The page has no reason to ask for a camera, a microphone or a location, and
+// saying so means a script that somehow ran here could not either. Payment is
+// left to this origin and Stripe's: the Payment Element's wallet buttons —
+// Apple Pay, Google Pay — use the Payment Request API from inside the Stripe
+// iframe, and a policy that denied it would fail those silently.
+//
+// Cross-Origin-Resource-Policy is deliberately not set. Its only useful value
+// here would be same-origin, and the letterhead in every email is an <img>
+// pointing at this origin from whatever client renders the message — which is
+// exactly the cross-origin no-cors load that header refuses.
+const permissionsPolicy = "camera=(), microphone=(), geolocation=(), " +
+	`payment=(self "https://js.stripe.com")`
+
 // secureHeaders sets the headers that cost nothing and prevent whole classes of
 // problem.
 //
@@ -79,6 +94,14 @@ func secureHeaders(behindProxy bool) func(http.Handler) http.Handler {
 			h.Set("X-Frame-Options", "DENY")
 			h.Set("Referrer-Policy", "strict-origin-when-cross-origin")
 			h.Set("Content-Security-Policy", contentSecurityPolicy)
+			h.Set("Permissions-Policy", permissionsPolicy)
+
+			// Cuts the window off from anything that opened it, so a page that
+			// reached this site through window.open cannot script it back.
+			// allow-popups rather than plain same-origin, because a 3-D Secure
+			// challenge or a wallet sheet may open one and must be able to
+			// return.
+			h.Set("Cross-Origin-Opener-Policy", "same-origin-allow-popups")
 
 			if isHTTPS(r, behindProxy) {
 				h.Set("Strict-Transport-Security", "max-age=31536000; includeSubDomains")
