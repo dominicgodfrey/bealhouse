@@ -356,8 +356,13 @@ shell access to this server is the only way in when no phone is enrolled. Every
 enrollment after the first can be minted from an already-signed-in console.
 
 ```bash
-sudo -u bealhouse env $(cat /etc/bealhouse/env | xargs) /usr/local/bin/bealhouse enroll "Owner's iPhone"
+sudo systemd-run --pipe --wait --collect --quiet --property=User=bealhouse --property=EnvironmentFile=/etc/bealhouse/env /usr/local/bin/bealhouse enroll "Owner's iPhone"
 ```
+
+Through `systemd-run` with the environment file, the same way `deploy.sh` runs
+a migration, and not `env $(cat /etc/bealhouse/env)`: that form expands every
+secret onto the command line, where `ps` shows it to any process on the box for
+as long as the command runs and the shell's history keeps it afterwards.
 
 The token is printed and never logged, and it travels in the URL **fragment** —
 not sent to the server, not in an access log, not in a Referer.
