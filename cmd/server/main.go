@@ -265,8 +265,13 @@ func run(cfg config.Config) error {
 			PushPublicKey:        cfg.PushVAPIDPublicKey,
 		}),
 		ReadHeaderTimeout: 10 * time.Second,
-		WriteTimeout:      30 * time.Second,
-		IdleTimeout:       60 * time.Second,
+		// ReadTimeout bounds the body as well as the headers, so a client that
+		// trickles a request one byte at a time cannot hold a goroutine open
+		// indefinitely. Longer than WriteTimeout, which is what actually ends
+		// a slow upload; this is the backstop for a body that never finishes.
+		ReadTimeout:  60 * time.Second,
+		WriteTimeout: 30 * time.Second,
+		IdleTimeout:  60 * time.Second,
 	}
 
 	errc := make(chan error, 1)
