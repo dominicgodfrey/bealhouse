@@ -651,6 +651,11 @@ only the last two steps need one.
   **last** hop and only when `BEHIND_PROXY=true`; without it the header is
   ignored entirely. Wrongly on, anyone invents an address and walks around the
   limit — so it is off by default.
+  **The key folds IPv6 onto its /64** (`limiterKey`). Every IPv6 allocation is
+  at least a /64, so keyed on the full address a caller has 2^64 fresh buckets
+  to walk through and the booking limit is worth nothing on a network with an
+  AAAA record. `clientIP` still returns the real address for logs; only the
+  bucket key is folded.
 - **Per-process, not per-cluster.** One binary on one VPS (decision #2) makes
   that fine. A second box makes the limit per-box, which is a reason to move it
   to Caddy or Postgres, not a reason to have skipped it.

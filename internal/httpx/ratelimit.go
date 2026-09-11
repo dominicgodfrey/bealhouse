@@ -142,7 +142,7 @@ func rateLimit(l *limiter, behindProxy bool) func(http.Handler) http.Handler {
 
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			if !l.allow(clientIP(r, behindProxy), time.Now()) {
+			if !l.allow(limiterKey(clientIP(r, behindProxy)), time.Now()) {
 				w.Header().Set("Retry-After", strconv.Itoa(retryAfter))
 				writeJSON(w, http.StatusTooManyRequests, map[string]string{
 					"error": "too many requests; please slow down and try again shortly",

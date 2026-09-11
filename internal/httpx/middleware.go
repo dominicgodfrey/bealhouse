@@ -36,6 +36,31 @@ func clientIP(r *http.Request, behindProxy bool) string {
 	return host
 }
 
+// limiterKey is the address as the rate limiter counts it.
+//
+// An IPv4 address is itself. An IPv6 address is folded onto its /64, because
+// that is the smallest allocation anybody is handed — a home connection, a VPS
+// — and every address inside it is one caller. Keyed on the full address, a
+// caller with a /64 has 2^64 fresh buckets to walk through, and the booking
+// limit that keeps a loop from holding the whole inn is worth nothing on a
+// network with an AAAA record. Folding costs a household sharing a /64 one
+// bucket between them, which is what an IPv4 household already gets behind
+// its NAT.
+//
+// Anything that does not parse is used as it is: a bucket under a strange key
+// is still a bucket, where dropping the request would be an outage caused by a
+// malformed header.
+func limiterKey(addr string) string {
+	ip := net.ParseIP(addr)
+	if ip == nil {
+		return addr
+	}
+	if v4 := ip.To4(); v4 != nil {
+		return v4.String()
+	}
+	return ip.Mask(net.CIDRMask(64, 128)).String()
+}
+
 // contentSecurityPolicy is written for what the app actually loads.
 //
 // The Vite build emits one external module script and one stylesheet with no

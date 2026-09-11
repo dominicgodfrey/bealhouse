@@ -3,6 +3,7 @@ package httpx
 import (
 	"net/http"
 	"net/http/httptest"
+	"strconv"
 	"strings"
 	"testing"
 	"testing/fstest"
@@ -213,6 +214,52 @@ func TestSteadyStreamDoesNotRefillForFree(t *testing.T) {
 	for i := range 20 {
 		if l.allow("guest", now.Add(time.Duration(i)*50*time.Millisecond)) {
 			t.Fatalf("request at +%dms was allowed; the bucket refilled early", i*50)
+		}
+	}
+}
+
+// An IPv6 caller has a /64 at the least, which is 2^64 addresses. Keyed on the
+// whole address, every one of them is a fresh bucket and the booking limit
+// that keeps a loop from holding the inn is worth nothing on a network with an
+// AAAA record. Neighbours in a /64 share one bucket.
+func TestIPv6NeighboursShareARateLimitBucket(t *testing.T) {
+	h := router(t, true)
+
+	// The same /64, a different address on every request, forwarded the way
+	// Caddy forwards the real client as the last hop.
+	hop := func(i int) map[string]string {
+		return map[string]string{"X-Forwarded-For": "2001:db8:1:2::" + strconv.Itoa(i+1)}
+	}
+
+	var limited bool
+	for i := range bookingBurst + 3 {
+		if get(t, h, http.MethodPost, "/api/bookings", hop(i)).Code == http.StatusTooManyRequests {
+			limited = true
+			break
+		}
+	}
+	if !limited {
+		t.Error("a caller walked through a /64 one address at a time and was never limited")
+	}
+
+	// And a different /64 is a different caller: it is not limited by the
+	// first one having been.
+	if got := get(t, h, http.MethodPost, "/api/bookings",
+		map[string]string{"X-Forwarded-For": "2001:db8:9:9::1"}).Code; got == http.StatusTooManyRequests {
+		t.Error("a caller on a different /64 was limited by its neighbour's traffic")
+	}
+}
+
+func TestLimiterKeyFoldsIPv6OntoItsPrefix(t *testing.T) {
+	for _, tc := range []struct{ in, want string }{
+		{"203.0.113.7", "203.0.113.7"},
+		{"::ffff:203.0.113.7", "203.0.113.7"},
+		{"2001:db8:1:2:3:4:5:6", "2001:db8:1:2::"},
+		{"2001:db8:1:2::1", "2001:db8:1:2::"},
+		{"not an address", "not an address"},
+	} {
+		if got := limiterKey(tc.in); got != tc.want {
+			t.Errorf("limiterKey(%q) = %q, want %q", tc.in, got, tc.want)
 		}
 	}
 }
