@@ -17,6 +17,7 @@ import (
 	"context"
 	"embed"
 	"fmt"
+	"html"
 	"html/template"
 	"strings"
 )
@@ -184,12 +185,17 @@ func (r *Renderer) assemble(set *template.Template, name string, payload any) (M
 	// carries the letterhead and the table scaffolding that survives Outlook,
 	// and one mistake in it would break every message the inn sends rather than
 	// the one being edited.
-	html, err := render(r.templates, "layout", data{Brand: r.brand, Data: template.HTML(body)})
+	rendered, err := render(r.templates, "layout", data{Brand: r.brand, Data: template.HTML(body)})
 	if err != nil {
 		return Message{}, err
 	}
 
-	return Message{Subject: strings.TrimSpace(subject), HTML: html}, nil
+	// The subject is a header, not markup, and it went through html/template
+	// alongside the body — which turns O'Brien into O&#39;Brien on the way. The
+	// escaping is undone here, where the string is known to be text: the only
+	// context a subject has is a plain one, so unescaping is exactly the
+	// inverse of what the template did to it.
+	return Message{Subject: html.UnescapeString(strings.TrimSpace(subject)), HTML: rendered}, nil
 }
 
 func render(set *template.Template, block string, in data) (string, error) {

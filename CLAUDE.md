@@ -666,6 +666,11 @@ only the last two steps need one.
   message is discarded and the sender still told thank you, because a refusal
   is a signal to route around. No CAPTCHA, on purpose — it would cost every
   visitor a puzzle and the site a third-party script.
+- **Error strings must not carry a guest's address.** Anything at Error level
+  is forwarded to Sentry once a DSN is set, and Sentry is not a party the
+  privacy section names. The job row already holds the envelope beside the
+  error; `TestResendReturnsAnErrorCarryingTheProvidersReason` asserts the
+  recipient is *not* in it.
 - **The SPA fallback answers GET and HEAD only.** A POST to an unrouted path is
   somebody expecting an endpoint, and answering it with index.html and a 200 is
   worse than answering nothing — see the webhook note below.

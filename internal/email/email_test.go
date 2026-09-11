@@ -96,3 +96,25 @@ func TestInnNameDefaults(t *testing.T) {
 		t.Errorf("inn name %q, want the supplied one", custom.brand.InnName)
 	}
 }
+
+// A subject is a header, not markup. It renders through html/template beside
+// the body, which turns an apostrophe into &#39; on the way — and O&#39;Brien
+// in a subject line is a guest who thinks the inn cannot spell their name.
+func TestSubjectsAreNotHTMLEscaped(t *testing.T) {
+	r := renderer(t, Brand{SiteURL: "https://example.test"})
+
+	msg, err := r.Render(context.Background(), OwnerNotification, OwnerNotificationData{
+		Code:      "BH-ABCDEF",
+		GuestName: "Siobhán O'Brien & family",
+		Checkin:   "Friday, June 5, 2026",
+	})
+	if err != nil {
+		t.Fatalf("rendering: %v", err)
+	}
+	if !strings.Contains(msg.Subject, "O'Brien & family") {
+		t.Errorf("subject = %q, want the guest's name as they wrote it", msg.Subject)
+	}
+	if strings.Contains(msg.Subject, "&#39;") || strings.Contains(msg.Subject, "&amp;") {
+		t.Errorf("subject = %q carries HTML entities", msg.Subject)
+	}
+}

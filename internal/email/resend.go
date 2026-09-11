@@ -83,19 +83,19 @@ func (r *Resend) Send(ctx context.Context, to string, msg Message) error {
 		HTML:    msg.HTML,
 	})
 	if err != nil {
-		return fmt.Errorf("email: encoding the request for %s: %w", to, err)
+		return fmt.Errorf("email: encoding the request: %w", err)
 	}
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, r.endpoint, bytes.NewReader(body))
 	if err != nil {
-		return fmt.Errorf("email: building the request for %s: %w", to, err)
+		return fmt.Errorf("email: building the request: %w", err)
 	}
 	req.Header.Set("Authorization", "Bearer "+r.apiKey)
 	req.Header.Set("Content-Type", "application/json")
 
 	resp, err := r.client.Do(req)
 	if err != nil {
-		return fmt.Errorf("email: sending to %s: %w", to, err)
+		return fmt.Errorf("email: sending: %w", err)
 	}
 	defer resp.Body.Close()
 
@@ -108,8 +108,15 @@ func (r *Resend) Send(ctx context.Context, to string, msg Message) error {
 		// The body carries Resend's own reason — an unverified domain, a
 		// malformed from, a rate limit. It is worth more than the status alone
 		// and contains nothing secret; the key travels in a header, not here.
-		return fmt.Errorf("email: sending to %s: resend returned %s: %s",
-			to, resp.Status, bytes.TrimSpace(payload))
+		//
+		// **The recipient is deliberately not in this string.** An error from
+		// here becomes the job's last_error and an Error-level log line, and
+		// Error-level lines are forwarded to Sentry once a DSN is configured —
+		// a third party the privacy policy does not name. The job row already
+		// carries the envelope, so an operator who needs the address has it
+		// beside the error rather than inside it.
+		return fmt.Errorf("email: resend returned %s: %s",
+			resp.Status, bytes.TrimSpace(payload))
 	}
 
 	var out struct {

@@ -88,8 +88,12 @@ func (r *Renderer) Handler(sender Sender) func(context.Context, []byte) error {
 		if err != nil {
 			return err
 		}
+		// The template and not the recipient. The error is what reaches the
+		// log at Error level, and from there Sentry; the address stays in the
+		// job's own payload, where whoever is reading the failure can see it
+		// without it having left the box.
 		if err := sender.Send(ctx, env.To, msg); err != nil {
-			return fmt.Errorf("email: sending %q to %s: %w", env.Template, env.To, err)
+			return fmt.Errorf("email: sending %q: %w", env.Template, err)
 		}
 		return nil
 	}

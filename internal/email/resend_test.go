@@ -92,8 +92,12 @@ func TestResendReturnsAnErrorCarryingTheProvidersReason(t *testing.T) {
 	if !strings.Contains(err.Error(), "not verified") {
 		t.Errorf("error = %v, want it to carry the provider's message", err)
 	}
-	if !strings.Contains(err.Error(), "guest@example.com") {
-		t.Errorf("error = %v, want it to name the recipient", err)
+	// And the recipient must not be in it. This error becomes an Error-level
+	// log line, and those are forwarded to Sentry — a third party the privacy
+	// policy does not name. The job row carries the address beside the error;
+	// the error itself has no business carrying it.
+	if strings.Contains(err.Error(), "guest@example.com") {
+		t.Errorf("error = %v, which names the recipient", err)
 	}
 }
 
