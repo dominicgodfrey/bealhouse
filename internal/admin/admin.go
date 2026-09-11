@@ -90,6 +90,19 @@ const (
 	// handset years later still worked.
 	SessionLifetime = 365 * 24 * time.Hour
 
+	// SessionCeiling is how long a session can live in total, however much it
+	// is used. The rolling expiry above is what lets a phone in weekly use
+	// stay signed in; this is what stops a cookie copied off one from working
+	// forever by being used often enough. Measured from when the session was
+	// opened, and enforced in the same statement that rolls the expiry
+	// forward, so the two cannot disagree.
+	//
+	// A year, which with a year's rolling window means a phone signs in once
+	// a year whatever it did in between — one Face ID prompt, and a session
+	// that always has an end. The two constants are separate so the idle
+	// window can be shortened without the ceiling moving.
+	SessionCeiling = 365 * 24 * time.Hour
+
 	// touchInterval is how stale last_seen_at is allowed to get before the
 	// session row is written to. Without it the console writes a row per
 	// request; with it, the rolling expiry is still accurate to the hour, which

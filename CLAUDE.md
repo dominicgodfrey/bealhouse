@@ -912,8 +912,10 @@ Four properties, each because the alternative has a specific hole:
 
 - **Sessions are rows, stored as SHA-256 of the cookie value.** Rolling 365 days
   from last use, so a phone in weekly use never signs in again and a lost one
-  dies on its own. A stateless token could not be revoked; that is the whole
-  reason this is a table.
+  dies on its own, **and capped at `SessionCeiling` from sign-in however much
+  it is used**, so a cookie copied off a phone cannot be kept alive forever.
+  Both are applied in `TouchSession`'s one `LEAST(...)`. A stateless token
+  could not be revoked; that is the whole reason this is a table.
 - **An invitation is single use** — `UPDATE ... RETURNING`, so concurrent racers
   produce exactly one winner. Claimed at the *start* of the ceremony and released
   if it fails, so a mis-tapped Face ID does not burn it.

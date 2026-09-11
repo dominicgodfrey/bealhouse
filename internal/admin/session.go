@@ -76,6 +76,7 @@ func (c *Console) Authenticate(ctx context.Context, token string) (Identity, err
 		if err := c.q.TouchSession(ctx, db.TouchSessionParams{
 			TokenHash:       hash,
 			LifetimeSeconds: SessionLifetime.Seconds(),
+			CeilingSeconds:  SessionCeiling.Seconds(),
 		}); err != nil {
 			slog.Error("could not extend an admin session", "err", err)
 		}

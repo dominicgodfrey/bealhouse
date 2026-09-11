@@ -110,10 +110,18 @@ WHERE s.token_hash = sqlc.arg(token_hash)
 -- a phone in daily use never has to sign in again, and one that stopped being
 -- used stops working on its own. Called at most once an hour by the caller, so
 -- an idle console is not writing a row per request.
+--
+-- Rolled forward, but never past the ceiling: a session ends at most
+-- ceiling_seconds after it was opened however often it is used, so a cookie
+-- copied off a phone cannot be kept alive indefinitely by being used. LEAST in
+-- the same statement, so the rolling expiry and the ceiling cannot disagree.
 -- name: TouchSession :exec
 UPDATE user_sessions
 SET last_seen_at = now(),
-    expires_at   = now() + make_interval(secs => sqlc.arg(lifetime_seconds)::double precision)
+    expires_at   = LEAST(
+      now() + make_interval(secs => sqlc.arg(lifetime_seconds)::double precision),
+      created_at + make_interval(secs => sqlc.arg(ceiling_seconds)::double precision)
+    )
 WHERE token_hash = sqlc.arg(token_hash)
   AND revoked_at IS NULL
   AND expires_at > now();

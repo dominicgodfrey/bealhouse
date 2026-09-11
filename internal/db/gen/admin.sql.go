@@ -662,14 +662,18 @@ func (q *Queries) TouchPushSubscription(ctx context.Context, endpoint string) er
 const touchSession = `-- name: TouchSession :exec
 UPDATE user_sessions
 SET last_seen_at = now(),
-    expires_at   = now() + make_interval(secs => $1::double precision)
-WHERE token_hash = $2
+    expires_at   = LEAST(
+      now() + make_interval(secs => $1::double precision),
+      created_at + make_interval(secs => $2::double precision)
+    )
+WHERE token_hash = $3
   AND revoked_at IS NULL
   AND expires_at > now()
 `
 
 type TouchSessionParams struct {
 	LifetimeSeconds float64
+	CeilingSeconds  float64
 	TokenHash       []byte
 }
 
@@ -679,8 +683,13 @@ type TouchSessionParams struct {
 // a phone in daily use never has to sign in again, and one that stopped being
 // used stops working on its own. Called at most once an hour by the caller, so
 // an idle console is not writing a row per request.
+//
+// Rolled forward, but never past the ceiling: a session ends at most
+// ceiling_seconds after it was opened however often it is used, so a cookie
+// copied off a phone cannot be kept alive indefinitely by being used. LEAST in
+// the same statement, so the rolling expiry and the ceiling cannot disagree.
 func (q *Queries) TouchSession(ctx context.Context, arg TouchSessionParams) error {
-	_, err := q.db.Exec(ctx, touchSession, arg.LifetimeSeconds, arg.TokenHash)
+	_, err := q.db.Exec(ctx, touchSession, arg.LifetimeSeconds, arg.CeilingSeconds, arg.TokenHash)
 	return err
 }
 

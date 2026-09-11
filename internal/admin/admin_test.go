@@ -538,3 +538,46 @@ func TestTheInvitationTravelsInTheFragment(t *testing.T) {
 		t.Errorf("url %q puts the token in a query string, where every proxy logs it", url)
 	}
 }
+
+// A session used often enough must still end. The rolling expiry is what keeps
+// a phone in weekly use signed in; the ceiling is what stops a cookie copied
+// off one being kept alive forever by being used. A session opened eleven
+// months ago and used today is rolled forward to the ceiling and no further.
+func TestASessionCannotOutliveItsCeiling(t *testing.T) {
+	ctx, console, q, pool := setup(t)
+	u := makeUser(t, ctx, q, pool)
+	pk := makePasskey(t, ctx, q, u.ID, "Phone")
+
+	s := signIn(t, ctx, q, u.ID, pk)
+	hash := hashToken(s.Token)
+
+	// Opened 340 days ago, last seen two hours ago, still inside its expiry.
+	if _, err := pool.Exec(ctx, `
+		UPDATE user_sessions
+		SET created_at   = now() - interval '340 days',
+		    last_seen_at = now() - interval '2 hours',
+		    expires_at   = now() + interval '1 hour'
+		WHERE token_hash = $1`, hash); err != nil {
+		t.Fatalf("ageing the session: %v", err)
+	}
+
+	if _, err := console.Authenticate(ctx, s.Token); err != nil {
+		t.Fatalf("authenticating: %v", err)
+	}
+
+	var expires time.Time
+	if err := pool.QueryRow(ctx,
+		"SELECT expires_at FROM user_sessions WHERE token_hash = $1", hash).Scan(&expires); err != nil {
+		t.Fatalf("reading the expiry: %v", err)
+	}
+
+	// The ceiling is a year from creation: 25 days from now, give or take the
+	// clock. A full year would mean the ceiling is not being applied.
+	remaining := time.Until(expires)
+	if remaining > 26*24*time.Hour {
+		t.Errorf("expiry is %v away; the ceiling should have held it to about 25 days", remaining)
+	}
+	if remaining < 24*24*time.Hour {
+		t.Errorf("expiry is %v away; the ceiling cut it shorter than a year from creation", remaining)
+	}
+}
