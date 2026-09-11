@@ -149,6 +149,13 @@ export type NewInquiry = {
    * was before the contact form existed.
    */
   kind?: 'event' | 'contact'
+  /**
+   * The honeypot. The form renders it where nobody can see it, so a person
+   * leaves it empty and a script filling every box it finds does not. The
+   * server discards a message with anything in it and still says thank you,
+   * because a refusal is a signal to route around and a thank-you is not.
+   */
+  website?: string
 }
 
 export function submitInquiry(inquiry: NewInquiry): Promise<void> {

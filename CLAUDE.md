@@ -659,6 +659,13 @@ only the last two steps need one.
 - **Per-process, not per-cluster.** One binary on one VPS (decision #2) makes
   that fine. A second box makes the limit per-box, which is a reason to move it
   to Caddy or Postgres, not a reason to have skipped it.
+- **`POST /api/inquiries` has its own small bucket and an 8 KB body**, not the
+  console's 512 KB `decodeBody`. Every row lands in the owner's list and pushes
+  a notification to their phone. The two forms carry a **honeypot** field
+  (`website`, `web/src/components/Honeypot.tsx`): a value in it means the
+  message is discarded and the sender still told thank you, because a refusal
+  is a signal to route around. No CAPTCHA, on purpose — it would cost every
+  visitor a puzzle and the site a third-party script.
 - **The SPA fallback answers GET and HEAD only.** A POST to an unrouted path is
   somebody expecting an endpoint, and answering it with index.html and a 200 is
   worse than answering nothing — see the webhook note below.

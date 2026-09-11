@@ -50,6 +50,14 @@ const (
 	// twelve, refilling one every fifteen seconds.
 	adminRate  = 15 * time.Second
 	adminBurst = 12
+
+	// inquiryRate covers the two public forms. A person sends one message, or
+	// two if the first had a typo; a script sends one a second. Its own bucket
+	// rather than the readers' because every row lands in a list the owner
+	// reads and pushes a notification to their phone, and forty of those in a
+	// burst is a handset buzzing for the rest of the evening.
+	inquiryRate  = time.Minute
+	inquiryBurst = 5
 )
 
 // idleBucketTTL is how long an unused bucket is kept before the sweeper drops

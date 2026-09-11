@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"strconv"
+	"strings"
 	"testing"
 	"time"
 
@@ -878,4 +879,47 @@ func priceEveryRoom(t *testing.T, tx pgx.Tx, cents int64) map[string]int64 {
 		out[strconv.FormatInt(r.ID, 10)] = cents
 	}
 	return out
+}
+
+// The honeypot on the public forms. A field no person sees, filled in, is a
+// script — and the message is discarded without a word, because a refusal
+// tells the script what to leave blank next time and a thank-you does not.
+func TestAFilledHoneypotDiscardsTheInquiryQuietly(t *testing.T) {
+	o, tx := ops(t)
+	ctx := context.Background()
+
+	err := o.SubmitInquiry(ctx, console.NewInquiry{
+		Name:    "A. Script",
+		Email:   "script@example.test",
+		Message: "cheap watches",
+		Website: "https://example.test/watches",
+	})
+	if err != nil {
+		t.Fatalf("a filled honeypot answered %v; it should look like success", err)
+	}
+
+	var rows int
+	if err := tx.QueryRow(ctx,
+		"SELECT count(*) FROM event_inquiries WHERE email = 'script@example.test'").Scan(&rows); err != nil {
+		t.Fatalf("counting inquiries: %v", err)
+	}
+	if rows != 0 {
+		t.Errorf("%d inquiry rows written for a message that filled the honeypot, want none", rows)
+	}
+}
+
+// And a message longer than anyone writes to an inn is refused rather than
+// stored: the fields go on into a list the owner reads on a phone.
+func TestAnOverlongInquiryIsRefused(t *testing.T) {
+	o, _ := ops(t)
+
+	err := o.SubmitInquiry(context.Background(), console.NewInquiry{
+		Name:    "A. Guest",
+		Email:   "guest@example.test",
+		Message: strings.Repeat("x", 4001),
+	})
+	var bad console.BadRequest
+	if !errors.As(err, &bad) {
+		t.Fatalf("err = %v, want a BadRequest", err)
+	}
 }

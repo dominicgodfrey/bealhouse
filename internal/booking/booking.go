@@ -16,6 +16,7 @@ import (
 	"fmt"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
@@ -48,6 +49,13 @@ var (
 	// here rather than only in the form, on the same terms as the email — a
 	// `required` attribute is a suggestion to anything that is not a browser.
 	ErrGuestPhoneRequired = errors.New("booking: a phone number is required")
+
+	// ErrGuestDetailsTooLong is a name, address or number past anything a
+	// person has. The request body is already bounded, so this is not about
+	// the server reading it; it is that these three strings go on into every
+	// email, the PDF and the owner's phone, and a name several kilobytes long
+	// is nobody's name.
+	ErrGuestDetailsTooLong = errors.New("booking: a guest detail is longer than anything real")
 
 	// ErrPoliciesNotAccepted is a booking that did not agree to the terms.
 	// Server-side on purpose: the tick-box disables a button, and a disabled
@@ -512,6 +520,11 @@ func (r Request) validate() error {
 	if digits(r.Guest.Phone) < 7 {
 		return ErrGuestPhoneRequired
 	}
+	if utf8.RuneCountInString(r.Guest.Name) > guestNameLimit ||
+		utf8.RuneCountInString(email) > guestEmailLimit ||
+		utf8.RuneCountInString(r.Guest.Phone) > guestPhoneLimit {
+		return ErrGuestDetailsTooLong
+	}
 	// The tick-box in the browser disables a button; this refuses the booking.
 	// One of those is enforcement and the other is a courtesy, and the guest is
 	// agreeing to the terms under which their money is kept.
@@ -520,6 +533,15 @@ func (r Request) validate() error {
 	}
 	return nil
 }
+
+// What a guest's details may run to. Generous for a person: the longest email
+// address the standard allows, a name with room for several, a number with an
+// extension and every way of punctuating it.
+const (
+	guestNameLimit  = 200
+	guestEmailLimit = 254
+	guestPhoneLimit = 40
+)
 
 // digits counts the digits in a string and ignores everything else.
 func digits(s string) int {

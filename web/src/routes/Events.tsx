@@ -6,6 +6,7 @@ import { formatLong } from '../lib/dates'
 import { useAsync } from '../lib/useAsync'
 import { ErrorNote, Layout, Loading, Prose } from '../components/Layout'
 import { Gallery, fromPagePhotos } from '../components/Gallery'
+import { Honeypot } from '../components/Honeypot'
 import { Photo } from '../components/Photo'
 
 /**
@@ -122,6 +123,7 @@ function InquiryForm() {
     eventDate: '',
     partySize: 0,
     message: '',
+    website: '',
   })
   const [working, setWorking] = useState(false)
   const [error, setError] = useState<Error | null>(null)
@@ -174,10 +176,12 @@ function InquiryForm() {
       {error && <ErrorNote error={error} />}
 
       <form onSubmit={submit} className="flex flex-col gap-4">
+        <Honeypot value={form.website} onChange={(v) => set('website', v)} />
         <div className="grid gap-4 sm:grid-cols-2">
           <Field label="Your name">
             <input
               required
+              maxLength={200}
               value={form.name}
               onChange={(e) => set('name', e.target.value)}
               className={inputClass}
@@ -187,6 +191,7 @@ function InquiryForm() {
             <input
               required
               type="email"
+              maxLength={254}
               value={form.email}
               onChange={(e) => set('email', e.target.value)}
               className={inputClass}
@@ -194,6 +199,7 @@ function InquiryForm() {
           </Field>
           <Field label="Phone" hint="Optional.">
             <input
+              maxLength={40}
               value={form.phone}
               onChange={(e) => set('phone', e.target.value)}
               className={inputClass}
@@ -221,6 +227,7 @@ function InquiryForm() {
         <Field label="What are you thinking of?">
           <textarea
             rows={5}
+            maxLength={4000}
             value={form.message}
             onChange={(e) => set('message', e.target.value)}
             className={inputClass}

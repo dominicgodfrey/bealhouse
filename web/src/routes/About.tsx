@@ -6,6 +6,7 @@ import { fetchPageCopy, paragraphs, submitInquiry } from '../lib/site'
 import { useAsync } from '../lib/useAsync'
 import { ErrorNote, Layout, Prose } from '../components/Layout'
 import { Gallery, fromPagePhotos } from '../components/Gallery'
+import { Honeypot } from '../components/Honeypot'
 
 /**
  * Who runs the inn, where it is, and how to reach them.
@@ -115,7 +116,7 @@ function FindUs() {
  * promise is that somebody reads it, and the thank-you says exactly that.
  */
 function ContactForm() {
-  const [form, setForm] = useState({ name: '', email: '', phone: '', message: '' })
+  const [form, setForm] = useState({ name: '', email: '', phone: '', message: '', website: '' })
   const [working, setWorking] = useState(false)
   const [error, setError] = useState<Error | null>(null)
   const [sent, setSent] = useState(false)
@@ -164,9 +165,11 @@ function ContactForm() {
 
       {/* Left-aligned: it is a form, like the search on the home page. */}
       <form onSubmit={submit} className="flex flex-col gap-4 text-left">
+        <Honeypot value={form.website} onChange={(v) => set('website', v)} />
         <ContactField label="Your name" required>
           <input
             required
+            maxLength={200}
             value={form.name}
             onChange={(e) => set('name', e.target.value)}
             autoComplete="name"
@@ -177,6 +180,7 @@ function ContactForm() {
           <input
             required
             type="email"
+            maxLength={254}
             value={form.email}
             onChange={(e) => set('email', e.target.value)}
             autoComplete="email"
@@ -186,6 +190,7 @@ function ContactForm() {
         <ContactField label="Phone">
           <input
             type="tel"
+            maxLength={40}
             value={form.phone}
             onChange={(e) => set('phone', e.target.value)}
             autoComplete="tel"
@@ -196,6 +201,7 @@ function ContactForm() {
           <textarea
             required
             rows={5}
+            maxLength={4000}
             value={form.message}
             onChange={(e) => set('message', e.target.value)}
             className={contactInput}

@@ -264,6 +264,33 @@ func TestLimiterKeyFoldsIPv6OntoItsPrefix(t *testing.T) {
 	}
 }
 
+// The public forms have their own allowance, tighter than the readers'. Every
+// message lands in the owner's list and on the owner's phone, and forty in a
+// burst is a handset buzzing for the evening.
+func TestInquiriesHaveTheirOwnAllowance(t *testing.T) {
+	h := router(t, false)
+
+	var limited bool
+	for range inquiryBurst + 2 {
+		if get(t, h, http.MethodPost, "/api/inquiries", nil).Code == http.StatusTooManyRequests {
+			limited = true
+			break
+		}
+	}
+	if !limited {
+		t.Fatalf("%d inquiries from one address and none was limited", inquiryBurst+2)
+	}
+	if inquiryBurst >= apiBurst {
+		t.Errorf("inquiry burst %d is not tighter than the readers' %d", inquiryBurst, apiBurst)
+	}
+
+	// A read from the same address still works: the inquiry limit is its own
+	// bucket, not the readers' drained.
+	if read := get(t, h, http.MethodGet, "/api/health", nil); read.Code != http.StatusOK {
+		t.Errorf("reads answered %d after the inquiry limit bit, want 200", read.Code)
+	}
+}
+
 // The features nothing here uses are switched off in the browser, and the
 // window is cut off from whatever opened it.
 func TestUnusedBrowserFeaturesAreSwitchedOff(t *testing.T) {

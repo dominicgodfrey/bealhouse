@@ -116,6 +116,7 @@ func NewRouter(d Deps) http.Handler {
 	reads := newLimiter(apiRate, apiBurst)
 	bookings := newLimiter(bookingRate, bookingBurst)
 	paying := newLimiter(paymentRate, paymentBurst)
+	inquiries := newLimiter(inquiryRate, inquiryBurst)
 
 	r.Route("/api", func(api chi.Router) {
 		api.Use(rateLimit(reads, d.BehindProxy))
@@ -179,13 +180,14 @@ func NewRouter(d Deps) http.Handler {
 
 			// The marketing site's owner-managed content. Reads, and the one
 			// anonymous write that is not a booking — an events inquiry, which
-			// takes no inventory off sale and spends nothing, so it shares the
-			// readers' allowance rather than needing the booking endpoint's.
+			// takes no inventory off sale and spends nothing, but does put a
+			// row in front of the owner and a notification on their phone, so
+			// it carries its own small allowance on top of the readers'.
 			api.Get("/menu", menu(d.Ops))
 			api.Get("/events", events(d.Ops))
 			api.Get("/copy/{slug}", pageCopy(d.Ops))
 			api.Get("/attractions", attractions(d.Ops))
-			api.Post("/inquiries", submitInquiry(d.Ops))
+			api.With(rateLimit(inquiries, d.BehindProxy)).Post("/inquiries", submitInquiry(d.Ops))
 
 			// The booking and refund rules, read from settings and from
 			// pricing rather than written into the copy — so the page a
@@ -206,7 +208,7 @@ func NewRouter(d Deps) http.Handler {
 			api.Get("/copy/{slug}", databaseRequired)
 			api.Get("/attractions", databaseRequired)
 			api.Get("/policies", databaseRequired)
-			api.Post("/inquiries", databaseRequired)
+			api.With(rateLimit(inquiries, d.BehindProxy)).Post("/inquiries", databaseRequired)
 		}
 
 		// The owner's console. Everything under it that reads or writes real

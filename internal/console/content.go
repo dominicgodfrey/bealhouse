@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"bealhouse/internal/civil"
 	db "bealhouse/internal/db/gen"
@@ -692,7 +693,28 @@ type NewInquiry struct {
 	// inquiry, which is what every row was before the contact form existed —
 	// so an old client that sends nothing still lands where it always did.
 	Kind string `json:"kind"`
+
+	// Website is the honeypot. The form renders it where no person can see it
+	// and no person fills it in; a script filling every box it finds does. A
+	// value here means the message is discarded, and discarded quietly — the
+	// sender is told thank you, because a refusal is a signal to route around
+	// and a thank-you is not.
+	//
+	// The one cheap measure that costs a real visitor nothing. A CAPTCHA would
+	// cost every visitor a puzzle and the site a third-party script, which is
+	// the trade this form is not making.
+	Website string `json:"website"`
 }
+
+// What a form field is allowed to hold. Generous for a person and nothing
+// like room for a script filling the table: a name is a name, and four
+// thousand characters is a longer message than anyone writes to an inn.
+const (
+	inquiryNameLimit    = 200
+	inquiryEmailLimit   = 254
+	inquiryPhoneLimit   = 40
+	inquiryMessageLimit = 4000
+)
 
 // SubmitInquiry records a message from the public site.
 //
@@ -701,6 +723,11 @@ type NewInquiry struct {
 // owner answers, and the only thing the system owes it is not to lose it. The
 // contact form is the same promise with a shorter form in front of it.
 func (o *Ops) SubmitInquiry(ctx context.Context, in NewInquiry) error {
+	if strings.TrimSpace(in.Website) != "" {
+		// The honeypot was filled in. Nothing is written and nothing is said.
+		return nil
+	}
+
 	name := strings.TrimSpace(in.Name)
 	address := strings.TrimSpace(in.Email)
 	if name == "" {
@@ -711,6 +738,14 @@ func (o *Ops) SubmitInquiry(ctx context.Context, in NewInquiry) error {
 	// and the obvious typo.
 	if !strings.Contains(address, "@") || strings.HasPrefix(address, "@") || strings.HasSuffix(address, "@") {
 		return badf("please leave an email address we can reply to")
+	}
+	if utf8.RuneCountInString(name) > inquiryNameLimit ||
+		utf8.RuneCountInString(address) > inquiryEmailLimit ||
+		utf8.RuneCountInString(in.Phone) > inquiryPhoneLimit {
+		return badf("that name, email or phone number is longer than we can take")
+	}
+	if utf8.RuneCountInString(in.Message) > inquiryMessageLimit {
+		return badf("that message is longer than we can take; please keep it under four thousand characters")
 	}
 
 	when, err := optionalDay(in.EventDate)
